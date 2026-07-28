@@ -1,6 +1,6 @@
 {
   "name": "tuono",
-  "version": "0.19.7",
+  "version": "0.20.0",
   "description": "Superfast React fullstack framework",
   "homepage": "https://tuono.dev",
   "scripts": {
@@ -84,7 +84,10 @@
     "vite-config": "workspace:*",
     "vitest": "4.1.10"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "**/ssr/server.*",
+    "**/ssr/polyfills/globalScope.*"
+  ],
   "keywords": [
     "react",
     "typescript",

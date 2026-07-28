@@ -18,7 +18,9 @@ use tracing::error;
 use tuono_internal::config::Config;
 
 pub const IGNORE_EXTENSIONS: [&str; 3] = ["css", "scss", "sass"];
-pub const IGNORE_FILES: [&str; 2] = ["__layout", "middlewares"];
+// Kept in sync with the middleware filename convention so a middleware file is
+// never collected as a route (it only describes middleware for its directory).
+pub const IGNORE_FILES: [&str; 2] = ["__layout", crate::route_directory_info::MIDDLEWARE_FILENAME];
 
 #[cfg(target_os = "windows")]
 pub const ROUTES_FOLDER_PATH: &str = "\\src\\routes";
@@ -276,7 +278,7 @@ mod tests {
             "\\home\\user\\Documents\\tuono\\src\\routes\\about.rs",
             "\\home\\user\\Documents\\tuono\\src\\routes\\index.rs",
             "\\home\\user\\Documents\\tuono\\src\\routes\\posts\\index.rs",
-            "\\home\\user\\Documents\\tuono\\src\\routes\\posts\\middlewares.rs",
+            "\\home\\user\\Documents\\tuono\\src\\routes\\posts\\middleware.rs",
             "\\home\\user\\Documents\\tuono\\src\\routes\\posts\\[post].rs",
             "\\home\\user\\Documents\\tuono\\src\\routes\\posts\\handle-this.rs",
             "\\home\\user\\Documents\\tuono\\src\\routes\\posts\\handle-this\\[post].rs",
@@ -290,7 +292,7 @@ mod tests {
             "/home/user/Documents/tuono/src/routes/index.rs",
             "/home/user/Documents/tuono/src/routes/posts/index.rs",
             "/home/user/Documents/tuono/src/routes/posts/[post].rs",
-            "/home/user/Documents/tuono/src/routes/posts/middlewares.rs",
+            "/home/user/Documents/tuono/src/routes/posts/middleware.rs",
             "/home/user/Documents/tuono/src/routes/posts/handle-this.rs",
             "/home/user/Documents/tuono/src/routes/posts/handle-this/[post].rs",
             "/home/user/Documents/tuono/src/routes/posts/UPPERCASE.rs",

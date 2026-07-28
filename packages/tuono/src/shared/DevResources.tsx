@@ -19,9 +19,17 @@ export const DevResources = ({
       ? `${origin}${VITE_PROXY_PATH}`
       : `http://${host}:${port}${VITE_PROXY_PATH}`
 
+  /**
+   * These scripts must execute in order: the react-refresh preamble has to run
+   * (and set `__vite_plugin_react_preamble_installed__`) before `client-main`
+   * loads any React component, otherwise `@vitejs/plugin-react-swc` throws
+   * "can't detect preamble". `type="module"` already defers execution without
+   * blocking parsing, so `async` only removes the ordering guarantee and must
+   * NOT be used here — it caused an intermittent preamble race.
+   */
   return (
     <>
-      <script type="module" async>
+      <script type="module">
         {[
           `import RefreshRuntime from '${viteBaseUrl}/@react-refresh'`,
           'RefreshRuntime.injectIntoGlobalHook(window)',
@@ -30,12 +38,8 @@ export const DevResources = ({
           'window.__vite_plugin_react_preamble_installed__ = true',
         ].join('\n')}
       </script>
-      <script type="module" async src={`${viteBaseUrl}/@vite/client`}></script>
-      <script
-        type="module"
-        async
-        src={`${viteBaseUrl}/client-main.tsx`}
-      ></script>
+      <script type="module" src={`${viteBaseUrl}/@vite/client`}></script>
+      <script type="module" src={`${viteBaseUrl}/client-main.tsx`}></script>
     </>
   )
 }

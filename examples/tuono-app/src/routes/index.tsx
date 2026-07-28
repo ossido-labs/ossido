@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import type { TuonoRouteProps } from 'tuono'
+import { Link, type TuonoRouteProps } from 'tuono'
 
 interface IndexProps {
   subtitle: string
@@ -22,6 +22,7 @@ export default function IndexPage({
         <a href="https://www.npmjs.com/package/tuono" target="_blank">
           Npm
         </a>
+        <Link href="/test">Test Page</Link>
       </header>
       <div className="title-wrap">
         <h1 className="title">

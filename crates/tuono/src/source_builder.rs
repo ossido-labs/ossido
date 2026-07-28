@@ -55,6 +55,25 @@ fn recoverable_error(message: &str) -> ! {
     std::process::exit(1);
 }
 
+// Header kept on the generated `main.rs`. `prettyplease` (like `syn`) drops
+// non-doc `//` comments, so it is re-applied after formatting.
+const GENERATED_FILE_HEADER: &str =
+    "// File automatically generated\n// Do not manually change it\n";
+
+// Format generated Rust source so the emitted `.tuono/main.rs` is readable
+// instead of a single concatenated line. Falls back to the raw source if it
+// cannot be parsed, so a malformed generation still surfaces a real compiler
+// error rather than being swallowed here.
+fn format_rust_source(source: &str) -> String {
+    match syn::parse_file(source) {
+        Ok(parsed) => format!(
+            "{GENERATED_FILE_HEADER}\n{}",
+            prettyplease::unparse(&parsed)
+        ),
+        Err(_) => source.to_string(),
+    }
+}
+
 // Struct to build the source code
 // on both "dev" and "build" commands
 #[derive(Clone, Debug)]
@@ -156,7 +175,10 @@ impl SourceBuilder {
     pub fn refresh_axum_source(&self) -> io::Result<()> {
         let axum_source = self.generate_axum_source();
 
-        self.create_file(PathBuf::from(MAIN_FILE_PATH), &axum_source)?;
+        self.create_file(
+            PathBuf::from(MAIN_FILE_PATH),
+            &format_rust_source(&axum_source),
+        )?;
 
         Ok(())
     }

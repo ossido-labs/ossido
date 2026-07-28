@@ -4,6 +4,7 @@ use std::fs;
 use tracing::Level;
 
 mod utils;
+use utils::assert_contains_ignoring_whitespace;
 use utils::temp_tuono_project::TempTuonoProject;
 
 const POST_API_FILE: &str = r"#[tuono_lib::api(POST)]";
@@ -38,11 +39,16 @@ fn it_successfully_create_the_index_route() {
     let temp_main_rs_content =
         fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/index.rs"]"#));
-    assert!(temp_main_rs_content.contains("mod index;"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path="../src/routes/index.rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod index;");
 
-    assert!(temp_main_rs_content
-        .contains(r#".route("/", get(index::tuono_internal_route)).route("/__tuono/data/", get(index::tuono_internal_api))"#));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/", get(index::tuono_internal_route)).route("/__tuono/data/", get(index::tuono_internal_api))"#,
+    );
 }
 
 #[test]
@@ -64,12 +70,16 @@ fn it_successfully_create_an_api_route() {
     let temp_main_rs_content =
         fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/api/health_check.rs"]"#));
-    assert!(temp_main_rs_content.contains("mod api_health_check;"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path="../src/routes/api/health_check.rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod api_health_check;");
 
-    assert!(temp_main_rs_content.contains(
-        r#".route("/api/health_check", post(api_health_check::post_tuono_internal_api))"#
-    ));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/api/health_check", post(api_health_check::post_tuono_internal_api))"#,
+    );
 }
 
 #[test]
@@ -94,16 +104,19 @@ fn it_successfully_create_multiple_api_for_the_same_file() {
     let temp_main_rs_content =
         fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/api/health_check.rs"]"#));
-    assert!(temp_main_rs_content.contains("mod api_health_check;"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path="../src/routes/api/health_check.rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod api_health_check;");
 
-    assert!(temp_main_rs_content.contains(
-        r#".route("/api/health_check", post(api_health_check::post_tuono_internal_api))"#
-    ));
-    assert!(
-        temp_main_rs_content.contains(
-            r#".route("/api/health_check", get(api_health_check::get_tuono_internal_api))"#
-        )
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/api/health_check", post(api_health_check::post_tuono_internal_api))"#,
+    );
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/api/health_check", get(api_health_check::get_tuono_internal_api))"#,
     );
 }
 
@@ -163,27 +176,37 @@ fn it_successfully_create_catch_all_routes() {
     let temp_main_rs_content =
         fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/api/[...all_apis].rs"]"#));
-    assert!(temp_main_rs_content.contains("mod api_dyn_catch_all_all_apis;"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path="../src/routes/api/[...all_apis].rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod api_dyn_catch_all_all_apis;");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/[...all_routes].rs"]"#));
-    assert!(temp_main_rs_content.contains("mod dyn_catch_all_all_routes;"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path="../src/routes/[...all_routes].rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod dyn_catch_all_all_routes;");
 
-    assert!(temp_main_rs_content.contains(
-        r#".route("/api/{*all_apis}", post(api_dyn_catch_all_all_apis::post_tuono_internal_api))"#
-    ));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/api/{*all_apis}", post(api_dyn_catch_all_all_apis::post_tuono_internal_api))"#,
+    );
 
-    assert!(temp_main_rs_content.contains(
-        r#".route("/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_route))"#
-    ));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_route))"#,
+    );
 
-    assert!(temp_main_rs_content.contains(
-        r#".route("/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_route))"#
-    ));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_route))"#,
+    );
 
-    assert!(temp_main_rs_content.contains(
-        r#".route("/__tuono/data/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_api))"#
-    ));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/__tuono/data/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_api))"#,
+    );
 }
 
 #[test]
@@ -258,7 +281,7 @@ fn it_successfully_adds_middleware_to_router() {
     let temp_tuono_project = TempTuonoProject::new();
 
     temp_tuono_project.add_file_with_content(
-        "./src/routes/middlewares.rs",
+        "./src/routes/middleware.rs",
         r#"use tower_http::trace::TraceLayer;
 
 #[tuono_lib::middleware]
@@ -279,9 +302,12 @@ pub fn trace_layer() -> TraceLayer<tower_http::classify::SharedClassifier<tower_
     let temp_main_rs_content =
         fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/middlewares.rs"]"#));
-    assert!(temp_main_rs_content.contains("mod middlewares;"));
-    assert!(temp_main_rs_content.contains(".layer(middlewares::trace_layer())"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path = "../src/routes/middleware.rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod middleware;");
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, ".layer(middleware::trace_layer())");
 }
 
 #[test]
@@ -290,7 +316,7 @@ fn it_successfully_adds_multiple_middlewares_to_router() {
     let temp_tuono_project = TempTuonoProject::new();
 
     temp_tuono_project.add_file_with_content(
-        "./src/routes/middlewares.rs",
+        "./src/routes/middleware.rs",
         r#"use tower_http::trace::TraceLayer;
 
 #[tuono_lib::middleware]
@@ -316,10 +342,16 @@ pub fn another_middleware() -> tower_http::cors::CorsLayer {
     let temp_main_rs_content =
         fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/middlewares.rs"]"#));
-    assert!(temp_main_rs_content.contains("mod middlewares;"));
-    assert!(temp_main_rs_content.contains(".layer(middlewares::trace_layer())"));
-    assert!(temp_main_rs_content.contains(".layer(middlewares::another_middleware())"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path = "../src/routes/middleware.rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod middleware;");
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, ".layer(middleware::trace_layer())");
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        ".layer(middleware::another_middleware())",
+    );
 }
 
 #[test]
@@ -328,7 +360,7 @@ fn it_successfully_adds_middleware_in_subdirectory() {
     let temp_tuono_project = TempTuonoProject::new();
 
     temp_tuono_project.add_file_with_content(
-        "./src/routes/api/middlewares.rs",
+        "./src/routes/api/middleware.rs",
         r#"#[tuono_lib::middleware]
 pub fn api_middleware() -> tower_http::cors::CorsLayer {
     tower_http::cors::CorsLayer::new()
@@ -349,7 +381,13 @@ pub fn api_middleware() -> tower_http::cors::CorsLayer {
     let temp_main_rs_content =
         fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
 
-    assert!(temp_main_rs_content.contains(r#"#[path="../src/routes/api/middlewares.rs"]"#));
-    assert!(temp_main_rs_content.contains("mod api_middlewares;"));
-    assert!(temp_main_rs_content.contains(".layer(api_middlewares::api_middleware())"));
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"#[path = "../src/routes/api/middleware.rs"]"#,
+    );
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod api_middleware;");
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        ".layer(api_middleware::api_middleware())",
+    );
 }

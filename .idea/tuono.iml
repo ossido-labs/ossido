@@ -9,6 +9,8 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/tuono_lib/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/tuono_lib/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/crates/tuono_lib_macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/tuono-app/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/tuono-app/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

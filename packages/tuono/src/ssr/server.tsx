@@ -26,6 +26,10 @@
  * This function might be a good entry point for adding such polyfills
  * https://docs.rs/ssr_rs/latest/ssr_rs/struct.Ssr.html#method.add_global_fn
  */
+// Must run before the polyfills below: aliases `global` to `globalThis` so
+// their UMD init IIFEs find a valid scope in the `window`/`global`-less
+// ssr_rs V8 runtime instead of dereferencing `undefined`.
+import './polyfills/globalScope'
 import 'fast-text-encoding'
 import 'url-search-params-polyfill'
 

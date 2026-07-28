@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { resolve } from 'node:path'
 
 import type { InlineConfig, Plugin } from 'vite'
 import { build, createServer, mergeConfig } from 'vite'
@@ -15,6 +16,18 @@ import { createJsonConfig, loadConfig } from './config'
 import { ENV_PREFIX } from './constants'
 
 const require = createRequire(import.meta.url)
+
+/**
+ * Absolute entry paths for the generated `.tuono` scaffold.
+ *
+ * The vite config sets `root: '.tuono'`. Vite's `build()` resolves a relative
+ * `rollupOptions.input` against the CWD, but the dev server's dependency
+ * scanner (rolldown, vite 8+) resolves it against `root` — so a path like
+ * `./.tuono/client-main.tsx` double-nests to `.tuono/.tuono/...` and fails to
+ * resolve. Absolute paths are unambiguous across both code paths.
+ */
+const CLIENT_MAIN_ENTRY = resolve('.tuono/client-main.tsx')
+const SERVER_MAIN_ENTRY = resolve('.tuono/server-main.tsx')
 
 /**
  * `@rollup/plugin-inject` injects these imports into every module that
@@ -113,7 +126,7 @@ const developmentSSRBundle = (): void => {
             outDir: 'server',
             emptyOutDir: true,
             rollupOptions: {
-              input: './.tuono/server-main.tsx',
+              input: SERVER_MAIN_ENTRY,
               output: {
                 entryFileNames: 'dev-server.js',
                 format: 'iife',
@@ -151,7 +164,7 @@ const developmentCSRWatch = (): void => {
             manifest: true,
             emptyOutDir: true,
             rollupOptions: {
-              input: './.tuono/client-main.tsx',
+              input: CLIENT_MAIN_ENTRY,
             },
           },
         },
@@ -174,7 +187,7 @@ const buildProd = (): void => {
             emptyOutDir: true,
             outDir: '../out/client',
             rollupOptions: {
-              input: './.tuono/client-main.tsx',
+              input: CLIENT_MAIN_ENTRY,
             },
           },
         },
@@ -192,7 +205,7 @@ const buildProd = (): void => {
             outDir: '../out/server',
             emptyOutDir: true,
             rollupOptions: {
-              input: './.tuono/server-main.tsx',
+              input: SERVER_MAIN_ENTRY,
               output: {
                 entryFileNames: 'prod-server.js',
                 format: 'iife',

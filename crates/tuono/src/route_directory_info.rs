@@ -11,7 +11,7 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{Attribute, Expr, FnArg, Ident, Item, ItemFn, parse_quote};
 
-pub const MIDDLEWARE_FILENAME: &str = "middlewares";
+pub const MIDDLEWARE_FILENAME: &str = "middleware";
 
 #[derive(Clone, Debug, Default)]
 pub struct RouteDirectoryInfo {
@@ -213,7 +213,7 @@ impl MiddlewareData {
         })
     }
 
-    // Reads a middlewares.rs file and returns a Vector of Strings representing functions that were decorated with the tuono_lib::middleware macro
+    // Reads a middleware.rs file and returns a Vector of Strings representing functions that were decorated with the tuono_lib::middleware macro
     pub fn read_middleware_methods_from_file(path: &str) -> Arc<Mutex<Vec<DebugItemFn>>> {
         let file = fs_extra::file::read_to_string(path).expect("Failed to read API file");
         let syntax = syn::parse_file(&file).expect("Unable to parse file");
@@ -260,7 +260,7 @@ mod tests {
         // Assuming base path is current dir, but this might vary
         // For test, we can check the format
         let import = dir_info.get_middleware_module_import();
-        assert!(import.ends_with("_middlewares"));
+        assert!(import.ends_with("_middleware"));
     }
 
     #[test]
@@ -303,7 +303,7 @@ mod tests {
         std::fs::create_dir(&sub_dir).unwrap();
         let file = temp_dir.path().join("test.rs");
         File::create(&file).unwrap();
-        let middlewares_file = temp_dir.path().join("middlewares.rs");
+        let middlewares_file = temp_dir.path().join("middleware.rs");
         let mut file = File::create(&middlewares_file).unwrap();
         writeln!(file, "#[tuono_lib::middleware]\nfn test_middleware() {{}}").unwrap();
 
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn test_middleware_data_new() {
         let temp_dir = TempDir::new().unwrap();
-        let middlewares_file = temp_dir.path().join("middlewares.rs");
+        let middlewares_file = temp_dir.path().join("middleware.rs");
         let mut file = File::create(&middlewares_file).unwrap();
         writeln!(file, "#[tuono_lib::middleware]\nfn test_middleware() {{}}").unwrap();
 
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn test_read_middleware_methods_from_file() {
         let temp_dir = TempDir::new().unwrap();
-        let middlewares_file = temp_dir.path().join("middlewares.rs");
+        let middlewares_file = temp_dir.path().join("middleware.rs");
         let mut file = File::create(&middlewares_file).unwrap();
         writeln!(
             file,
