@@ -4,11 +4,11 @@
   "description": "Superfast React fullstack framework",
   "homepage": "https://tuono.dev",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build",
-    "lint": "eslint .",
-    "format": "prettier --check --ignore-unknown --ignore-path ../../.prettierignore .",
-    "format:fix": "prettier --write --ignore-unknown --ignore-path ../../.prettierignore .",
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "lint": "oxlint",
+    "format": "oxfmt --check .",
+    "format:fix": "oxfmt .",
     "typecheck": "tsc --noEmit",
     "test:watch": "vitest",
     "test": "vitest run"
@@ -65,28 +65,24 @@
     "react-dom": ">=19.0.0"
   },
   "dependencies": {
-    "@babel/core": "^7.24.4",
-    "@babel/plugin-syntax-jsx": "^7.24.1",
-    "@babel/plugin-syntax-typescript": "^7.24.1",
     "@rollup/plugin-inject": "^5.0.5",
-    "@vitejs/plugin-react-swc": "^3.8.0",
+    "@vitejs/plugin-react-swc": "^4.3.2",
     "fast-text-encoding": "^1.0.6",
     "tuono-react-vite-plugin": "workspace:*",
     "tuono-router": "workspace:*",
     "url-search-params-polyfill": "^8.2.5",
-    "vite": "^6.1.1",
+    "vite": "^8.1.5",
     "web-streams-polyfill": "^4.0.0"
   },
   "devDependencies": {
-    "@types/babel__core": "7.20.5",
-    "@types/babel__traverse": "7.20.7",
     "@types/node": "22.16.5",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tsdown": "0.22.14",
     "vite-config": "workspace:*",
-    "vitest": "3.2.4"
+    "vitest": "4.1.10"
   },
   "sideEffects": false,
   "keywords": [

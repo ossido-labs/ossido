@@ -232,7 +232,9 @@ fn update_package_json_version(folder_path: &Path) -> io::Result<()> {
     let package_json_path = folder_path.join(PathBuf::from("package.json"));
     let package_json = fs::read_to_string(&package_json_path)
         .unwrap_or_else(|err| exit_with_error(&format!("Failed to read package.json: {err}")));
-    let package_json = package_json.replace("link:../../packages/tuono", v);
+    let search = "\"tuono\": \"workspace:*\"";
+    let replace = format!("\"tuono\": \"{}\"", v);
+    let package_json = package_json.replace(search, &replace);
 
     let mut file = OpenOptions::new()
         .write(true)

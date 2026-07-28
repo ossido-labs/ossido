@@ -6,13 +6,8 @@
   "packageRules": [
     {
       "matchDepTypes": ["devDependencies"],
-      "matchPackageNames": [
-        "eslint",
-        "eslint-*",
-        "typescript-eslint",
-        "@eslint/**"
-      ],
-      "groupName": "devDependencies (eslint)"
+      "matchPackageNames": ["oxlint", "oxfmt"],
+      "groupName": "devDependencies (oxc)"
     }
   ]
 }

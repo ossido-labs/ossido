@@ -284,8 +284,8 @@ function patchOverlay(code: string): string {
 
 export const ErrorOverlayVitePlugin: Plugin = {
   name: 'tuono-error-overlay-plugin',
-  transform(code, id, opts = {}) {
-    if (opts.ssr) return
+  transform(code, id, opts) {
+    if (opts?.ssr) return
     if (!id.includes('vite/dist/client/client.mjs')) return
 
     return patchOverlay(code)

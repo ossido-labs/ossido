@@ -89,7 +89,7 @@ impl GitHubServerMock {
                 "tuono-labs/tuono/v{tuono_version}/examples/tuono-app/package.json"
             )))
             .respond_with(file_response_template(
-                r#"{"name": "tuono-app", "dependencies": { "tuono": "link:../../packages/tuono" }}"#,
+                r#"{"name": "tuono-app", "dependencies": { "tuono": "workspace:*" }}"#,
             ))
             .mount(&server)
             .await;

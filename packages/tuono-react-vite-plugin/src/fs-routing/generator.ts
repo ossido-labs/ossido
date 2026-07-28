@@ -1,7 +1,7 @@
 import * as fsp from 'fs/promises'
 import path from 'path'
 
-import { format } from 'prettier'
+import { format } from 'oxfmt'
 
 import type { Config, RouteNode } from '../types'
 
@@ -239,11 +239,15 @@ export async function routeGenerator(
     .filter(Boolean)
     .join('\n\n')
 
-  const routeConfigFileContent = await format(routeImports, {
-    semi: false,
-    singleQuote: true,
-    parser: 'typescript',
-  })
+  const { code: routeConfigFileContent } = await format(
+    config.generatedRouteTree,
+    routeImports,
+    {
+      semi: false,
+      singleQuote: true,
+      printWidth: 80,
+    },
+  )
 
   const routeTreeContent = await fsp
     .readFile(path.resolve(config.generatedRouteTree), 'utf-8')

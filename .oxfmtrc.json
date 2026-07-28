@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "printWidth": 80,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    "dist",
+    ".tuono",
+    "out",
+    "vite.config.ts.timestamp-*",
+    "packages/tuono-lazy-fn-vite-plugin/tests/sources/*",
+    "e2e/fixtures/*/test-results",
+    "**/*.toml"
+  ]
+}

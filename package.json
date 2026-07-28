@@ -2,7 +2,7 @@
   "name": "workspace",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.13.1+sha512.37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad",
+  "packageManager": "bun@1.3.14",
   "scripts": {
     "dev": "turbo dev --filter=./devtools/* --filter=./packages/*",
     "build": "turbo build --filter=./devtools/* --filter=./packages/*",
@@ -12,31 +12,32 @@
     "typecheck": "turbo typecheck --filter=./devtools/* --filter=./packages/*",
     "test": "turbo test --filter=./devtools/* --filter=./packages/*",
     "test:watch": "turbo test:watch --filter=./devtools/* --filter=./packages/*",
-    "test:e2e": "pnpm --filter \"./e2e/fixtures/*\" run test:e2e",
-    "examples:format": "prettier ./examples/** --check",
-    "examples:format:fix": "prettier ./examples/** --write",
-    "examples:typecheck": "pnpm --filter \"./examples/*\" exec tsc --noEmit",
-    "repo:root:format": "prettier . !./assets !./crates !./examples !./devtools !./packages --check",
-    "repo:root:format:fix": "prettier . !./assets !./crates !./examples !./devtools !./packages --write",
+    "test:e2e": "bun --filter \"./e2e/fixtures/*\" run test:e2e",
+    "examples:format": "oxfmt --check ./examples",
+    "examples:format:fix": "oxfmt ./examples",
+    "examples:typecheck": "bun --filter \"./examples/*\" exec tsc --noEmit",
+    "repo:root:format": "oxfmt --check . !assets/** !crates/** !examples/** !devtools/** !packages/**",
+    "repo:root:format:fix": "oxfmt . !assets/** !crates/** !examples/** !devtools/** !packages/**",
     "check-packages": "turbo build test lint format typecheck --filter=!./examples",
-    "check-examples": "pnpm run \"/^examples:(format|typecheck)$/\"",
-    "check-all": "pnpm run check-packages && pnpm run check-examples && pnpm run repo:root:format"
+    "check-examples": "bun run \"/^examples:(format|typecheck)$/\"",
+    "check-all": "bun run check-packages && bun run check-examples && bun run repo:root:format"
+  },
+  "workspaces": {
+    "packages": [
+      "devtools/*",
+      "packages/*",
+      "examples/*",
+      "e2e/fixtures/*"
+    ]
   },
   "author": "Valerio Ageno",
   "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "9.24.0",
     "@playwright/test": "1.54.1",
     "@types/node": "22.16.5",
-    "@vitest/eslint-plugin": "1.2.1",
-    "eslint": "9.24.0",
-    "eslint-import-resolver-typescript": "4.3.2",
-    "eslint-plugin-import": "2.31.0",
-    "eslint-plugin-react": "7.37.5",
-    "eslint-plugin-react-hooks": "5.2.0",
-    "prettier": "3.5.3",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
     "turbo": "2.5.5",
-    "typescript": "5.8.3",
-    "typescript-eslint": "8.29.1"
+    "typescript": "5.8.3"
   }
 }

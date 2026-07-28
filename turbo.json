@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/turbo/schema.json",
-  "globalDependencies": ["eslint.config.js"],
+  "globalDependencies": [".oxlintrc.json", ".oxfmtrc.json"],
   "tasks": {
     "lint": {
       "dependsOn": ["^build"]

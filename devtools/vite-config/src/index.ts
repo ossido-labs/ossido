@@ -1,37 +1,36 @@
-import type { UserConfig } from 'vite'
-import { preserveDirectives } from 'rollup-plugin-preserve-directives'
-import { externalizeDeps } from 'vite-plugin-externalize-deps'
-import UnpluginIsolatedDecl from 'unplugin-isolated-decl/vite'
+import type { UserConfig } from 'tsdown'
 
-interface Options {
+interface BuildOptions {
   /** Entry file, e.g. `./src/index.ts` */
   entry: string | Array<string>
+  /** Optional build target, e.g. `es2022` */
+  target?: UserConfig['target']
 }
 
-export function defineViteConfig({ entry }: Options): UserConfig {
-  const outDir = 'dist'
-
+/**
+ * Shared tsdown build config for the tuono packages.
+ *
+ * tsdown externalizes `dependencies` and `peerDependencies` by default and
+ * emits `.d.ts` files natively, so it replaces the previous Vite library build
+ * plus the `vite-plugin-externalize-deps`, `unplugin-isolated-decl` and
+ * `rollup-plugin-preserve-directives` plugins.
+ */
+export function defineBuildConfig({ entry, target }: BuildOptions): UserConfig {
   return {
-    build: {
-      outDir,
-      minify: false,
-      sourcemap: true,
-      lib: {
-        entry,
-        formats: ['es'],
-        fileName: 'esm/[name]',
-      },
-      rollupOptions: {
-        output: {
-          preserveModules: true,
-          entryFileNames: 'esm/[name].js',
-        },
-      },
-    },
-    plugins: [
-      externalizeDeps(),
-      preserveDirectives(),
-      UnpluginIsolatedDecl({ transformer: 'oxc' }),
-    ],
+    entry,
+    format: 'es',
+    // Neutral platform for isomorphic (browser + node) library output, and
+    // `.js`/`.d.ts` extensions (not `.mjs`) to match the `exports` map.
+    platform: 'neutral',
+    fixedExtension: false,
+    outDir: 'dist/esm',
+    // Preserve the source module structure (one output file per input),
+    // matching the previous rollup `preserveModules` behaviour that the
+    // package `exports` map relies on.
+    unbundle: true,
+    dts: true,
+    sourcemap: true,
+    minify: false,
+    target,
   }
 }

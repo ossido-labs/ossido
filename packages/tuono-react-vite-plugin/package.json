@@ -4,11 +4,11 @@
   "description": "Plugin for the tuono's file system router. Tuono is the react/rust fullstack framework",
   "homepage": "https://tuono.dev",
   "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build",
-    "lint": "eslint .",
-    "format": "prettier --check --ignore-unknown --ignore-path ../../.prettierignore .",
-    "format:fix": "prettier --write --ignore-unknown --ignore-path ../../.prettierignore .",
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "lint": "oxlint",
+    "format": "oxfmt --check .",
+    "format:fix": "oxfmt .",
     "typecheck": "tsc --noEmit",
     "test:watch": "vitest",
     "test": "vitest run"
@@ -38,14 +38,12 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@babel/core": "^7.24.4",
-    "@babel/types": "^7.24.0",
-    "prettier": "^3.2.4",
-    "vite": "^6.1.1"
+    "oxfmt": "0.61.0",
+    "vite": "^8.1.5"
   },
   "devDependencies": {
-    "@types/babel__core": "7.20.5",
+    "tsdown": "0.22.14",
     "vite-config": "workspace:*",
-    "vitest": "3.2.4"
+    "vitest": "4.1.10"
   }
 }

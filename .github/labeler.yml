@@ -12,7 +12,7 @@ typescript:
             'packages/**',
             'package.json',
             'pnpm-*.yaml',
-            'eslint.config.js',
+            '.oxlintrc.json',
             'tsconfig.json',
           ]
 
@@ -27,8 +27,7 @@ typescript:
             'devtools/**',
             '.npmrc',
             '.nvmrc',
-            '.prettierrc',
-            '.prettierignore',
+            '.oxfmtrc.json',
             'renovate.json',
             'turbo.json',
           ]

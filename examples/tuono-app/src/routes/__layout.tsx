@@ -9,7 +9,7 @@ export default function RootLayout({
 }: TuonoLayoutProps): JSX.Element {
   return (
     <html>
-      <body>
+      <body className="bg-primary">
         <main>{children}</main>
         <TuonoScripts />
       </body>

@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module'
+
 import type { InlineConfig, Plugin } from 'vite'
 import { build, createServer, mergeConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
@@ -12,20 +14,36 @@ import { blockingAsync } from './utils'
 import { createJsonConfig, loadConfig } from './config'
 import { ENV_PREFIX } from './constants'
 
+const require = createRequire(import.meta.url)
+
+/**
+ * `@rollup/plugin-inject` injects these imports into every module that
+ * references the globals below — including third-party files deep in
+ * `node_modules` (e.g. `react-dom/server`). Vite 8's bundler (rolldown)
+ * resolves an injected bare specifier relative to the *importing* file, so
+ * `'tuono/ssr'` fails to resolve from within `react-dom`. Resolving to
+ * absolute paths up-front makes the injected imports resolvable from anywhere
+ * (and is a no-op for rollup on Vite <= 7).
+ */
+const SSR_POLYFILLS_MODULE = require.resolve('tuono/ssr')
+const WEB_STREAMS_POLYFILL_MODULE = require.resolve('web-streams-polyfill')
+
 const VITE_SSR_PLUGINS: Array<Plugin> = [
   {
     enforce: 'post',
-    ...inject({
-      ReadableStream: ['web-streams-polyfill', 'ReadableStream'],
+    // `@rollup/plugin-inject` is typed against an older rollup than the one
+    // bundled with vite, so its `Plugin` type needs widening to vite's.
+    ...(inject({
+      ReadableStream: [WEB_STREAMS_POLYFILL_MODULE, 'ReadableStream'],
 
       /**
        * Added to support `react@19`
        * @see https://github.com/tuono-labs/tuono/issues/218
        */
-      MessageChannel: ['tuono/ssr', 'MessageChannelPolyfill'],
-      MessageEvent: ['tuono/ssr', 'MessageEventPolyfill'],
-      Event: ['tuono/ssr', 'EventPolyfill'],
-    }),
+      MessageChannel: [SSR_POLYFILLS_MODULE, 'MessageChannelPolyfill'],
+      MessageEvent: [SSR_POLYFILLS_MODULE, 'MessageEventPolyfill'],
+      Event: [SSR_POLYFILLS_MODULE, 'EventPolyfill'],
+    }) as unknown as Plugin),
   },
 ]
 
@@ -44,7 +62,9 @@ function createBaseViteConfigFromTuonoConfig(
 
   const viteBaseConfig: InlineConfig = {
     root: '.tuono',
-    logLevel: 'silent',
+    // `'error'` (not `'silent'`) so build failures surface instead of
+    // degrading to a silent client-side fallback with hydration mismatches.
+    logLevel: 'error',
     publicDir: '../public',
     cacheDir: 'cache',
     envDir: '../',
@@ -94,9 +114,6 @@ const developmentSSRBundle = (): void => {
             emptyOutDir: true,
             rollupOptions: {
               input: './.tuono/server-main.tsx',
-              onLog() {
-                /* Silence all logs */
-              },
               output: {
                 entryFileNames: 'dev-server.js',
                 format: 'iife',
@@ -196,7 +213,8 @@ const buildConfig = (): void => {
   blockingAsync(async (): Promise<void> => {
     await build({
       root: '.tuono',
-      logLevel: 'silent',
+      // `'error'` (not `'silent'`) so config build failures are visible.
+      logLevel: 'error',
       cacheDir: 'cache',
       envDir: '../',
       build: {
