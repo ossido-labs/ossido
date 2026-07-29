@@ -70,6 +70,7 @@
     "fast-text-encoding": "^1.0.6",
     "tuono-react-vite-plugin": "workspace:*",
     "tuono-router": "workspace:*",
+    "tuono-ui": "workspace:*",
     "url-search-params-polyfill": "^8.2.5",
     "vite": "^8.1.5",
     "web-streams-polyfill": "^4.0.0"

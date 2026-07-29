@@ -1,4 +1,4 @@
-import type { RouteComponent } from './types'
+import type { RouteComponent, LoadingComponent, ErrorComponent } from './types'
 import { trimPathLeft, joinPaths } from './utils'
 
 interface RouteOptions {
@@ -9,6 +9,17 @@ interface RouteOptions {
   filePath?: string
   component: RouteComponent
   hasHandler?: boolean
+  /**
+   * Nearest-ancestor `loading.tsx`, resolved at generation time. Rendered as
+   * the `<Suspense>` fallback while this route's server data loads on client
+   * navigation. Falls back to a framework default when absent.
+   */
+  loadingComponent?: LoadingComponent
+  /**
+   * Nearest-ancestor `error.tsx`, resolved at generation time. Rendered by the
+   * route error boundary. Falls back to a framework default when absent.
+   */
+  errorComponent?: ErrorComponent
 }
 
 export function createRoute(options: RouteOptions): Route {
@@ -99,7 +110,7 @@ export class Route {
     return this
   }
 
-  update = (options: RouteOptions): this => {
+  update = (options: Partial<RouteOptions>): this => {
     Object.assign(this.options, options)
     this.isRoot = options.isRoot || !options.getParentRoute
     return this

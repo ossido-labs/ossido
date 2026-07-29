@@ -1,33 +1,26 @@
+import type { ReactNode } from 'react'
 import { describe, it, expectTypeOf } from 'vitest'
 
-import type { TuonoRouteProps } from './types'
+import type { TuonoErrorProps } from 'tuono-router'
 
-describe('TuonoRouteProps', () => {
-  interface MyData {
-    something: string
-  }
+import type { TuonoLayoutProps } from './types'
 
-  type RouteProps = TuonoRouteProps<MyData>
-
-  it('should have correct union types', () => {
-    expectTypeOf<RouteProps>()
-      .toHaveProperty('isLoading')
-      .toEqualTypeOf<boolean>()
-
-    expectTypeOf<RouteProps>()
-      .toHaveProperty('data')
-      .toEqualTypeOf<null | MyData>()
+describe('TuonoLayoutProps', () => {
+  it('should expose `children`', () => {
+    expectTypeOf<TuonoLayoutProps>()
+      .toHaveProperty('children')
+      .toEqualTypeOf<ReactNode>()
   })
+})
 
-  it('should correctly infer `data` based upon `isLoading`', () => {
-    expectTypeOf<RouteProps>()
-      .extract<{ isLoading: true }>()
-      .toHaveProperty('data')
-      .toEqualTypeOf<null>()
+describe('TuonoErrorProps', () => {
+  it('should expose `error` and `reset`', () => {
+    expectTypeOf<TuonoErrorProps>()
+      .toHaveProperty('error')
+      .toEqualTypeOf<Error>()
 
-    expectTypeOf<RouteProps>()
-      .extract<{ isLoading: false }>()
-      .toHaveProperty('data')
-      .toEqualTypeOf<MyData>()
+    expectTypeOf<TuonoErrorProps>()
+      .toHaveProperty('reset')
+      .toEqualTypeOf<() => void>()
   })
 })

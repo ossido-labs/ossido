@@ -5,13 +5,12 @@ import { Route } from '../route'
 import type { RouteComponent, RouteProps } from '../types'
 import { createRouter } from '../router'
 
-import {
-  RouterContextProvider,
-  useRouterContext,
-} from './RouterContext'
+import { RouterContextProvider, useRouterContext } from './RouterContext'
 
 function createRootComponent(): RouteComponent {
-  const RootComponent = (({ children }: RouteProps) => <>{children}</>) as RouteComponent
+  const RootComponent = (({ children }: RouteProps) => (
+    <>{children}</>
+  )) as RouteComponent
   RootComponent.preload = vi.fn()
   RootComponent.displayName = 'root'
   return RootComponent
@@ -22,35 +21,36 @@ function buildRouter(): ReturnType<typeof createRouter> {
   return createRouter({ routeTree: root })
 }
 
-function TransitionProbe(): React.JSX.Element {
-  const { isTransitioning } = useRouterContext()
-  return <div data-testid="transitioning">{String(isTransitioning)}</div>
+function NavigationIdProbe(): React.JSX.Element {
+  const { navigationId } = useRouterContext()
+  return <div data-testid="navigation-id">{String(navigationId)}</div>
 }
 
 describe('<RouterContextProvider /> browser navigation', () => {
   afterEach(cleanup)
 
-  it('flags a transition on popstate so props are refetched with the loading state', () => {
+  it('bumps the navigation id on popstate so the route refetches', () => {
     render(
       <RouterContextProvider
         router={buildRouter()}
         serverInitialLocation={{ pathname: '/', href: '/', searchStr: '' }}
       >
-        <TransitionProbe />
+        <NavigationIdProbe />
       </RouterContextProvider>,
     )
 
-    // Initial render is settled, no transition in progress.
-    expect(screen.getByTestId('transitioning').textContent).toBe('false')
+    // Initial render starts at 0 (must be identical on server and client so
+    // the seeded initial resource is read without a hydration mismatch).
+    expect(screen.getByTestId('navigation-id').textContent).toBe('0')
 
     // Simulate a browser back/forward navigation.
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate'))
     })
 
-    // Regression guard: popstate must go through the same transition flow as
-    // `push`/`replace`. Without it the route would render with `isLoading=false`
-    // and cleared server props, crashing pages that read those props on back.
-    expect(screen.getByTestId('transitioning').textContent).toBe('true')
+    // Regression guard: popstate must bump the navigation id — the key changes,
+    // so the route builds a fresh data resource (refetches) instead of reusing
+    // stale/cleared data and crashing on back.
+    expect(screen.getByTestId('navigation-id').textContent).toBe('1')
   })
 })

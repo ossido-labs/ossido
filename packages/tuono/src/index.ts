@@ -6,6 +6,8 @@ export {
   useRouter,
 } from 'tuono-router'
 
+export type { TuonoErrorProps } from 'tuono-router'
+
 export {
   dynamic,
   RouteLazyLoading as __tuono__internal__lazyLoadRoute,
@@ -13,4 +15,4 @@ export {
 
 export { TuonoScripts } from './shared/TuonoScripts'
 
-export type { TuonoRouteProps, TuonoLayoutProps } from './types'
+export type { TuonoLayoutProps } from './types'

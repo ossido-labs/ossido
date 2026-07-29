@@ -1,0 +1,67 @@
+/*
+ * Design tokens shared by the framework's default screens (the dev error
+ * overlay, the production error fallback, the not-found page, …). Injected as a
+ * `<style>` element by `BaseStyles` — the router library has no CSS bundling
+ * step, so styles ship as strings.
+ *
+ * The Google Fonts import MUST stay the first rule in the sheet (CSS ignores
+ * `@import` that follows other rules). Noto Sans is the default body font;
+ * JetBrains Mono is used for code and stack traces.
+ */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Typography ------------------------------------------------------------ */
+  --tuono-font-sans:
+    'Noto Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --tuono-font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --tuono-font-size-xs: 12px;
+  --tuono-font-size-sm: 13px;
+  --tuono-font-size: 14px;
+  --tuono-font-size-lg: 18px;
+  --tuono-font-size-xl: 22px;
+
+  --tuono-font-weight-regular: 400;
+  --tuono-font-weight-medium: 500;
+  --tuono-font-weight-semibold: 600;
+  --tuono-font-weight-bold: 700;
+
+  --tuono-line-height: 1.5;
+  --tuono-line-height-tight: 1.25;
+  --tuono-letter-spacing-wide: 0.04em;
+
+  /* Colours (dark theme) -------------------------------------------------- */
+  --tuono-color-bg: #1b1b1f;
+  --tuono-color-surface: #232329;
+  --tuono-color-surface-hover: #35353c;
+  --tuono-color-surface-raised: #2b2b31;
+  --tuono-color-border: #2e2e35;
+  --tuono-color-border-strong: #3a3a42;
+
+  --tuono-color-text: #e6e6e6;
+  --tuono-color-text-muted: #c7c7cf;
+  --tuono-color-text-subtle: #8a8a94;
+  --tuono-color-text-faint: #6f6f78;
+
+  --tuono-color-accent: #f43f5e;
+  --tuono-color-accent-text: #ff8fa3;
+  --tuono-color-on-accent: #ffffff;
+  --tuono-color-danger-surface: #4a1d27;
+
+  /* Radii ----------------------------------------------------------------- */
+  --tuono-radius-sm: 6px;
+  --tuono-radius: 8px;
+  --tuono-radius-pill: 999px;
+
+  /* Spacing --------------------------------------------------------------- */
+  --tuono-space-1: 0.25rem;
+  --tuono-space-2: 0.5rem;
+  --tuono-space-3: 0.75rem;
+  --tuono-space-4: 1rem;
+  --tuono-space-6: 1.5rem;
+  --tuono-space-8: 2rem;
+}

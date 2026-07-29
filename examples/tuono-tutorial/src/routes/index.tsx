@@ -1,6 +1,5 @@
 // src/routes/index.tsx
 import type { JSX } from 'react'
-import type { TuonoRouteProps } from 'tuono'
 
 import PokemonLink from '../components/PokemonLink'
 
@@ -8,11 +7,7 @@ interface IndexProps {
   results: Array<{ name: string; url: string }>
 }
 
-export default function IndexPage({
-  data,
-}: TuonoRouteProps<IndexProps>): JSX.Element | null {
-  if (!data?.results) return null
-
+export default function IndexPage({ results }: IndexProps): JSX.Element {
   return (
     <>
       <title>Tuono tutorial</title>
@@ -45,7 +40,7 @@ export default function IndexPage({
       <ul style={{ flexWrap: 'wrap', display: 'flex', gap: 10 }}>
         <PokemonLink name="GOAT" id={0} />
 
-        {data.results.map((pokemon, i) => (
+        {results.map((pokemon, i) => (
           <PokemonLink key={pokemon.name} name={pokemon.name} id={i + 1} />
         ))}
       </ul>

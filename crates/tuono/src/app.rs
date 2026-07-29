@@ -18,9 +18,16 @@ use tracing::error;
 use tuono_internal::config::Config;
 
 pub const IGNORE_EXTENSIONS: [&str; 3] = ["css", "scss", "sass"];
-// Kept in sync with the middleware filename convention so a middleware file is
-// never collected as a route (it only describes middleware for its directory).
-pub const IGNORE_FILES: [&str; 2] = ["__layout", crate::route_directory_info::MIDDLEWARE_FILENAME];
+// Files that are never collected as routes. `loading`/`error` are React-only
+// special files (Suspense fallback / error boundary); `middleware` is kept in
+// sync with the middleware filename convention (it only describes middleware
+// for its directory).
+pub const IGNORE_FILES: [&str; 4] = [
+    "__layout",
+    "loading",
+    "error",
+    crate::route_directory_info::MIDDLEWARE_FILENAME,
+];
 
 #[cfg(target_os = "windows")]
 pub const ROUTES_FOLDER_PATH: &str = "\\src\\routes";
@@ -415,6 +422,10 @@ mod tests {
         let routes = [
             "/home/user/Documents/tuono/src/routes/__layout.tsx",
             "/home/user/Documents/tuono/src/routes/posts/__layout.tsx",
+            "/home/user/Documents/tuono/src/routes/loading.tsx",
+            "/home/user/Documents/tuono/src/routes/error.tsx",
+            "/home/user/Documents/tuono/src/routes/posts/loading.tsx",
+            "/home/user/Documents/tuono/src/routes/posts/error.tsx",
         ];
 
         routes.into_iter().for_each(|route| {

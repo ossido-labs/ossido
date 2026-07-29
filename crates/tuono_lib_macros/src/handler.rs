@@ -48,6 +48,7 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
         pub async fn tuono_internal_route(
             #axum_arguments
         ) -> impl tuono_lib::axum::response::IntoResponse {
+            use tuono_lib::axum::response::IntoResponse as _;
 
             #application_state_extractor
 
@@ -56,12 +57,18 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
 
            let req = tuono_lib::Request::new(pathname.to_owned(), headers.to_owned(), params, None);
 
-           #fn_name(req.clone(), #argument_names).await.render_to_string(req)
+           // Catch an unexpected panic so it surfaces in the dev error overlay
+           // (dev) or as a detail-free 500 (prod) rather than dropping the request.
+           match tuono_lib::catch_handler(#fn_name(req.clone(), #argument_names)).await {
+               Ok(response) => response.render_to_string(req).into_response(),
+               Err(server_error) => tuono_lib::render_error_to_string(req, server_error),
+           }
         }
 
         pub async fn tuono_internal_api(
             #axum_arguments
         ) -> impl tuono_lib::axum::response::IntoResponse {
+            use tuono_lib::axum::response::IntoResponse as _;
 
             #application_state_extractor
 
@@ -70,7 +77,10 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
 
            let req = tuono_lib::Request::new(pathname.to_owned(), headers.to_owned(), params, None);
 
-           #fn_name(req.clone(), #argument_names).await.json()
+           match tuono_lib::catch_handler(#fn_name(req.clone(), #argument_names)).await {
+               Ok(response) => response.json().into_response(),
+               Err(server_error) => tuono_lib::error_json(server_error),
+           }
         }
     }
     .into()

@@ -54,10 +54,17 @@ impl Server {
         let _ = GLOBAL_MODE.set(mode);
         let _ = GLOBAL_CONFIG.set(config.clone());
 
+        if mode == Mode::Dev {
+            // Capture panic locations/backtraces so a handler panic can be
+            // surfaced in the client dev error overlay.
+            crate::server_error::install_dev_panic_hook();
+        }
+
         if mode == Mode::Prod
-            && let Err(err) = load_manifest() {
-                tuono_println!("Failed to load vite manifest: {}", err.to_string().red());
-            }
+            && let Err(err) = load_manifest()
+        {
+            tuono_println!("Failed to load vite manifest: {}", err.to_string().red());
+        }
 
         let server_address = format!("{}:{}", config.server.host, config.server.port);
 

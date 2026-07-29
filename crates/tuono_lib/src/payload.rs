@@ -1,11 +1,16 @@
 use crate::config::GLOBAL_CONFIG;
 use crate::manifest::MANIFEST;
 use crate::mode::{GLOBAL_MODE, Mode};
+use crate::server_error::ServerError;
 use erased_serde::Serialize;
 use serde::Serialize as SerdeSerialize;
 use tuono_internal::config::ServerConfig;
 
 use crate::request::{Location, Request};
+
+/// Empty stand-in for the `data` field when rendering an error payload, which
+/// carries no route data. `'static` so it coerces to the payload's lifetime.
+const EMPTY_DATA: () = ();
 
 #[derive(SerdeSerialize)]
 /// This is the payload sent to the client for hydration
@@ -19,6 +24,13 @@ pub struct Payload<'a> {
     css_bundles: Option<Vec<String>>,
     #[serde(rename(serialize = "devServerConfig"))]
     dev_server_config: Option<&'a ServerConfig>,
+    /// Present only when a handler panicked (dev mode). The client seeds the
+    /// route's data resource as rejected so the error overlay renders.
+    #[serde(
+        rename(serialize = "serverError"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    server_error: Option<ServerError>,
 }
 
 impl<'a> Payload<'a> {
@@ -42,7 +54,16 @@ impl<'a> Payload<'a> {
             js_bundles: None,
             css_bundles: None,
             dev_server_config,
+            server_error: None,
         }
+    }
+
+    /// Build a payload that carries a handler error instead of route data. Used
+    /// by the SSR error path so the client renders the error overlay.
+    pub fn new_with_error(req: &'a Request, error: ServerError) -> Payload<'a> {
+        let mut payload = Payload::new(req, &EMPTY_DATA);
+        payload.server_error = Some(error);
+        payload
     }
 
     pub fn client_payload(&mut self) -> Result<String, serde_json::Error> {
@@ -139,6 +160,7 @@ mod tests {
             js_bundles: None,
             css_bundles: None,
             dev_server_config: None,
+            server_error: None,
         }
     }
 

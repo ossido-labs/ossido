@@ -1,74 +1,79 @@
 import type { JSX } from 'react'
 import { memo, Suspense, useMemo } from 'react'
 
+import { DefaultLoading, DefaultError, DevErrorOverlay } from 'tuono-ui'
+
 import type { Mode } from '../types'
 import type { Route } from '../route'
-
-import { useServerPayloadData } from '../hooks/useServerPayloadData'
+import { buildResourceKey } from '../data/resourceCache'
 
 import { useRouterContext } from './RouterContext'
 import { CriticalCss } from './CriticalCss'
+import { RouteDataLoader } from './RouteDataLoader'
+import { TuonoErrorBoundary } from './TuonoErrorBoundary'
 
-interface RouteMatchProps<TServerPayloadData = unknown> {
+interface RouteMatchProps {
   route: Route
-  // User defined server side props
-  serverInitialData: TServerPayloadData
   mode?: Mode
 }
 
 /**
- * Returns the route match with the root element if exists
- *
- * It handles the fetch of the client side resources
+ * Renders the matched route: its parent layouts wrap an error boundary +
+ * `<Suspense>` boundary around the data-reading leaf. The boundary is keyed by
+ * the data-resource key so a navigation (including same-route param changes)
+ * remounts it and shows the loading fallback, while the layouts persist.
  */
-export const RouteMatch = ({
-  route,
-  serverInitialData,
-  mode,
-}: RouteMatchProps): JSX.Element => {
-  const { data } = useServerPayloadData(route, serverInitialData)
-  const { isTransitioning } = useRouterContext()
+export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
+  const { location, navigationId, retry } = useRouterContext()
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const routes = useMemo(() => loadParentComponents(route), [route.id])
 
-  const routeData = isTransitioning ? null : data
+  const resourceKey = buildResourceKey(navigationId, location)
+
+  const LoadingComponent = route.options.loadingComponent ?? DefaultLoading
+  // The dev overlay leaks source/stack, so it is only used in development;
+  // production falls back to a detail-free page.
+  const ErrorComponent =
+    route.options.errorComponent ??
+    (mode === 'Dev' ? DevErrorOverlay : DefaultError)
 
   return (
-    <TraverseRootComponents
-      routes={routes}
-      data={routeData}
-      isLoading={isTransitioning}
-      mode={mode}
-    >
-      <Suspense>
-        <CriticalCss routeFilePath={route.filePath} mode={mode} />
-        <route.component data={routeData} isLoading={isTransitioning} />
-      </Suspense>
+    <TraverseRootComponents routes={routes} mode={mode}>
+      <TuonoErrorBoundary
+        key={resourceKey}
+        fallback={ErrorComponent}
+        onReset={retry}
+      >
+        <Suspense fallback={<LoadingComponent />}>
+          <RouteDataLoader
+            route={route}
+            resourceKey={resourceKey}
+            location={location}
+            mode={mode}
+          />
+        </Suspense>
+      </TuonoErrorBoundary>
     </TraverseRootComponents>
   )
 }
 
-interface TraverseRootComponentsProps<TData = unknown> {
+interface TraverseRootComponentsProps {
   routes: Array<Route>
-  data: TData
-  isLoading: boolean
   children?: React.ReactNode
   index?: number
   mode?: Mode
 }
 
 /**
- * This component traverses and renders all components
- * that wrap the selected route (__layout).
- * Parent components must be memoized
- * to prevent re-rendering issues when the route changes.
+ * Renders the layout (`__layout`) components that wrap the selected route.
+ * Layouts receive only `children` now — they live OUTSIDE the keyed Suspense
+ * boundary, so they persist across navigation while only the page area shows
+ * the loading fallback. Memoized so navigation does not re-render layouts.
  */
 const TraverseRootComponents = memo(
   ({
     routes,
-    data,
-    isLoading,
     index = 0,
     mode,
     children,
@@ -82,15 +87,9 @@ const TraverseRootComponents = memo(
       const routeFilePath = route.filePath || route.id
 
       return (
-        <Parent data={data} isLoading={isLoading}>
+        <Parent>
           <CriticalCss routeFilePath={routeFilePath} mode={mode} />
-          <TraverseRootComponents
-            routes={routes}
-            data={data}
-            isLoading={isLoading}
-            index={index + 1}
-            mode={mode}
-          >
+          <TraverseRootComponents routes={routes} index={index + 1} mode={mode}>
             {children}
           </TraverseRootComponents>
         </Parent>

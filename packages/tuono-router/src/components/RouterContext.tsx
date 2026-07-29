@@ -25,14 +25,25 @@ export interface ParsedLocation {
 interface RouterContextValue {
   router: Router
   location: ParsedLocation
-  isTransitioning: boolean
+  /**
+   * Incremented on every navigation (and error retry). Combined with the
+   * pathname it forms the data-resource key, so each navigation refetches and
+   * remounts the route's Suspense boundary (showing `loading.tsx`).
+   *
+   * Initialized to `0` identically on server and client and never changed
+   * during the initial mount — otherwise the boundary would remount and flash
+   * the loading fallback over server-rendered content (hydration mismatch).
+   */
+  navigationId: number
+  /** Update the current location and start a new navigation. */
   updateLocation: (loc: ParsedLocation) => void
-  stopTransitioning: () => void
+  /** Re-run the current route's data load (used by error boundary `reset`). */
+  retry: () => void
 }
 
 const RouterContext = createContext({} as RouterContextValue)
 
-function getInitialLocation(
+export function getInitialLocation(
   serverPayloadLocation: ServerInitialLocation,
 ): ParsedLocation {
   if (isServerSide) {
@@ -74,33 +85,27 @@ export function RouterContextProvider({
   const [location, setLocation] = useState<ParsedLocation>(() =>
     getInitialLocation(serverInitialLocation),
   )
-  // Global state to track whether a page transition is in progress.
-  // Set to `false` once the page is fully loaded, including server-side data.
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
+  const [navigationId, setNavigationId] = useState<number>(0)
 
   const updateLocation = useCallback((newLocation: ParsedLocation): void => {
-    setIsTransitioning(true)
+    setNavigationId((id) => id + 1)
     setLocation(newLocation)
   }, [])
 
-  const stopTransitioning = useCallback((): void => {
-    setIsTransitioning(false)
+  const retry = useCallback((): void => {
+    setNavigationId((id) => id + 1)
   }, [])
 
   /**
-   * Listen browser navigation events
+   * Listen browser navigation events. The browser has already updated the URL,
+   * so this only mirrors it into router state (and bumps the navigation id so
+   * the route refetches — preserving back/forward data loads).
    */
   useEffect(() => {
     const updateLocationOnPopStateChange = ({
       target,
     }: PopStateEvent): void => {
       const { location: targetLocation } = target as typeof window
-
-      // Route back/forward navigation through the same transition flow as
-      // `push`/`replace`: flag the transition so the route renders its loading
-      // state while the server-side props are refetched. Without this the
-      // component would briefly render with `isLoading=false` and cleared
-      // (`undefined`) data, crashing pages that read server props.
       updateLocation(fromUrlToParsedLocation(targetLocation.href))
     }
 
@@ -115,11 +120,11 @@ export function RouterContextProvider({
     () => ({
       router,
       location,
-      isTransitioning,
+      navigationId,
       updateLocation,
-      stopTransitioning,
+      retry,
     }),
-    [location, router, isTransitioning, updateLocation, stopTransitioning],
+    [location, router, navigationId, updateLocation, retry],
   )
 
   return (

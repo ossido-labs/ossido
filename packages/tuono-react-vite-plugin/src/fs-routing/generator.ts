@@ -3,7 +3,7 @@ import path from 'path'
 
 import { format } from 'oxfmt'
 
-import type { Config, RouteNode } from '../types'
+import type { Config, RouteNode, SpecialFileNode } from '../types'
 
 import { buildRouteConfig } from './build-route-config'
 import { hasParentRoute } from './has-parent-route'
@@ -22,6 +22,8 @@ import {
 import {
   ROUTES_FOLDER,
   LAYOUT_PATH_ID,
+  LOADING_FILE_ID,
+  ERROR_FILE_ID,
   GENERATED_ROUTE_TREE,
   DYNAMIC_FN,
 } from './constants'
@@ -39,11 +41,45 @@ const defaultConfig: Config = {
 let isFirst = false
 let skipMessage = false
 
+/** Directory a forward-slashed file path lives in (`.` for the root). */
+function dirKey(filePath: string): string {
+  const idx = filePath.lastIndexOf('/')
+  return idx === -1 ? '.' : filePath.slice(0, idx)
+}
+
+function parentDir(dir: string): string {
+  const idx = dir.lastIndexOf('/')
+  return idx === -1 ? '.' : dir.slice(0, idx)
+}
+
+/** Walk up the directory tree to the closest `loading`/`error` file. */
+function findNearestSpecialFile(
+  startDir: string,
+  filesByDir: Map<string, SpecialFileNode>,
+): SpecialFileNode | undefined {
+  let current = startDir || '.'
+  for (;;) {
+    const found = filesByDir.get(current)
+    if (found) return found
+    if (current === '.') return undefined
+    current = parentDir(current)
+  }
+}
+
+interface RouteNodesResult {
+  routeNodes: Array<RouteNode>
+  rustHandlersNodes: Array<string>
+  loadingFiles: Array<SpecialFileNode>
+  errorFiles: Array<SpecialFileNode>
+}
+
 async function getRouteNodes(
   config = defaultConfig,
-): Promise<{ routeNodes: Array<RouteNode>; rustHandlersNodes: Array<string> }> {
+): Promise<RouteNodesResult> {
   const routeNodes: Array<RouteNode> = []
   const rustHandlersNodes: Array<string> = []
+  const loadingFiles: Array<SpecialFileNode> = []
+  const errorFiles: Array<SpecialFileNode> = []
 
   async function recurse(dir: string): Promise<void> {
     const fullDir = path.resolve(config.folderName, dir)
@@ -57,14 +93,33 @@ async function getRouteNodes(
         if (dirent.isDirectory()) {
           await recurse(relativePath)
         } else if (fullPath.match(/\.(tsx|ts|jsx|js|mdx)$/)) {
+          const isScript = Boolean(fullPath.match(/\.(tsx|ts|jsx|js)$/))
           // Check that the route is correctly default exported
           if (
-            fullPath.match(/\.(tsx|ts|jsx|js)$/) &&
+            isScript &&
             !isDefaultExported((await fsp.readFile(fullPath)).toString())
           ) {
             return
           }
           const filePath = replaceBackslash(path.join(dir, dirent.name))
+
+          // `loading.tsx` / `error.tsx` are not routes — collect them separately
+          // so they can be attached to routes as nearest-ancestor metadata.
+          if (isScript) {
+            const baseName = removeExt(dirent.name)
+            if (baseName === LOADING_FILE_ID || baseName === ERROR_FILE_ID) {
+              const specialFile: SpecialFileNode = {
+                filePath,
+                fullPath,
+                variableName: routePathToVariable(`/${removeExt(filePath)}`),
+                dir: dirKey(filePath),
+              }
+              if (baseName === LOADING_FILE_ID) loadingFiles.push(specialFile)
+              else errorFiles.push(specialFile)
+              return
+            }
+          }
+
           const filePathNoExt = removeExt(filePath)
           let routePath = cleanPath(`/${filePathNoExt}`) || ''
 
@@ -103,7 +158,7 @@ async function getRouteNodes(
 
   await recurse('./')
 
-  return { routeNodes, rustHandlersNodes }
+  return { routeNodes, rustHandlersNodes, loadingFiles, errorFiles }
 }
 
 export async function routeGenerator(
@@ -127,8 +182,12 @@ export async function routeGenerator(
   const taskId = latestTask + 1
   latestTask = taskId
 
-  const { routeNodes: beforeRouteNodes, rustHandlersNodes } =
-    await getRouteNodes(config)
+  const {
+    routeNodes: beforeRouteNodes,
+    rustHandlersNodes,
+    loadingFiles,
+    errorFiles,
+  } = await getRouteNodes(config)
 
   const preRouteNodes = sortRouteNodes(beforeRouteNodes)
 
@@ -157,6 +216,41 @@ export async function routeGenerator(
   for (const node of preRouteNodes) {
     handleNode(node)
   }
+
+  // Resolve the nearest-ancestor loading/error file for each (non-layout) route
+  // and remember which special files are actually referenced (so only those get
+  // imported).
+  const loadingByDir = new Map(loadingFiles.map((file) => [file.dir, file]))
+  const errorByDir = new Map(errorFiles.map((file) => [file.dir, file]))
+  const usedSpecialFiles = new Map<string, SpecialFileNode>()
+
+  for (const node of routeNodes) {
+    if (node.routePath.endsWith(LAYOUT_PATH_ID)) continue
+    const nodeDir = dirKey(node.filePath)
+    node.loadingFile = findNearestSpecialFile(nodeDir, loadingByDir)
+    node.errorFile = findNearestSpecialFile(nodeDir, errorByDir)
+    if (node.loadingFile) {
+      usedSpecialFiles.set(node.loadingFile.filePath, node.loadingFile)
+    }
+    if (node.errorFile) {
+      usedSpecialFiles.set(node.errorFile.filePath, node.errorFile)
+    }
+  }
+
+  const specialImports = [...usedSpecialFiles.values()]
+    .sort((a, b) => a.variableName.localeCompare(b.variableName))
+    .map(
+      (file) =>
+        `import ${file.variableName}Import from './${replaceBackslash(
+          removeExt(
+            path.relative(
+              path.dirname(config.generatedRouteTree),
+              path.resolve(config.folderName, file.filePath),
+            ),
+          ),
+        )}'`,
+    )
+    .join('\n')
 
   const routeConfigChildrenText = buildRouteConfig(routeNodes)
 
@@ -208,6 +302,12 @@ export async function routeGenerator(
               ? 'hasHandler: true'
               : '',
             `filePath: '${node.path || '/'}'`,
+            node.loadingFile
+              ? `loadingComponent: ${node.loadingFile.variableName}Import`
+              : '',
+            node.errorFile
+              ? `errorComponent: ${node.errorFile.variableName}Import`
+              : '',
           ]
             .filter(Boolean)
             .join(',')}
@@ -228,6 +328,7 @@ export async function routeGenerator(
         ),
       )}'`,
     ].join('\n'),
+    specialImports,
     imports,
     'const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport });',
     createRoutes,

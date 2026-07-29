@@ -65,7 +65,7 @@ describe('<NotFound />', () => {
       render(<NotFound />)
 
       expect(RouteMatchMock).toHaveBeenCalledExactlyOnceWith(
-        { route: customRoute404, serverInitialData: {} },
+        { route: customRoute404, mode: undefined },
         undefined, // deprecated react context parameter
       )
       expect(rootRouteComponentMock).not.toHaveBeenCalled()

@@ -3,6 +3,7 @@
 node_modules/
 dist/
 .turbo/
+storybook-static/
 
 */**/routeTree.gen.ts
 

@@ -6,10 +6,9 @@ import { build, createServer, mergeConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import inject from '@rollup/plugin-inject'
 import { TuonoReactPlugin } from 'tuono-react-vite-plugin'
+import { ErrorOverlayVitePlugin } from 'tuono-ui/vite-plugin'
 
 import type { TuonoConfig } from '../config'
-
-import { ErrorOverlayVitePlugin } from './error-overlay'
 
 import { blockingAsync } from './utils'
 import { createJsonConfig, loadConfig } from './config'

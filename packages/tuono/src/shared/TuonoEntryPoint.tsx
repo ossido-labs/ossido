@@ -19,10 +19,7 @@ export function TuonoEntryPoint({
   return (
     <StrictMode>
       <TuonoContextProvider serverPayload={serverPayload}>
-        <RouterContextProviderWrapper
-          router={router}
-          mode={serverPayload?.mode}
-        />
+        <RouterContextProviderWrapper router={router} />
       </TuonoContextProvider>
     </StrictMode>
   )

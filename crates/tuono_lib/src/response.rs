@@ -1,10 +1,80 @@
 use crate::Request;
+use crate::mode::{GLOBAL_MODE, Mode};
+use crate::server_error::ServerError;
 use crate::{Payload, ssr::Js};
 use axum::Json;
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{Html, IntoResponse, Redirect};
+use axum::response::{Html, IntoResponse, Redirect, Response as AxumResponse};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use erased_serde::Serialize;
+
+const INTERNAL_SERVER_ERROR_HTML: &str = "500 Internal server error";
+
+/// JSON body returned by the data endpoint (`/__tuono/data/...`) when a handler
+/// panics. Mirrors the normal `{ data, info }` shape so the client parses it the
+/// same way, with the error nested under `info.serverError` (dev only).
+#[derive(serde::Serialize)]
+struct JsonErrorResponse {
+    data: Option<()>,
+    info: JsonErrorInfo,
+}
+
+#[derive(serde::Serialize)]
+struct JsonErrorInfo {
+    #[serde(rename = "serverError", skip_serializing_if = "Option::is_none")]
+    server_error: Option<ServerError>,
+}
+
+/// Render the SSR error page for a panicked handler. In development the page
+/// boots the client with the error payload so the overlay renders; in
+/// production it returns a detail-free `500` (no source/stack leaked).
+pub fn render_error_to_string(req: Request, error: ServerError) -> AxumResponse {
+    let mode = *GLOBAL_MODE.get().expect("Failed to get GLOBAL_MODE");
+
+    if mode == Mode::Prod {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
+        )
+            .into_response();
+    }
+
+    let mut payload = Payload::new_with_error(&req, error);
+    match payload
+        .client_payload()
+        .ok()
+        .and_then(|payload| Js::render_to_string(Some(&payload)).ok())
+    {
+        Some(html) => (StatusCode::INTERNAL_SERVER_ERROR, Html(html)).into_response(),
+        None => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
+        )
+            .into_response(),
+    }
+}
+
+/// JSON error response for a panicked handler on the data endpoint. In
+/// development it carries the structured error under `info.serverError`; in
+/// production it returns a detail-free `500`.
+pub fn error_json(error: ServerError) -> AxumResponse {
+    let mode = *GLOBAL_MODE.get().expect("Failed to get GLOBAL_MODE");
+
+    let server_error = if mode == Mode::Prod {
+        None
+    } else {
+        Some(error)
+    };
+
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(JsonErrorResponse {
+            data: None,
+            info: JsonErrorInfo { server_error },
+        }),
+    )
+        .into_response()
+}
 
 pub struct Props {
     data: Box<dyn Serialize>,

@@ -1,6 +1,6 @@
-use tuono_lib::{Request, Response, Props};
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
+use tuono_lib::{Props, Request, Response};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TestPageProps {
@@ -10,7 +10,10 @@ struct TestPageProps {
 #[tuono_lib::handler]
 async fn test_props(_req: Request) -> Response {
     let data = TestPageProps {
-        timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
     };
 
     Response::Props(Props::new(data))

@@ -1,13 +1,13 @@
-import type { TuonoRouteProps } from 'tuono'
+import type { JSX } from 'react'
 
-export default function ({
-  data,
-  isLoading,
-}: TuonoRouteProps<{ timestamp: number }>) {
-  if (isLoading) return <p>Loading...</p>
+interface TestProps {
+  timestamp: number
+}
+
+export default function TestPage({ timestamp }: TestProps): JSX.Element {
   return (
     <p>
-      Test... <span suppressHydrationWarning>{data?.timestamp}</span>
+      Test... <span suppressHydrationWarning>{timestamp}</span>
     </p>
   )
 }

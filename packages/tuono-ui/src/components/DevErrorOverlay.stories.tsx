@@ -1,0 +1,134 @@
+import { Component, useState } from 'react'
+import type { JSX, ReactNode } from 'react'
+import type { Meta, StoryObj } from '@storybook/react-vite'
+
+import type { TuonoErrorWithSource } from '../types'
+
+import { DevErrorOverlay } from './DevErrorOverlay'
+import { DefaultScreen } from './DefaultScreen'
+
+const jsError = new Error('Cannot read properties of undefined (reading "map")')
+jsError.stack = `TypeError: Cannot read properties of undefined (reading "map")
+    at IndexPage (http://localhost:3101/vite-server/@fs/Users/me/app/src/routes/index.tsx:12:24)
+    at renderWithHooks (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:4392:19)`
+
+const rustError: TuonoErrorWithSource = new Error(
+  'Boom! This panic was raised inside a Rust route handler',
+)
+rustError.name = 'RustPanic'
+rustError.stack = [
+  '    at src/routes/rust-error.rs:8:5',
+  '   4: tuono_app::routes::rust_error::{{closure}}',
+  '             at src/routes/rust-error.rs:8:5',
+  '   5: core::panicking::panic_fmt',
+  '             at /rustc/abc/library/core/src/panicking.rs:80:14',
+].join('\n')
+rustError.tuonoServerSource = {
+  file: 'src/routes/rust-error.rs',
+  line: 8,
+  column: 5,
+  content: [
+    'use tuono_lib::{Request, Response};',
+    '',
+    '#[tuono_lib::handler]',
+    'async fn rust_error(_req: Request) -> Response {',
+    '    panic!("Boom! This panic was raised inside a Rust route handler");',
+    '}',
+    '',
+  ].join('\n'),
+}
+
+// #region Interactive trigger
+/** Throws during render — the point of the "Triggered" story. */
+function Bomb(): never {
+  throw new Error('Cannot read properties of null (reading "toUpperCase")')
+}
+
+interface DemoBoundaryProps {
+  onReset: () => void
+  children: ReactNode
+}
+
+/**
+ * A minimal error boundary, standing in for the router's `TuonoErrorBoundary`,
+ * so the story shows the real flow: a descendant throws → the boundary catches
+ * it → the overlay renders. `reset` is wired to the overlay's "Try again".
+ */
+class DemoBoundary extends Component<
+  DemoBoundaryProps,
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error }
+  }
+
+  render(): ReactNode {
+    if (this.state.error) {
+      return (
+        <DevErrorOverlay error={this.state.error} reset={this.props.onReset} />
+      )
+    }
+    return this.props.children
+  }
+}
+
+function TriggerDemo(): JSX.Element {
+  // Bumping `attempt` re-mounts the boundary (clearing its caught error), the
+  // same trick RouteMatch uses to reset via the resource key.
+  const [attempt, setAttempt] = useState(0)
+  const [armed, setArmed] = useState(false)
+
+  const reset = (): void => {
+    setArmed(false)
+    setAttempt((n) => n + 1)
+  }
+
+  return (
+    <DemoBoundary key={attempt} onReset={reset}>
+      {armed ? (
+        <Bomb />
+      ) : (
+        <DefaultScreen badge="Demo" title="Dev error overlay">
+          <p className="tuono-screen-text">
+            Throw an error from a React render and watch the boundary catch it.
+          </p>
+          <button
+            type="button"
+            className="tuono-screen-action"
+            onClick={(): void => setArmed(true)}
+          >
+            Throw a render error
+          </button>
+        </DefaultScreen>
+      )}
+    </DemoBoundary>
+  )
+}
+// #endregion
+
+const meta = {
+  title: 'Default Screens/DevErrorOverlay',
+  component: DevErrorOverlay,
+  parameters: { layout: 'fullscreen' },
+  args: { reset: (): void => undefined, error: jsError },
+} satisfies Meta<typeof DevErrorOverlay>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+/** A JavaScript error — frames resolve to app source via sourcemaps. */
+export const JavaScriptError: Story = {
+  args: { error: jsError },
+}
+
+/** A Rust handler panic — the server-embedded source excerpt is highlighted. */
+export const RustPanic: Story = {
+  args: { error: rustError },
+}
+
+/** Interactive: click the button to throw a real render error into a boundary. */
+export const Triggered: Story = {
+  render: (): JSX.Element => <TriggerDemo />,
+}

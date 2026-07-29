@@ -1,40 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 
 import { createRoute, createRouter } from '../index'
-import type { RouteProps } from '../types'
 import { useRouter } from '../hooks/useRouter'
 
 import { RouterProvider } from './RouterProvider'
 
 /**
- * Reproduces the reported bug: after a client-side navigation, pressing the
- * browser Back button left the destination page with missing server props and
- * crashed, because `popstate` did not flag a transition (so the page rendered
- * with cleared data while `isLoading` was already `false`).
- *
- * The invariant we assert — "if the page has no data, it must be loading" — is
- * exactly what breaks without the fix.
+ * Reproduces the original bug: after a client-side navigation, pressing the
+ * browser Back button must refetch the destination's server data (not render
+ * stale/empty data and crash). In the Suspense model a rendered page always has
+ * resolved data, so we assert Back shows freshly fetched data.
  */
 
 interface PageData {
   name: string
 }
 
-// Records every (data, isLoading) pair each page component renders with, so we
-// can assert the no-data-while-not-loading invariant across the whole flow.
-const renderLog: Array<{ page: string; hasData: boolean; isLoading: boolean }> =
-  []
-
 function makePage(pageName: string) {
-  return function Page({ data, isLoading }: RouteProps<PageData>): React.JSX.Element {
-    renderLog.push({ page: pageName, hasData: data != null, isLoading: !!isLoading })
+  return function Page(props: Partial<PageData>): React.JSX.Element {
     const { push } = useRouter()
     return (
       <div>
-        <div data-testid="content">
-          {isLoading ? 'loading' : `${pageName}:${data?.name ?? 'MISSING'}`}
-        </div>
+        <div data-testid="content">{`${pageName}:${props.name ?? 'MISSING'}`}</div>
         <button
           data-testid="go-about"
           onClick={(): void => push('/about', { scroll: false })}
@@ -48,15 +43,21 @@ function makePage(pageName: string) {
 
 function makeRouter(): ReturnType<typeof createRouter> {
   const rootRoute = createRoute({
-    component: (({ children }: RouteProps) => <>{children}</>) as never,
+    component: (({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    )) as never,
   })
-  const homeRoute = createRoute({ component: makePage('home') as never }).update({
+  const homeRoute = createRoute({
+    component: makePage('home') as never,
+  }).update({
     path: '/',
     getParentRoute: () => rootRoute,
     hasHandler: true,
     filePath: '/',
   })
-  const aboutRoute = createRoute({ component: makePage('about') as never }).update({
+  const aboutRoute = createRoute({
+    component: makePage('about') as never,
+  }).update({
     path: '/about',
     getParentRoute: () => rootRoute,
     hasHandler: true,
@@ -68,14 +69,13 @@ function makeRouter(): ReturnType<typeof createRouter> {
 
 describe('browser back navigation after client-side routing', () => {
   beforeEach(() => {
-    renderLog.length = 0
     window.scroll = vi.fn()
-    // Reset URL to the home page for each test.
     window.history.pushState({}, '', '/')
     global.fetch = vi.fn(async (url: string) => {
       const pathname = url.replace('/__tuono/data', '')
       const name = pathname.startsWith('/about') ? 'ABOUT' : 'HOME'
       return {
+        ok: true,
         json: async (): Promise<unknown> => ({ data: { name }, info: {} }),
       } as Response
     }) as never
@@ -83,19 +83,23 @@ describe('browser back navigation after client-side routing', () => {
 
   afterEach(cleanup)
 
-  it('refetches server props on Back and never renders empty data without a loading flag', async () => {
+  it('refetches the destination server data on Back', async () => {
     render(
       <RouterProvider
         router={makeRouter()}
-        serverInitialLocation={{ pathname: '/', href: 'http://localhost/', searchStr: '' }}
+        serverInitialLocation={{
+          pathname: '/',
+          href: 'http://localhost/',
+          searchStr: '',
+        }}
         serverInitialData={{ name: 'HOME_SSR' }}
       />,
     )
 
-    // 1. Initial SSR render shows the dehydrated home props.
+    // 1. Initial render reads the seeded SSR data synchronously.
     expect(screen.getByTestId('content').textContent).toBe('home:HOME_SSR')
 
-    // 2. Client-side navigate to /about — refetches its props.
+    // 2. Client-navigate to /about — suspends, fetches, then renders.
     await act(async () => {
       fireEvent.click(screen.getByTestId('go-about'))
     })
@@ -103,7 +107,8 @@ describe('browser back navigation after client-side routing', () => {
       expect(screen.getByTestId('content').textContent).toBe('about:ABOUT'),
     )
 
-    // 3. Press browser Back to '/'. The framework must refetch home's props.
+    // 3. Browser Back to '/'. It must refetch (fresh 'HOME'), not reuse the
+    // stale SSR value or the previous route's data.
     await act(async () => {
       window.history.pushState({}, '', '/')
       window.dispatchEvent(new PopStateEvent('popstate'))
@@ -111,10 +116,5 @@ describe('browser back navigation after client-side routing', () => {
     await waitFor(() =>
       expect(screen.getByTestId('content').textContent).toBe('home:HOME'),
     )
-
-    // 4. The invariant: no page ever rendered with missing data while NOT
-    // loading. A violation is the crash the user reported.
-    const brokenRenders = renderLog.filter((r) => !r.hasData && !r.isLoading)
-    expect(brokenRenders).toEqual([])
   })
 })

@@ -30,6 +30,8 @@ main {
 .header {
   display: flex;
   gap: 20px;
+  max-width: 673px;
+  margin: 20px auto;
 }
 
 .header a {

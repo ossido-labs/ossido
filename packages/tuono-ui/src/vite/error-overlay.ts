@@ -11,7 +11,11 @@
 import type { ErrorPayload, Plugin } from 'vite'
 
 // Set the `:host` styles to ensure that Playwright can detect the element as visible
+// Palette and fonts mirror the tuono-ui design tokens (see components/base.css)
+// so this build-time overlay matches the runtime error screens. The Google Fonts
+// import must stay first; it loads the same Noto Sans / JetBrains Mono families.
 const templateStyle = /*css*/ `
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
 :host {
   position: fixed;
   top: 0;
@@ -19,16 +23,19 @@ const templateStyle = /*css*/ `
   width: 100%;
   height: 100%;
   z-index: 99999;
-  --monospace: 'SFMono-Regular', Consolas,
-  'Liberation Mono', Menlo, Courier, monospace;
-  --red: #ff5555;
-  --yellow: #e2aa53;
-  --purple: #cfa4ff;
-  --cyan: #2dd9da;
-  --dim: #c9c9c9;
+  --sans: 'Noto Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  --monospace: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --accent: #f43f5e;
+  --red: #ff8fa3;
+  --yellow: #e6e6e6;
+  --purple: #ff8fa3;
+  --cyan: #c7c7cf;
+  --dim: #8a8a94;
 
-  --window-background: #181818;
-  --window-color: #d8d8d8;
+  --window-background: #1b1b1f;
+  --window-color: #e6e6e6;
 }
 
 .backdrop {
@@ -44,7 +51,7 @@ const templateStyle = /*css*/ `
 }
 
 .window {
-  font-family: var(--monospace);
+  font-family: var(--sans);
   line-height: 1.5;
   max-width: 80vw;
   color: var(--window-color);
@@ -53,10 +60,10 @@ const templateStyle = /*css*/ `
   padding: 2.5vh 4vw;
   position: relative;
   background: var(--window-background);
-  border-radius: 6px 6px 8px 8px;
+  border-radius: 8px;
   box-shadow: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);
   overflow: hidden;
-  border-top: 8px solid var(--red);
+  border-top: 8px solid var(--accent);
   direction: ltr;
   text-align: left;
 }
@@ -88,9 +95,11 @@ pre.frame {
 }
 
 .message {
+  font-family: var(--sans);
   line-height: 1.3;
   font-weight: 600;
   white-space: pre-wrap;
+  margin-bottom: 1rem;
 }
 
 .message-body {
@@ -158,10 +167,7 @@ const codeframeRE = /^(?:>?\s*\d+\s+\|.*|\s+\|\s*\^.*)\r?\n/gm
 const overlayTemplate = `
 <div class="backdrop" part="backdrop">
   <div class="window" part="window">
-    <pre class="message" part="message">
-      <span class="plugin" part="plugin"></span>
-      <span class="message-body" part="message-body"></span>
-    </pre>
+    <pre class="message" part="message"><span class="plugin" part="plugin"></span><span class="message-body" part="message-body"></span></pre>
     <pre class="file" part="file">
     </pre>
     <pre class="frame" part="frame"></pre>
@@ -197,6 +203,7 @@ export class ErrorOverlay extends HTMLElement {
     if (err.plugin) {
       this.text('.plugin', `[plugin:${err.plugin}] `)
     }
+
     this.text('.message-body', message.trim())
 
     const [file] = (err.loc?.file || err.id || 'unknown file').split(`?`)
@@ -269,24 +276,39 @@ export class ErrorOverlay extends HTMLElement {
 }
 
 function getOverlayCode(): string {
+  // Bind the class to `const ErrorOverlay` explicitly: the bundler may emit it
+  // as an anonymous class expression (`class extends HTMLElement {…}`), which is
+  // a syntax error as a bare statement. The binding also shadows Vite's class
+  // (renamed to `ViteErrorOverlay` by patchOverlay) so `customElements.define`
+  // registers ours.
   return `
 		const overlayTemplate = \`${overlayTemplate}\`;
-		${ErrorOverlay.toString()}
+		const ErrorOverlay = ${ErrorOverlay.toString()};
 	`
 }
 
+// The exact declaration of Vite's built-in overlay class in its HMR client.
+// Vite 8 emits `var ErrorOverlay = class extends HTMLElement` (older versions
+// used `class ErrorOverlay extends HTMLElement`). We match on this string —
+// which only appears in Vite's client — instead of the module id, so the patch
+// survives changes to how the client module is resolved/served.
+const VITE_OVERLAY_CLASS_DECL = 'var ErrorOverlay = class extends HTMLElement'
+
 function patchOverlay(code: string): string {
+  // Inject our overlay (its own `overlayTemplate` + `ErrorOverlay` class) ahead
+  // of Vite's, and rename Vite's class so `customElements.define(overlayId,
+  // ErrorOverlay)` registers ours instead.
   return code.replace(
-    'class ErrorOverlay',
-    getOverlayCode() + '\nclass ViteErrorOverlay',
+    VITE_OVERLAY_CLASS_DECL,
+    getOverlayCode() + '\nvar ViteErrorOverlay = class extends HTMLElement',
   )
 }
 
 export const ErrorOverlayVitePlugin: Plugin = {
   name: 'tuono-error-overlay-plugin',
-  transform(code, id, opts) {
+  transform(code, _id, opts) {
     if (opts?.ssr) return
-    if (!id.includes('vite/dist/client/client.mjs')) return
+    if (!code.includes(VITE_OVERLAY_CLASS_DECL)) return
 
     return patchOverlay(code)
   },

@@ -105,9 +105,10 @@ async fn handle_socket(mut tuono_socket: WebSocket) {
             };
 
             if let Err(err) = tuono_sender.send(msg_to_browser).await
-                && err.to_string() != Error::AlreadyClosed.to_string() {
-                    eprintln!("Failed to send back message from vite to browser: {err}")
-                }
+                && err.to_string() != Error::AlreadyClosed.to_string()
+            {
+                eprintln!("Failed to send back message from vite to browser: {err}")
+            }
         }
     });
 }
