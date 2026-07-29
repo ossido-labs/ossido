@@ -21,9 +21,11 @@ import {
 
 import {
   ROUTES_FOLDER,
+  PAGE_FILE_ID,
   LAYOUT_PATH_ID,
   LOADING_FILE_ID,
   ERROR_FILE_ID,
+  NOT_FOUND_FILE_ID,
   GENERATED_ROUTE_TREE,
   DYNAMIC_FN,
 } from './constants'
@@ -52,7 +54,7 @@ function parentDir(dir: string): string {
   return idx === -1 ? '.' : dir.slice(0, idx)
 }
 
-/** Walk up the directory tree to the closest `loading`/`error` file. */
+/** Walk up the directory tree to the closest special file. */
 function findNearestSpecialFile(
   startDir: string,
   filesByDir: Map<string, SpecialFileNode>,
@@ -71,6 +73,7 @@ interface RouteNodesResult {
   rustHandlersNodes: Array<string>
   loadingFiles: Array<SpecialFileNode>
   errorFiles: Array<SpecialFileNode>
+  notFoundFiles: Array<SpecialFileNode>
 }
 
 async function getRouteNodes(
@@ -80,6 +83,7 @@ async function getRouteNodes(
   const rustHandlersNodes: Array<string> = []
   const loadingFiles: Array<SpecialFileNode> = []
   const errorFiles: Array<SpecialFileNode> = []
+  const notFoundFiles: Array<SpecialFileNode> = []
 
   async function recurse(dir: string): Promise<void> {
     const fullDir = path.resolve(config.folderName, dir)
@@ -94,6 +98,36 @@ async function getRouteNodes(
           await recurse(relativePath)
         } else if (fullPath.match(/\.(tsx|ts|jsx|js|mdx)$/)) {
           const isScript = Boolean(fullPath.match(/\.(tsx|ts|jsx|js)$/))
+          const baseName = removeExt(dirent.name)
+          const filePath = replaceBackslash(path.join(dir, dirent.name))
+
+          // `loading` / `error` / `not-found` are not routes — collect them
+          // separately so they can be attached to routes as nearest-ancestor
+          // metadata (Suspense fallback / error boundary / not-found UI).
+          if (
+            baseName === LOADING_FILE_ID ||
+            baseName === ERROR_FILE_ID ||
+            baseName === NOT_FOUND_FILE_ID
+          ) {
+            const specialFile: SpecialFileNode = {
+              filePath,
+              fullPath,
+              variableName: routePathToVariable(`/${removeExt(filePath)}`),
+              dir: dirKey(filePath),
+            }
+            if (baseName === LOADING_FILE_ID) loadingFiles.push(specialFile)
+            else if (baseName === ERROR_FILE_ID) errorFiles.push(specialFile)
+            else notFoundFiles.push(specialFile)
+            return
+          }
+
+          // Only `page` (the route leaf for its directory) and `layout` (the
+          // shared wrapper) are routes. Everything else in `src/routes` is
+          // ignored, so components can be colocated next to a page.
+          if (baseName !== PAGE_FILE_ID && baseName !== LAYOUT_PATH_ID) {
+            return
+          }
+
           // Check that the route is correctly default exported
           if (
             isScript &&
@@ -101,37 +135,18 @@ async function getRouteNodes(
           ) {
             return
           }
-          const filePath = replaceBackslash(path.join(dir, dirent.name))
-
-          // `loading.tsx` / `error.tsx` are not routes — collect them separately
-          // so they can be attached to routes as nearest-ancestor metadata.
-          if (isScript) {
-            const baseName = removeExt(dirent.name)
-            if (baseName === LOADING_FILE_ID || baseName === ERROR_FILE_ID) {
-              const specialFile: SpecialFileNode = {
-                filePath,
-                fullPath,
-                variableName: routePathToVariable(`/${removeExt(filePath)}`),
-                dir: dirKey(filePath),
-              }
-              if (baseName === LOADING_FILE_ID) loadingFiles.push(specialFile)
-              else errorFiles.push(specialFile)
-              return
-            }
-          }
 
           const filePathNoExt = removeExt(filePath)
           let routePath = cleanPath(`/${filePathNoExt}`) || ''
 
           const variableName = routePathToVariable(routePath)
 
-          // Remove the index from the route path and
-          // if the route path is empty, use `/'
-          if (routePath === 'index') {
-            routePath = '/'
+          // A `page` maps to its containing directory: `about/page` → `/about`,
+          // the root `page` → `/`. `layout` keeps its `/layout` suffix, which
+          // marks it as a layout throughout the rest of the pipeline.
+          if (baseName === PAGE_FILE_ID) {
+            routePath = routePath.replace(/\/page$/, '/') || '/'
           }
-
-          routePath = routePath.replace(/\/index$/, '/') || '/'
 
           routeNodes.push({
             filePath,
@@ -140,15 +155,18 @@ async function getRouteNodes(
             variableName,
           })
         } else if (fullPath.match(/\.(rs)$/)) {
+          // `page.rs` (page data) and `layout.rs` (layout data) are handler
+          // nodes; API handlers and middleware are wired on the Rust side only.
+          const rsBaseName = removeExt(dirent.name)
+          if (rsBaseName !== PAGE_FILE_ID && rsBaseName !== LAYOUT_PATH_ID) return
+
           const filePath = replaceBackslash(path.join(dir, dirent.name))
           const filePathNoExt = removeExt(filePath)
           let routePath = cleanPath(`/${filePathNoExt}`) || ''
 
-          if (routePath === 'index') {
-            routePath = '/'
+          if (rsBaseName === PAGE_FILE_ID) {
+            routePath = routePath.replace(/\/page$/, '/') || '/'
           }
-
-          routePath = routePath.replace(/\/index$/, '/') || '/'
 
           rustHandlersNodes.push(routePath)
         }
@@ -158,7 +176,7 @@ async function getRouteNodes(
 
   await recurse('./')
 
-  return { routeNodes, rustHandlersNodes, loadingFiles, errorFiles }
+  return { routeNodes, rustHandlersNodes, loadingFiles, errorFiles, notFoundFiles }
 }
 
 export async function routeGenerator(
@@ -187,6 +205,7 @@ export async function routeGenerator(
     rustHandlersNodes,
     loadingFiles,
     errorFiles,
+    notFoundFiles,
   } = await getRouteNodes(config)
 
   const preRouteNodes = sortRouteNodes(beforeRouteNodes)
@@ -217,11 +236,12 @@ export async function routeGenerator(
     handleNode(node)
   }
 
-  // Resolve the nearest-ancestor loading/error file for each (non-layout) route
-  // and remember which special files are actually referenced (so only those get
-  // imported).
+  // Resolve the nearest-ancestor loading/error/not-found file for each
+  // (non-layout) route and remember which special files are actually
+  // referenced (so only those get imported).
   const loadingByDir = new Map(loadingFiles.map((file) => [file.dir, file]))
   const errorByDir = new Map(errorFiles.map((file) => [file.dir, file]))
+  const notFoundByDir = new Map(notFoundFiles.map((file) => [file.dir, file]))
   const usedSpecialFiles = new Map<string, SpecialFileNode>()
 
   for (const node of routeNodes) {
@@ -229,12 +249,23 @@ export async function routeGenerator(
     const nodeDir = dirKey(node.filePath)
     node.loadingFile = findNearestSpecialFile(nodeDir, loadingByDir)
     node.errorFile = findNearestSpecialFile(nodeDir, errorByDir)
+    node.notFoundFile = findNearestSpecialFile(nodeDir, notFoundByDir)
     if (node.loadingFile) {
       usedSpecialFiles.set(node.loadingFile.filePath, node.loadingFile)
     }
     if (node.errorFile) {
       usedSpecialFiles.set(node.errorFile.filePath, node.errorFile)
     }
+    if (node.notFoundFile) {
+      usedSpecialFiles.set(node.notFoundFile.filePath, node.notFoundFile)
+    }
+  }
+
+  // The root `not-found.tsx` is the global not-found UI (rendered when no route
+  // matches at all). Always import it when present.
+  const rootNotFoundFile = notFoundFiles.find((file) => file.dir === '.')
+  if (rootNotFoundFile) {
+    usedSpecialFiles.set(rootNotFoundFile.filePath, rootNotFoundFile)
   }
 
   const specialImports = [...usedSpecialFiles.values()]
@@ -302,11 +333,17 @@ export async function routeGenerator(
               ? 'hasHandler: true'
               : '',
             `filePath: '${node.path || '/'}'`,
+            // The route's source file path, matching the Rust route key — used to
+            // seed/read its server data (page or layout).
+            `dataKey: '/${removeExt(node.filePath)}'`,
             node.loadingFile
               ? `loadingComponent: ${node.loadingFile.variableName}Import`
               : '',
             node.errorFile
               ? `errorComponent: ${node.errorFile.variableName}Import`
+              : '',
+            node.notFoundFile
+              ? `notFoundComponent: ${node.notFoundFile.variableName}Import`
               : '',
           ]
             .filter(Boolean)
@@ -316,6 +353,17 @@ export async function routeGenerator(
       })
       .join('\n\n'),
   ]
+
+  // The root layout's data key is its source file (`layout`); it has a handler
+  // when a root `layout.rs` was collected.
+  const rootLayoutHasHandler = rustHandlersNodes.includes('/layout')
+  const rootRouteDeclaration = `const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport, dataKey: '/layout'${
+    rootLayoutHasHandler ? ', hasHandler: true' : ''
+  }${
+    rootNotFoundFile
+      ? `, notFoundComponent: ${rootNotFoundFile.variableName}Import`
+      : ''
+  } });`
 
   const routeImports = [
     '// This file is auto-generated by Tuono',
@@ -330,7 +378,7 @@ export async function routeGenerator(
     ].join('\n'),
     specialImports,
     imports,
-    'const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport });',
+    rootRouteDeclaration,
     createRoutes,
     '// Create/Update Routes',
     createRouteUpdates,

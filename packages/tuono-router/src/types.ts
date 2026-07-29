@@ -60,6 +60,9 @@ export interface ServerErrorPayload {
 /** A `loading.tsx` component. Rendered as a `<Suspense>` fallback (no props). */
 export type LoadingComponent = ComponentType
 
+/** A `not-found.tsx` component. Rendered when no route matches (no props). */
+export type NotFoundComponent = ComponentType
+
 // The error UI and its types live in the design system (tuono-ui); re-exported
 // here so router consumers keep importing them from `tuono-router`.
 export type {

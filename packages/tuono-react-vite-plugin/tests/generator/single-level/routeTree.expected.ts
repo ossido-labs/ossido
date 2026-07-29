@@ -2,34 +2,40 @@
 
 import { createRoute, __tuono__internal__lazyLoadRoute } from 'tuono'
 
-import RootLayoutImport from './routes/__layout'
+import RootLayoutImport from './routes/layout'
 
-const AboutImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/about'),
+const PageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/page'),
 )
-const IndexImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/index'),
+const AboutPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/about/page'),
 )
 
-const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport })
+const rootRoute = createRoute({
+  isRoot: true,
+  component: RootLayoutImport,
+  dataKey: '/layout',
+})
 
-const About = createRoute({ component: AboutImport })
-const Index = createRoute({ component: IndexImport })
+const Page = createRoute({ component: PageImport })
+const AboutPage = createRoute({ component: AboutPageImport })
 
 // Create/Update Routes
 
-const AboutRoute = About.update({
-  path: '/about',
-  getParentRoute: () => rootRoute,
-  filePath: '/about',
-})
-
-const IndexRoute = Index.update({
+const PageRoute = Page.update({
   path: '/',
   getParentRoute: () => rootRoute,
   filePath: '/',
+  dataKey: '/page',
+})
+
+const AboutPageRoute = AboutPage.update({
+  path: '/about',
+  getParentRoute: () => rootRoute,
+  filePath: '/about/',
+  dataKey: '/about/page',
 })
 
 // Create and export the route tree
 
-export const routeTree = rootRoute.addChildren([IndexRoute, AboutRoute])
+export const routeTree = rootRoute.addChildren([PageRoute, AboutPageRoute])

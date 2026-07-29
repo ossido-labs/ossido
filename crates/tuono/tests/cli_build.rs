@@ -9,6 +9,7 @@ use utils::temp_tuono_project::TempTuonoProject;
 
 const POST_API_FILE: &str = r"#[tuono_lib::api(POST)]";
 const GET_API_FILE: &str = r"#[tuono_lib::api(GET)]";
+const HANDLER_FILE: &str = "#[tuono_lib::handler]\nasync fn handler(_req: tuono_lib::Request) -> tuono_lib::Response { todo!() }";
 
 fn tracing_message(level: Level, module: &str, message: &str) -> String {
     format!("\x1b[31m{level}\x1b[0m \x1b[2mtuono::{module}\x1b[0m\x1b[2m:\x1b[0m {message}\n")
@@ -25,7 +26,7 @@ const BUILD_TUONO_CONFIG: &str = "./node_modules/.bin/tuono-build-config";
 fn it_successfully_create_the_index_route() {
     let temp_tuono_project = TempTuonoProject::new();
 
-    temp_tuono_project.add_file("./src/routes/index.rs");
+    temp_tuono_project.add_file("./src/routes/page.rs");
 
     let mut test_tuono_build = Command::cargo_bin("tuono").unwrap();
     test_tuono_build
@@ -41,13 +42,13 @@ fn it_successfully_create_the_index_route() {
 
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
-        r#"#[path="../src/routes/index.rs"]"#,
+        r#"#[path="../src/routes/page.rs"]"#,
     );
-    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod index;");
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod page;");
 
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
-        r#".route("/", get(index::tuono_internal_route)).route("/__tuono/data/", get(index::tuono_internal_api))"#,
+        r#".route("/", get(page::tuono_internal_route)).route("/__tuono/data/", get(page::tuono_internal_api))"#,
     );
 }
 
@@ -157,10 +158,60 @@ fn it_successfully_import_mixed_case_routes() {
 
 #[test]
 #[serial]
+fn it_successfully_composes_layout_handlers_into_pages() {
+    let temp_tuono_project = TempTuonoProject::new();
+
+    // A root `layout.rs` wraps the `/about` page.
+    temp_tuono_project.add_file_with_content("./src/routes/layout.rs", HANDLER_FILE);
+    temp_tuono_project.add_file_with_content("./src/routes/about/page.rs", HANDLER_FILE);
+
+    let mut test_tuono_build = Command::cargo_bin("tuono").unwrap();
+    test_tuono_build
+        .arg("build")
+        .arg("--no-js-emit")
+        .assert()
+        .success();
+
+    let temp_main_rs_path = temp_tuono_project.path().join(".tuono/main.rs");
+    let temp_main_rs_content =
+        fs::read_to_string(&temp_main_rs_path).expect("Failed to read '.tuono/main.rs' content.");
+
+    // Both the layout and the page modules are imported…
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod layout;");
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod about_page;");
+
+    // …and the page's routes are served by composites that run the layout +
+    // page data handlers keyed by their route file paths.
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"("/layout".to_string(), layout::tuono_internal_props("#,
+    );
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"about_page::tuono_internal_props("#,
+    );
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/about", get(__tuono_ssr_about_page))"#,
+    );
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/__tuono/data/about", get(__tuono_data_about_page))"#,
+    );
+
+    // The layout itself has no standalone route.
+    assert!(
+        !temp_main_rs_content.contains("get(layout::tuono_internal_route)"),
+        "layout.rs must not get its own route"
+    );
+}
+
+#[test]
+#[serial]
 fn it_successfully_create_catch_all_routes() {
     let temp_tuono_project = TempTuonoProject::new();
 
-    temp_tuono_project.add_file("./src/routes/[...all_routes].rs");
+    temp_tuono_project.add_file("./src/routes/[...all_routes]/page.rs");
 
     temp_tuono_project.add_file_with_content("./src/routes/api/[...all_apis].rs", POST_API_FILE);
 
@@ -184,9 +235,12 @@ fn it_successfully_create_catch_all_routes() {
 
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
-        r#"#[path="../src/routes/[...all_routes].rs"]"#,
+        r#"#[path="../src/routes/[...all_routes]/page.rs"]"#,
     );
-    assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod dyn_catch_all_all_routes;");
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        "mod dyn_catch_all_all_routes_page;",
+    );
 
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
@@ -195,17 +249,12 @@ fn it_successfully_create_catch_all_routes() {
 
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
-        r#".route("/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_route))"#,
+        r#".route("/{*all_routes}", get(dyn_catch_all_all_routes_page::tuono_internal_route))"#,
     );
 
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
-        r#".route("/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_route))"#,
-    );
-
-    assert_contains_ignoring_whitespace(
-        &temp_main_rs_content,
-        r#".route("/__tuono/data/{*all_routes}", get(dyn_catch_all_all_routes::tuono_internal_api))"#,
+        r#".route("/__tuono/data/{*all_routes}", get(dyn_catch_all_all_routes_page::tuono_internal_api))"#,
     );
 }
 

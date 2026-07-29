@@ -10,10 +10,9 @@ use tracing::error;
 use crate::app::{App, ROUTES_FOLDER_PATH};
 use crate::mode::Mode;
 use crate::route::AxumInfo;
-use crate::route::Route;
 use crate::route_directory_info::MIDDLEWARE_FILENAME;
 use crate::route_directory_info::RouteDirectoryInfo;
-use crate::typescript::TypesJar;
+use crate::typescript::{TypesJar, collect_layout_props, collect_route_props, render_route_props};
 
 #[cfg(not(target_os = "windows"))]
 const FALLBACK_HTML: &str = include_str!("../templates/fallback.html");
@@ -116,7 +115,8 @@ impl SourceBuilder {
         self.create_file(dev_folder.join("server-main.tsx"), SERVER_ENTRY_DATA)?;
         self.create_file(dev_folder.join("client-main.tsx"), CLIENT_ENTRY_DATA)?;
 
-        self.types_jar.generate_typescript_file(&self.base_path)?;
+        self.types_jar
+            .generate_typescript_file(&self.base_path, &self.route_props_typescript())?;
 
         if mode == Mode::Dev {
             self.app.build_tuono_config()?;
@@ -131,10 +131,14 @@ impl SourceBuilder {
         let Self { app, mode, .. } = &self;
         let mut main_file_definition: &str = " let router = Router::new()";
         let mut main_file_usage: &str = ";";
-        let mut mainfile_import: &str = "";
+        // `ApplicationState` is always referenced by the handlers' data entry
+        // point (`tuono_internal_props`) and by the layout composites, so it is
+        // aliased to the unit state unless the app defines a custom one below.
+        let mut mainfile_import: &str =
+            "mod tuono_main_state { pub type ApplicationState = (); }\n";
         let mode_str = mode.as_str();
         if app.has_app_state {
-            main_file_definition = "let user_custom_state = tuono_main_state::main().await;\n 
+            main_file_definition = "let user_custom_state = tuono_main_state::main().await;\n
             let router = Router::new()";
             main_file_usage = ".with_state(user_custom_state);";
             mainfile_import = r#"#[path="../src/app.rs"]
@@ -149,7 +153,11 @@ impl SourceBuilder {
             )
             .replace(
                 "// MODULE_IMPORTS\n",
-                &self.create_modules_declaration(&app.route_directory_info),
+                &format!(
+                    "{}{}",
+                    self.create_modules_declaration(&app.route_directory_info),
+                    self.create_composite_handlers(),
+                ),
             )
             .replace("/*VERSION*/", crate_version!())
             .replace(
@@ -200,7 +208,19 @@ impl SourceBuilder {
     }
 
     pub fn generate_typescript_file(&mut self) -> io::Result<()> {
-        self.types_jar.generate_typescript_file(&self.base_path)
+        let extra = self.route_props_typescript();
+        self.types_jar
+            .generate_typescript_file(&self.base_path, &extra)
+    }
+
+    /// The `RouteProps` map + `TuonoPage` helper, derived from each page
+    /// handler's return type. Recomputed on each generation so it tracks route
+    /// and handler changes.
+    fn route_props_typescript(&self) -> String {
+        render_route_props(
+            &collect_route_props(&self.base_path),
+            &collect_layout_props(&self.base_path),
+        )
     }
 
     // Adds calls to .layer() for adding middleware to axum
@@ -233,30 +253,42 @@ impl SourceBuilder {
         for directory in route_directory_info.directories.clone() {
             route_declarations.push_str(&self.create_routes_declaration(&directory));
         }
-        for (_key, route) in routes {
-            let Route { axum_info, .. } = &route;
-            if !axum_info.is_some() {
+        for (key, route) in routes {
+            let Some(axum_info) = &route.axum_info else {
+                continue;
+            };
+            // A `layout.rs` has no standalone route — it is composed into every
+            // page it wraps (see `create_composite_handlers`).
+            if route.is_layout {
                 continue;
             }
             let AxumInfo {
                 axum_route,
                 module_import,
-            } = axum_info.as_ref().unwrap();
-            if !route.is_api() {
-                route_declarations.push_str(&format!(
-                    r#".route("{axum_route}", get({module_import}::tuono_internal_route))"#
-                ));
-
-                route_declarations.push_str(&format!(
-                    r#".route("/__tuono/data{axum_route}", get({module_import}::tuono_internal_api))"#
-                ));
-            } else {
+            } = axum_info;
+            if route.is_api() {
                 for method in route.api_data.as_ref().unwrap().methods.clone() {
                     let method = method.to_string().to_lowercase();
                     route_declarations.push_str(&format!(
                             r#".route("{axum_route}", {method}({module_import}::{method}_tuono_internal_api))"#
                     ));
                 }
+            } else if self.layout_modules_for_page(&key).is_empty() {
+                // Plain page: render + data handlers straight from its module.
+                route_declarations.push_str(&format!(
+                    r#".route("{axum_route}", get({module_import}::tuono_internal_route))"#
+                ));
+                route_declarations.push_str(&format!(
+                    r#".route("/__tuono/data{axum_route}", get({module_import}::tuono_internal_api))"#
+                ));
+            } else {
+                // Wrapped by ≥1 `layout.rs`: use the generated composites.
+                route_declarations.push_str(&format!(
+                    r#".route("{axum_route}", get(__tuono_ssr_{module_import}))"#
+                ));
+                route_declarations.push_str(&format!(
+                    r#".route("/__tuono/data{axum_route}", get(__tuono_data_{module_import}))"#
+                ));
             }
         }
 
@@ -311,6 +343,94 @@ impl SourceBuilder {
         module_declarations
     }
 
+    /// The `layout.rs` handlers wrapping a page, ordered outermost → innermost,
+    /// as `(dataKey, module)` pairs. `dataKey` is the layout's route file path
+    /// (matching the client route's `dataKey`); `module` is its `#[path] mod`
+    /// name. Walks the page's ancestor directories (groups included) looking for
+    /// a collected `layout` route.
+    fn layout_modules_for_page(&self, page_path: &str) -> Vec<(String, String)> {
+        let directory = page_path.strip_suffix("/page").unwrap_or(page_path);
+
+        // Ancestor directories, root first: "" (root), "/a", "/a/b", …
+        let mut prefixes = vec![String::new()];
+        let mut accumulator = String::new();
+        for segment in directory.split('/').filter(|segment| !segment.is_empty()) {
+            accumulator.push('/');
+            accumulator.push_str(segment);
+            prefixes.push(accumulator.clone());
+        }
+
+        prefixes
+            .into_iter()
+            .filter_map(|prefix| {
+                let layout_path = format!("{prefix}/layout");
+                let route = self.app.route_map.get(&layout_path)?;
+                let module = route.axum_info.as_ref()?.module_import.clone();
+                route.is_layout.then_some((layout_path, module))
+            })
+            .collect()
+    }
+
+    /// Free functions that compose a page with the `layout.rs` handlers wrapping
+    /// it: one SSR handler and one data-endpoint handler per page that has at
+    /// least one wrapping layout with a data handler. Both extract the app state
+    /// once and hand a clone to every handler in the chain.
+    fn create_composite_handlers(&self) -> String {
+        let mut handlers = String::new();
+
+        for (page_path, route) in &self.app.route_map {
+            if route.is_layout || route.is_api() {
+                continue;
+            }
+            let Some(page_info) = &route.axum_info else {
+                continue;
+            };
+            let layouts = self.layout_modules_for_page(page_path);
+            if layouts.is_empty() {
+                continue;
+            }
+
+            let page_module = &page_info.module_import;
+            let layout_entries = layouts
+                .iter()
+                .map(|(data_key, module)| {
+                    format!(
+                        r#"("{data_key}".to_string(), {module}::tuono_internal_props(req.clone(), state.clone()).await)"#
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            handlers.push_str(&format!(
+                r#"
+                async fn __tuono_ssr_{page_module}(
+                    tuono_lib::axum::extract::Path(params): tuono_lib::axum::extract::Path<std::collections::HashMap<String, String>>,
+                    tuono_lib::axum::extract::State(state): tuono_lib::axum::extract::State<crate::tuono_main_state::ApplicationState>,
+                    request: tuono_lib::axum::extract::Request,
+                ) -> impl tuono_lib::axum::response::IntoResponse {{
+                    let req = tuono_lib::Request::new(request.uri().to_owned(), request.headers().to_owned(), params, None);
+                    let layouts = vec![{layout_entries}];
+                    let page = {page_module}::tuono_internal_props(req.clone(), state.clone()).await;
+                    tuono_lib::render_chain(req, page, layouts)
+                }}
+
+                async fn __tuono_data_{page_module}(
+                    tuono_lib::axum::extract::Path(params): tuono_lib::axum::extract::Path<std::collections::HashMap<String, String>>,
+                    tuono_lib::axum::extract::State(state): tuono_lib::axum::extract::State<crate::tuono_main_state::ApplicationState>,
+                    request: tuono_lib::axum::extract::Request,
+                ) -> impl tuono_lib::axum::response::IntoResponse {{
+                    let req = tuono_lib::Request::new(request.uri().to_owned(), request.headers().to_owned(), params, None);
+                    let layouts = vec![{layout_entries}];
+                    let page = {page_module}::tuono_internal_props(req.clone(), state.clone()).await;
+                    tuono_lib::chain_json(page, layouts)
+                }}
+                "#
+            ));
+        }
+
+        handlers
+    }
+
     fn build_html_fallback(&self) -> String {
         if let Some(config) = &self.app.config.as_ref() {
             if let Some(origin) = &config.server.origin {
@@ -329,6 +449,7 @@ impl SourceBuilder {
 mod tests {
 
     use super::*;
+    use crate::route::Route;
 
     #[test]
     fn should_set_the_correct_mode() {

@@ -25,6 +25,7 @@ export function RouterContextProviderWrapper({
       router={router}
       serverInitialLocation={serverPayload.location}
       serverInitialData={serverPayload.data}
+      serverInitialLayoutData={serverPayload.layoutData}
       serverInitialError={serverPayload.serverError}
       // Read `mode` from the payload context (available on server AND client);
       // the client `hydrateRoot` passes no `serverPayload` prop, so a prop-based

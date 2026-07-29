@@ -17,6 +17,14 @@ const EMPTY_DATA: () = ();
 pub struct Payload<'a> {
     location: Location,
     data: &'a dyn Serialize,
+    /// Server data for the `layout.rs` handlers wrapping this page, keyed by the
+    /// layout's route file path (its `dataKey`). Absent when no wrapping layout
+    /// has a data handler, so a plain page payload is unchanged.
+    #[serde(
+        rename(serialize = "layoutData"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
     mode: Mode,
     #[serde(rename(serialize = "jsBundles"))]
     js_bundles: Option<Vec<String>>,
@@ -50,12 +58,24 @@ impl<'a> Payload<'a> {
         Payload {
             location: req.location(),
             data,
+            layout_data: None,
             mode,
             js_bundles: None,
             css_bundles: None,
             dev_server_config,
             server_error: None,
         }
+    }
+
+    /// Build a payload that also carries the wrapping layouts' server data.
+    pub fn new_with_layout(
+        req: &'a Request,
+        data: &'a dyn Serialize,
+        layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
+    ) -> Payload<'a> {
+        let mut payload = Payload::new(req, data);
+        payload.layout_data = layout_data;
+        payload
     }
 
     /// Build a payload that carries a handler error instead of route data. Used
@@ -89,10 +109,10 @@ mod tests {
     use axum::http::Uri;
 
     const MANIFEST_EXAMPLE: &str = r#"{
-        "../src/routes/index.tsx": {
+        "../src/routes/page.tsx": {
             "file": "assets/index-D-yFyCZo.js",
             "name": "index",
-            "src": "../src/routes/index.tsx",
+            "src": "../src/routes/page.tsx",
             "isDynamicEntry": true,
             "imports": [
                 "client-main.tsx"
@@ -101,10 +121,10 @@ mod tests {
                 "assets/index-CynfArjF.css"
             ]
         },
-        "../src/routes/pokemons/[pokemon].tsx": {
+        "../src/routes/pokemons/[pokemon]/page.tsx": {
             "file": "assets/_pokemon_-DlFInatQ.js",
             "name": "_pokemon_",
-            "src": "../src/routes/pokemons/[pokemon].tsx",
+            "src": "../src/routes/pokemons/[pokemon]/page.tsx",
             "isDynamicEntry": true,
             "imports": [
                 "client-main.tsx"
@@ -113,10 +133,10 @@ mod tests {
                 "assets/_pokemon_-BcJZaQaO.css"
             ]
         },
-        "../src/routes/pokemons/__layout.tsx": {
+        "../src/routes/pokemons/layout.tsx": {
             "file": "assets/__layout-BFnT3M7X.js",
             "name": "__layout",
-            "src": "../src/routes/pokemons/__layout.tsx",
+            "src": "../src/routes/pokemons/layout.tsx",
             "isDynamicEntry": true,
             "imports": [
                 "client-main.tsx"
@@ -131,9 +151,9 @@ mod tests {
             "src": "client-main.tsx",
             "isEntry": true,
             "dynamicImports": [
-                "../src/routes/pokemons/__layout.tsx",
-                "../src/routes/index.tsx",
-                "../src/routes/pokemons/[pokemon].tsx"
+                "../src/routes/pokemons/layout.tsx",
+                "../src/routes/page.tsx",
+                "../src/routes/pokemons/[pokemon]/page.tsx"
             ],  
             "css": [
                 "assets/client-main-BS7N-NIa.css"
@@ -156,6 +176,7 @@ mod tests {
         Payload {
             location,
             data: &None::<Option<()>>,
+            layout_data: None,
             mode,
             js_bundles: None,
             css_bundles: None,

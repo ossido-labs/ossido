@@ -2,35 +2,44 @@
 
 import { createRoute, __tuono__internal__lazyLoadRoute } from 'tuono'
 
-import RootLayoutImport from './routes/__layout'
+import RootLayoutImport from './routes/layout'
 
-const IndexImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/index'),
+const PageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/page'),
 )
-const PostscatchallImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/[...catch_all]'),
+const PostscatchallPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/[...catch_all]/page'),
 )
 
-const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport })
+const rootRoute = createRoute({
+  isRoot: true,
+  component: RootLayoutImport,
+  dataKey: '/layout',
+})
 
-const Index = createRoute({ component: IndexImport })
-const Postscatchall = createRoute({ component: PostscatchallImport })
+const Page = createRoute({ component: PageImport })
+const PostscatchallPage = createRoute({ component: PostscatchallPageImport })
 
 // Create/Update Routes
 
-const IndexRoute = Index.update({
+const PageRoute = Page.update({
   path: '/',
   getParentRoute: () => rootRoute,
   filePath: '/',
+  dataKey: '/page',
 })
 
-const PostscatchallRoute = Postscatchall.update({
+const PostscatchallPageRoute = PostscatchallPage.update({
   path: '/posts/[...catch_all]',
   getParentRoute: () => rootRoute,
   hasHandler: true,
-  filePath: '/posts/[...catch_all]',
+  filePath: '/posts/[...catch_all]/',
+  dataKey: '/posts/[...catch_all]/page',
 })
 
 // Create and export the route tree
 
-export const routeTree = rootRoute.addChildren([IndexRoute, PostscatchallRoute])
+export const routeTree = rootRoute.addChildren([
+  PageRoute,
+  PostscatchallPageRoute,
+])

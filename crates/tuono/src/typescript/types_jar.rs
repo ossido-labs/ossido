@@ -108,9 +108,10 @@ impl TypesJar {
         }
     }
 
-    /// Generate the string containing all the typescript types
-    /// found in the jar.
-    fn generate_typescript(&self) -> String {
+    /// Generate the string containing all the typescript types found in the jar,
+    /// plus `extra` (the route→props map + `TuonoPage`), inside the
+    /// `declare module "tuono/types"` block.
+    fn generate_typescript(&self, extra: &str) -> String {
         self.log_duplicated_types();
         let mut typescript = String::from("declare module \"tuono/types\" {\n");
         for ttype in &self.types {
@@ -121,18 +122,23 @@ impl TypesJar {
             typescript.push_str(&ttype.types_as_string);
             typescript.push_str(&format!("// END [{}]\n", ttype.file_path.to_string_lossy()));
         }
+        typescript.push_str(extra);
         typescript.push_str("}\n");
         typescript
     }
 
-    pub fn generate_typescript_file(&mut self, base_path: &Path) -> std::io::Result<()> {
+    pub fn generate_typescript_file(
+        &mut self,
+        base_path: &Path,
+        extra: &str,
+    ) -> std::io::Result<()> {
         if !self.should_generate_typescript_file {
             trace!("No need to create typescript module file");
             return Ok(());
         }
         self.should_generate_typescript_file = false;
         trace!("Creating typescript module file");
-        let typescript = self.generate_typescript();
+        let typescript = self.generate_typescript(extra);
         let typescript_file_path = base_path.join(".tuono").join("types.ts");
         std::fs::write(typescript_file_path, typescript)?;
 

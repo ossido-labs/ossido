@@ -58,11 +58,22 @@ fn clean_route_path(path: String) -> String {
         .replace(".md", "")
         .replace(".jsx", "");
 
-    if path == "/index" {
+    // A route lives in `<dir>/page`; the URL is its containing directory.
+    if path == "/page" {
         return "/".to_string();
     }
 
-    path.replace("/index", "")
+    match path.strip_suffix("/page") {
+        Some(directory) => directory.to_string(),
+        None => path,
+    }
+}
+
+/// Whether a cleaned route path refers to a `layout` file — the root `/layout`
+/// or a nested `<dir>/layout`. Layout bundles are merged into the routes they
+/// wrap rather than served as routes themselves.
+fn is_layout_route(route: &str) -> bool {
+    route == "/layout" || route.ends_with("/layout")
 }
 
 impl From<ViteManifest> for Manifest {
@@ -75,7 +86,9 @@ impl From<ViteManifest> for Manifest {
             .clone();
 
         for (key, bundle) in &manifest {
-            if key.contains("__layout") {
+            let route = clean_route_path(key.clone());
+
+            if is_layout_route(&route) {
                 continue;
             }
 
@@ -89,8 +102,6 @@ impl From<ViteManifest> for Manifest {
                 );
                 continue;
             }
-
-            let route = clean_route_path(key.clone());
 
             // Skip components/utils files
             if !route.starts_with("/") {
@@ -122,11 +133,11 @@ impl From<ViteManifest> for Manifest {
             bundles.insert(route, route_bundle);
         }
 
-        // Add __layout imports
+        // Add `layout` imports to every route they wrap.
         for (key, layout_bundle) in &manifest {
             let route = clean_route_path(key.clone());
-            if route.contains("__layout") {
-                let path_included_in_layout = route.replace("__layout", "");
+            if is_layout_route(&route) {
+                let path_included_in_layout = route.replace("/layout", "");
 
                 let mut layout_css_files: Vec<String> = Vec::new();
                 let mut layout_js_files: Vec<String> = Vec::new();
@@ -261,10 +272,10 @@ mod tests {
     // It includes dynamic routes, static routes, catch all routes, nested
     // __layout and shared components.
     const MANIFEST_EXAMPLE: &str = r#"{
-      "../src/routes/about.tsx": {
+      "../src/routes/about/page.tsx": {
         "file": "assets/about-C3UqHfGb.js",
         "name": "about",
-        "src": "../src/routes/about.tsx",
+        "src": "../src/routes/about/page.tsx",
         "isDynamicEntry": true,
         "imports": [
           "client-main.tsx",
@@ -284,10 +295,10 @@ mod tests {
           "assets/FileWithCssOnly.css"
         ]
       },
-      "../src/routes/catch_all/[...slug].tsx": {
+      "../src/routes/catch_all/[...slug]/page.tsx": {
         "file": "assets/_...slug_-CpJyPnPj.js",
         "name": "_...slug_",
-        "src": "../src/routes/catch_all/[...slug].tsx",
+        "src": "../src/routes/catch_all/[...slug]/page.tsx",
         "isDynamicEntry": true,
         "imports": [
           "client-main.tsx"
@@ -296,10 +307,10 @@ mod tests {
           "assets/_..-CipbPoTl.css"
         ]
       },
-      "../src/routes/index.tsx": {
+      "../src/routes/page.tsx": {
         "file": "assets/index-B3tnHOzi.js",
         "name": "index",
-        "src": "../src/routes/index.tsx",
+        "src": "../src/routes/page.tsx",
         "isDynamicEntry": true,
         "imports": [
           "client-main.tsx"
@@ -308,10 +319,10 @@ mod tests {
           "assets/index-CynfArjF.css"
         ]
       },
-      "../src/routes/pokemons/[pokemon]/[type].tsx": {
+      "../src/routes/pokemons/[pokemon]/[type]/page.tsx": {
         "file": "assets/_type_-B-sJOcVJ.js",
         "name": "_type_",
-        "src": "../src/routes/pokemons/[pokemon]/[type].tsx",
+        "src": "../src/routes/pokemons/[pokemon]/[type]/page.tsx",
         "isDynamicEntry": true,
         "imports": [
           "client-main.tsx",
@@ -321,10 +332,10 @@ mod tests {
           "assets/_type_-B8vgxybx.css"
         ]
       },
-      "../src/routes/pokemons/[pokemon]/index.tsx": {
+      "../src/routes/pokemons/[pokemon]/page.tsx": {
         "file": "assets/index-ByRBj7WK.js",
         "name": "index",
-        "src": "../src/routes/pokemons/[pokemon]/index.tsx",
+        "src": "../src/routes/pokemons/[pokemon]/page.tsx",
         "isDynamicEntry": true,
         "imports": [
           "client-main.tsx",
@@ -334,10 +345,10 @@ mod tests {
           "assets/index-CM86zKWq.css"
         ]
       },
-      "../src/routes/pokemons/__layout.tsx": {
+      "../src/routes/pokemons/layout.tsx": {
         "file": "assets/__layout-2v3JiSeL.js",
         "name": "__layout",
-        "src": "../src/routes/pokemons/__layout.tsx",
+        "src": "../src/routes/pokemons/layout.tsx",
         "isDynamicEntry": true,
         "imports": [
           "client-main.tsx"
@@ -366,12 +377,12 @@ mod tests {
         "src": "client-main.tsx",
         "isEntry": true,
         "dynamicImports": [
-          "../src/routes/pokemons/__layout.tsx",
-          "../src/routes/about.tsx",
-          "../src/routes/index.tsx",
-          "../src/routes/catch_all/[...slug].tsx",
-          "../src/routes/pokemons/[pokemon]/[type].tsx",
-          "../src/routes/pokemons/[pokemon]/index.tsx"
+          "../src/routes/pokemons/layout.tsx",
+          "../src/routes/about/page.tsx",
+          "../src/routes/page.tsx",
+          "../src/routes/catch_all/[...slug]/page.tsx",
+          "../src/routes/pokemons/[pokemon]/[type]/page.tsx",
+          "../src/routes/pokemons/[pokemon]/page.tsx"
         ],
         "css": [
           "assets/client-main-BS7N-NIa.css"
@@ -381,21 +392,21 @@ mod tests {
 
     #[test]
     fn it_correctly_cleans_the_route_path() {
-        let cleaned_path = clean_route_path("../src/routes/index.tsx".to_string());
+        let cleaned_path = clean_route_path("../src/routes/page.tsx".to_string());
         assert_eq!(cleaned_path, "/");
 
         let cleaned_path =
-            clean_route_path("../src/routes/pokemons/[pokemon]/index.tsx".to_string());
+            clean_route_path("../src/routes/pokemons/[pokemon]/page.tsx".to_string());
         assert_eq!(cleaned_path, "/pokemons/[pokemon]");
 
-        let cleaned_path = clean_route_path("../src/routes/pokemons/__layout.tsx".to_string());
-        assert_eq!(cleaned_path, "/pokemons/__layout");
+        let cleaned_path = clean_route_path("../src/routes/pokemons/layout.tsx".to_string());
+        assert_eq!(cleaned_path, "/pokemons/layout");
 
         let cleaned_path =
-            clean_route_path("../src/routes/pokemons/[pokemon]/[type].mdx".to_string());
+            clean_route_path("../src/routes/pokemons/[pokemon]/[type]/page.mdx".to_string());
         assert_eq!(cleaned_path, "/pokemons/[pokemon]/[type]");
 
-        let cleaned_path = clean_route_path("../src/routes/about.md".to_string());
+        let cleaned_path = clean_route_path("../src/routes/about/page.md".to_string());
         assert_eq!(cleaned_path, "/about");
     }
 

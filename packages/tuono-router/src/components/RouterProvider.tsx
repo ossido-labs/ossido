@@ -7,6 +7,7 @@ import {
   buildResourceKey,
   seedResource,
   seedErrorResource,
+  seedLayoutData,
   toDataResult,
 } from '../data/resourceCache'
 
@@ -17,6 +18,8 @@ interface RouterProviderProps {
   router: Router
   serverInitialLocation: ServerInitialLocation
   serverInitialData: unknown
+  /** Wrapping layouts' server data, keyed by each layout's `dataKey`. */
+  serverInitialLayoutData?: Record<string, unknown>
   /** Set when the initial route's Rust handler panicked (dev mode). */
   serverInitialError?: ServerErrorPayload
   mode?: Mode
@@ -26,6 +29,7 @@ export function RouterProvider({
   router,
   serverInitialLocation,
   serverInitialData,
+  serverInitialLayoutData,
   serverInitialError,
   mode,
 }: RouterProviderProps): JSX.Element {
@@ -42,6 +46,11 @@ export function RouterProvider({
       seedErrorResource(resourceKey, serverInitialError)
     } else {
       seedResource(resourceKey, toDataResult(serverInitialData))
+    }
+    // Seed the wrapping layouts' data so they render synchronously (SSR + first
+    // client render) without a fetch.
+    if (serverInitialLayoutData) {
+      seedLayoutData(serverInitialLayoutData)
     }
     return null
   })

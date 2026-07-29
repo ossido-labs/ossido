@@ -2,62 +2,70 @@
 
 import { createRoute, __tuono__internal__lazyLoadRoute } from 'tuono'
 
-import RootLayoutImport from './routes/__layout'
+import RootLayoutImport from './routes/layout'
 
 import ErrorImport from './routes/error'
 import LoadingImport from './routes/loading'
 import PostsLoadingImport from './routes/posts/loading'
 
-const AboutImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/about'),
+const PageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/page'),
 )
-const IndexImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/index'),
+const PostsPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/page'),
 )
-const PostspostImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/[post]'),
+const AboutPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/about/page'),
 )
-const PostsIndexImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/index'),
+const PostspostPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/[post]/page'),
 )
 
-const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport })
+const rootRoute = createRoute({
+  isRoot: true,
+  component: RootLayoutImport,
+  dataKey: '/layout',
+})
 
-const About = createRoute({ component: AboutImport })
-const Index = createRoute({ component: IndexImport })
-const Postspost = createRoute({ component: PostspostImport })
-const PostsIndex = createRoute({ component: PostsIndexImport })
+const Page = createRoute({ component: PageImport })
+const PostsPage = createRoute({ component: PostsPageImport })
+const AboutPage = createRoute({ component: AboutPageImport })
+const PostspostPage = createRoute({ component: PostspostPageImport })
 
 // Create/Update Routes
 
-const AboutRoute = About.update({
-  path: '/about',
-  getParentRoute: () => rootRoute,
-  filePath: '/about',
-  loadingComponent: LoadingImport,
-  errorComponent: ErrorImport,
-})
-
-const IndexRoute = Index.update({
+const PageRoute = Page.update({
   path: '/',
   getParentRoute: () => rootRoute,
   filePath: '/',
+  dataKey: '/page',
   loadingComponent: LoadingImport,
   errorComponent: ErrorImport,
 })
 
-const PostspostRoute = Postspost.update({
-  path: '/posts/[post]',
+const PostsPageRoute = PostsPage.update({
+  path: '/posts',
   getParentRoute: () => rootRoute,
-  filePath: '/posts/[post]',
+  filePath: '/posts/',
+  dataKey: '/posts/page',
   loadingComponent: PostsLoadingImport,
   errorComponent: ErrorImport,
 })
 
-const PostsIndexRoute = PostsIndex.update({
-  path: '/posts',
+const AboutPageRoute = AboutPage.update({
+  path: '/about',
   getParentRoute: () => rootRoute,
-  filePath: '/posts/',
+  filePath: '/about/',
+  dataKey: '/about/page',
+  loadingComponent: LoadingImport,
+  errorComponent: ErrorImport,
+})
+
+const PostspostPageRoute = PostspostPage.update({
+  path: '/posts/[post]',
+  getParentRoute: () => rootRoute,
+  filePath: '/posts/[post]/',
+  dataKey: '/posts/[post]/page',
   loadingComponent: PostsLoadingImport,
   errorComponent: ErrorImport,
 })
@@ -65,8 +73,8 @@ const PostsIndexRoute = PostsIndex.update({
 // Create and export the route tree
 
 export const routeTree = rootRoute.addChildren([
-  IndexRoute,
-  AboutRoute,
-  PostsIndexRoute,
-  PostspostRoute,
+  PageRoute,
+  AboutPageRoute,
+  PostsPageRoute,
+  PostspostPageRoute,
 ])

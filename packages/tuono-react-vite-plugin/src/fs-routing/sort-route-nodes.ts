@@ -11,7 +11,7 @@ export const sortRouteNodes = (routes: Array<RouteNode>): Array<RouteNode> =>
     (d): number => d.routePath.split('/').length,
     // Dynamic route
     (d): number => (d.routePath.endsWith(']') ? 1 : -1),
-    (d): number => (d.filePath.match(/[./]index[.]/) ? 1 : -1),
+    (d): number => (d.filePath.match(/[./]page[.]/) ? 1 : -1),
     (d): number => (d.filePath.match(/[./]route[.]/) ? -1 : 1),
     (d): number => (d.routePath.endsWith('/') ? -1 : 1),
     (d): string => d.routePath,

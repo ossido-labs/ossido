@@ -1,3 +1,9 @@
+// See tests/main.rs: the `#[handler]` macro references
+// `crate::tuono_main_state::ApplicationState`.
+mod tuono_main_state {
+    pub type ApplicationState = ();
+}
+
 mod utils;
 use std::collections::HashMap;
 

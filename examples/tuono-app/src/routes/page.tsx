@@ -1,10 +1,7 @@
-import React from 'react'
+import type { TuonoPage } from 'tuono/types'
 
-interface IndexProps {
-  subtitle: string
-}
-
-export default function IndexPage({ subtitle }: IndexProps): React.ReactNode {
+// Props are typed automatically from the `/` route's Rust handler return type.
+const IndexPage: TuonoPage<'/'> = ({ subtitle }) => {
   return (
     <>
       <div className="title-wrap">
@@ -30,3 +27,5 @@ export default function IndexPage({ subtitle }: IndexProps): React.ReactNode {
     </>
   )
 }
+
+export default IndexPage

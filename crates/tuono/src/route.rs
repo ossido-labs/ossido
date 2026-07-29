@@ -14,6 +14,20 @@ fn has_dynamic_path(route: &str) -> bool {
     regex.is_match(route)
 }
 
+/// Strip route-group segments — a path segment wrapped in parens, e.g.
+/// `(marketing)` — from a URL. They organize files and share layouts without
+/// contributing a URL segment. Returns "" when nothing but groups remain (the
+/// caller maps that to "/").
+pub(crate) fn strip_route_groups(path: &str) -> String {
+    let group_re = Regex::new(r"\([^)]*\)").expect("Failed to create the group regex");
+    let without_groups = group_re.replace_all(path, "");
+    let slash_re = Regex::new(r"/{2,}").expect("Failed to create the slash regex");
+    slash_re
+        .replace_all(&without_groups, "/")
+        .trim_end_matches('/')
+        .to_string()
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AxumInfo {
     // Path for importing the module
@@ -28,11 +42,16 @@ impl AxumInfo {
         let mut module = route.path.chars();
         module.next();
 
-        let axum_route = if route.path.ends_with("/index") {
-            route.path.replace("/index", "")
-        } else {
-            route.path.clone()
-        };
+        // A route lives in `<dir>/page.rs`; the URL is the directory, so drop the
+        // trailing `/page`. The `#[path]`/module still point at the real file.
+        let axum_route = route
+            .path
+            .strip_suffix("/page")
+            .map(str::to_string)
+            .unwrap_or_else(|| route.path.clone());
+        // Route groups add no URL segment (the `#[path]`/module still points at
+        // the parenthesised folder, so the module name just drops the parens).
+        let axum_route = strip_route_groups(&axum_route);
 
         let module_import = module
             .as_str()
@@ -40,6 +59,7 @@ impl AxumInfo {
             .replace('/', "_")
             .replace('.', "_dot_")
             .replace('-', "_hyphen_")
+            .replace(['(', ')'], "")
             .to_lowercase();
 
         if axum_route.is_empty() {
@@ -72,7 +92,8 @@ impl AxumInfo {
                     .replace('-', "_hyphen_")
                     .replace('[', "dyn_")
                     .replace("...", "catch_all_")
-                    .replace(']', ""),
+                    .replace(']', "")
+                    .replace(['(', ')'], ""),
                 axum_route,
             };
         }
@@ -131,10 +152,20 @@ impl ApiData {
     }
 }
 
+/// Whether a route file path refers to a `layout` data handler (`layout.rs`) —
+/// the root `/layout` or a nested `<dir>/layout`.
+pub(crate) fn is_layout_path(path: &str) -> bool {
+    path == "/layout" || path.ends_with("/layout")
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Route {
-    path: String,
+    pub path: String,
     pub is_dynamic: bool,
+    /// A `layout.rs` data handler. It has no standalone SSR/data route of its
+    /// own — its props are composed into the SSR + data map of every page it
+    /// wraps.
+    pub is_layout: bool,
     pub axum_info: Option<AxumInfo>,
     pub api_data: Option<ApiData>,
 }
@@ -142,6 +173,7 @@ pub struct Route {
 impl Route {
     pub fn new(cleaned_path: String) -> Self {
         Route {
+            is_layout: is_layout_path(&cleaned_path),
             path: cleaned_path.clone(),
             axum_info: None,
             is_dynamic: has_dynamic_path(&cleaned_path),
@@ -153,16 +185,30 @@ impl Route {
         self.api_data.is_some()
     }
 
+    /// The public URL for this route: the file path with the trailing `/page`
+    /// dropped and route groups removed (`/about/page` → `/about`, `/page` →
+    /// `/`). Non-page paths (e.g. `/sitemap.xml`) are returned unchanged.
+    fn url_path(&self) -> String {
+        let stripped = self.path.strip_suffix("/page").unwrap_or(&self.path);
+        let stripped = strip_route_groups(stripped);
+        if stripped.is_empty() {
+            "/".to_string()
+        } else {
+            stripped
+        }
+    }
+
     pub fn update_axum_info(&mut self) {
         self.axum_info = Some(AxumInfo::new(self))
     }
 
     pub fn save_ssg_file(&self, reqwest: &Client) -> Result<(), String> {
-        if self.is_api() {
+        // Layouts have no standalone page to statically render.
+        if self.is_api() || self.is_layout {
             return Ok(());
         }
 
-        let path = &self.path.replace("index", "");
+        let path = &self.url_path();
 
         let url = format!("http://localhost:3000{path}");
 
@@ -182,11 +228,12 @@ impl Route {
         };
 
         if !parent_dir.is_dir()
-            && let Err(err) = create_all(parent_dir, false) {
-                return Err(format!(
-                    "Failed to create the parent directory {parent_dir:?}\nError: {err}"
-                ));
-            }
+            && let Err(err) = create_all(parent_dir, false)
+        {
+            return Err(format!(
+                "Failed to create the parent directory {parent_dir:?}\nError: {err}"
+            ));
+        }
 
         trace!("Saving the HTML file: {:?}", file_path);
 
@@ -215,11 +262,12 @@ impl Route {
             };
 
             if !data_parent_dir.is_dir()
-                && let Err(err) = create_all(data_parent_dir, false) {
-                    return Err(format!(
-                        "Failed to create the parent directory {data_parent_dir:?}\n Error: {err}"
-                    ));
-                }
+                && let Err(err) = create_all(data_parent_dir, false)
+            {
+                return Err(format!(
+                    "Failed to create the parent directory {data_parent_dir:?}\n Error: {err}"
+                ));
+            }
 
             let base = Url::parse("http://localhost:3000/__tuono/data").unwrap();
 
@@ -259,7 +307,7 @@ impl Route {
     }
 
     fn output_file_path(&self) -> PathBuf {
-        let cleaned_path = self.path.replace("index", "");
+        let cleaned_path = self.url_path();
 
         if NO_HTML_EXTENSIONS
             .iter()
@@ -279,14 +327,11 @@ mod tests {
     #[test]
     fn should_find_dynamic_paths() {
         let routes = [
-            ("/home/user/Documents/tuono/src/routes/about.rs", false),
-            ("/home/user/Documents/tuono/src/routes/index.rs", false),
+            ("/home/user/Documents/tuono/src/routes/about/page.rs", false),
+            ("/home/user/Documents/tuono/src/routes/page.rs", false),
+            ("/home/user/Documents/tuono/src/routes/posts/page.rs", false),
             (
-                "/home/user/Documents/tuono/src/routes/posts/index.rs",
-                false,
-            ),
-            (
-                "/home/user/Documents/tuono/src/routes/posts/[post].rs",
+                "/home/user/Documents/tuono/src/routes/posts/[post]/page.rs",
                 true,
             ),
         ];
@@ -297,39 +342,40 @@ mod tests {
     }
 
     #[test]
-    fn should_allow_index_in_route_name() {
-        let index_route = AxumInfo::new(&Route::new("/index".to_string()));
-        let index_page_route = AxumInfo::new(&Route::new("/index-page".to_string()));
+    fn should_strip_the_page_segment_from_the_url() {
+        let root_route = AxumInfo::new(&Route::new("/page".to_string()));
+        // A directory whose name contains "page" is only stripped once (trailing).
+        let nested_route = AxumInfo::new(&Route::new("/index-page/page".to_string()));
 
-        assert_eq!(index_route.axum_route, "/");
-        assert_eq!(index_route.module_import, "index");
+        assert_eq!(root_route.axum_route, "/");
+        assert_eq!(root_route.module_import, "page");
 
-        assert_eq!(index_page_route.axum_route, "/index-page");
-        assert_eq!(index_page_route.module_import, "index_hyphen_page");
+        assert_eq!(nested_route.axum_route, "/index-page");
+        assert_eq!(nested_route.module_import, "index_hyphen_page_page");
     }
 
     #[test]
     fn should_correctly_create_the_axum_infos() {
-        let info = AxumInfo::new(&Route::new("/index".to_string()));
+        let info = AxumInfo::new(&Route::new("/page".to_string()));
 
         assert_eq!(info.axum_route, "/");
-        assert_eq!(info.module_import, "index");
+        assert_eq!(info.module_import, "page");
 
-        let dyn_info = AxumInfo::new(&Route::new("/[posts]".to_string()));
+        let dyn_info = AxumInfo::new(&Route::new("/[posts]/page".to_string()));
 
         assert_eq!(dyn_info.axum_route, "/{posts}");
-        assert_eq!(dyn_info.module_import, "dyn_posts");
+        assert_eq!(dyn_info.module_import, "dyn_posts_page");
     }
 
     #[test]
     fn should_define_the_correct_html_build_path() {
         let routes = [
-            ("/index", "out/static/index.html"),
-            ("/documentation", "out/static/documentation/index.html"),
+            ("/page", "out/static/index.html"),
+            ("/documentation/page", "out/static/documentation/index.html"),
             ("/sitemap.xml", "out/static/sitemap.xml"),
             ("/robot.txt", "out/static/robot.txt"),
             (
-                "/documentation/routing",
+                "/documentation/routing/page",
                 "out/static/documentation/routing/index.html",
             ),
         ];

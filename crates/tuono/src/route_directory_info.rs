@@ -1,4 +1,4 @@
-use crate::app::{IGNORE_EXTENSIONS, IGNORE_FILES, ROUTES_FOLDER_PATH};
+use crate::app::{ROUTES_FOLDER_PATH, is_collectible_route};
 use crate::route::Route;
 use quote::quote;
 use std::collections::{HashMap, hash_map::Entry};
@@ -107,17 +107,7 @@ impl RouteDirectoryInfo {
     }
 
     pub fn should_collect_route(entry: &Path) -> bool {
-        let file_extension = entry.extension().expect("Failed to read file extension");
-        let file_name = entry.file_stem().expect("Failed to read file name");
-
-        if IGNORE_EXTENSIONS.iter().any(|val| val == &file_extension) {
-            return false;
-        }
-
-        if IGNORE_FILES.iter().any(|val| val == &file_name) {
-            return false;
-        }
-        true
+        is_collectible_route(entry, &RouteDirectoryInfo::get_base_path())
     }
 
     fn collect_route(entry: PathBuf, routes: HashMap<String, Route>) -> HashMap<String, Route> {
@@ -272,23 +262,34 @@ mod tests {
     #[test]
     fn test_should_collect_route() {
         let temp_dir = TempDir::new().unwrap();
-        let rs_file = temp_dir.path().join("test.rs");
-        File::create(&rs_file).unwrap();
-        assert!(RouteDirectoryInfo::should_collect_route(&rs_file));
 
-        let tsx_file = temp_dir.path().join("test.tsx");
-        File::create(&tsx_file).unwrap();
-        assert!(RouteDirectoryInfo::should_collect_route(&tsx_file));
+        let page_rs = temp_dir.path().join("page.rs");
+        File::create(&page_rs).unwrap();
+        assert!(RouteDirectoryInfo::should_collect_route(&page_rs));
 
-        let md_file = temp_dir.path().join("test.md");
-        File::create(&md_file).unwrap();
-        assert!(RouteDirectoryInfo::should_collect_route(&md_file));
+        let page_tsx = temp_dir.path().join("page.tsx");
+        File::create(&page_tsx).unwrap();
+        assert!(RouteDirectoryInfo::should_collect_route(&page_tsx));
+
+        // `layout.rs` is a data handler (collected); `layout.tsx` is not.
+        let layout_rs = temp_dir.path().join("layout.rs");
+        File::create(&layout_rs).unwrap();
+        assert!(RouteDirectoryInfo::should_collect_route(&layout_rs));
+
+        let layout_tsx = temp_dir.path().join("layout.tsx");
+        File::create(&layout_tsx).unwrap();
+        assert!(!RouteDirectoryInfo::should_collect_route(&layout_tsx));
+
+        // A stray colocated file is not a route.
+        let stray = temp_dir.path().join("helper.tsx");
+        File::create(&stray).unwrap();
+        assert!(!RouteDirectoryInfo::should_collect_route(&stray));
     }
 
     #[test]
     fn test_collect_route() {
         let temp_dir = TempDir::new().unwrap();
-        let rs_file = temp_dir.path().join("index.rs");
+        let rs_file = temp_dir.path().join("page.rs");
         File::create(&rs_file).unwrap();
 
         let routes = HashMap::new();

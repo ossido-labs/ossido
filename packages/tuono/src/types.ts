@@ -24,6 +24,9 @@ export type ServerPayload<TData = unknown> = {
 
   data: TData
 
+  /** Wrapping `layout.rs` handlers' data, keyed by each layout's `dataKey`. */
+  layoutData?: Record<string, unknown>
+
   /** Present (dev only) when the route's Rust handler panicked. */
   serverError?: ServerErrorPayload
 } & (

@@ -2,48 +2,55 @@
 
 import { createRoute, __tuono__internal__lazyLoadRoute } from 'tuono'
 
-import RootLayoutImport from './routes/__layout'
+import RootLayoutImport from './routes/layout'
 
-const AboutImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/about'),
+const PageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/page'),
 )
-const IndexImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/index'),
+const AboutPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/about/page'),
 )
-const PostsMyPostImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/my-post'),
+const PostsMyPostPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/my-post/page'),
 )
 
-const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport })
+const rootRoute = createRoute({
+  isRoot: true,
+  component: RootLayoutImport,
+  dataKey: '/layout',
+})
 
-const About = createRoute({ component: AboutImport })
-const Index = createRoute({ component: IndexImport })
-const PostsMyPost = createRoute({ component: PostsMyPostImport })
+const Page = createRoute({ component: PageImport })
+const AboutPage = createRoute({ component: AboutPageImport })
+const PostsMyPostPage = createRoute({ component: PostsMyPostPageImport })
 
 // Create/Update Routes
 
-const AboutRoute = About.update({
-  path: '/about',
-  getParentRoute: () => rootRoute,
-  filePath: '/about',
-})
-
-const IndexRoute = Index.update({
+const PageRoute = Page.update({
   path: '/',
   getParentRoute: () => rootRoute,
   filePath: '/',
+  dataKey: '/page',
 })
 
-const PostsMyPostRoute = PostsMyPost.update({
+const AboutPageRoute = AboutPage.update({
+  path: '/about',
+  getParentRoute: () => rootRoute,
+  filePath: '/about/',
+  dataKey: '/about/page',
+})
+
+const PostsMyPostPageRoute = PostsMyPostPage.update({
   path: '/posts/my-post',
   getParentRoute: () => rootRoute,
-  filePath: '/posts/my-post',
+  filePath: '/posts/my-post/',
+  dataKey: '/posts/my-post/page',
 })
 
 // Create and export the route tree
 
 export const routeTree = rootRoute.addChildren([
-  IndexRoute,
-  AboutRoute,
-  PostsMyPostRoute,
+  PageRoute,
+  AboutPageRoute,
+  PostsMyPostPageRoute,
 ])

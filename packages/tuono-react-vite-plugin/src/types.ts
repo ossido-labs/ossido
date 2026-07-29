@@ -1,6 +1,7 @@
 /**
- * A `loading.tsx` / `error.tsx` file. These are not routes — they are attached
- * to routes as the nearest-ancestor Suspense fallback / error boundary.
+ * A `loading.tsx` / `error.tsx` / `not-found.tsx` file. These are not routes —
+ * they are attached to routes as the nearest-ancestor Suspense fallback /
+ * error boundary / not-found UI.
  */
 export interface SpecialFileNode {
   filePath: string
@@ -24,6 +25,8 @@ export interface RouteNode {
   loadingFile?: SpecialFileNode
   /** Nearest-ancestor `error.tsx`, resolved at generation time. */
   errorFile?: SpecialFileNode
+  /** Nearest-ancestor `not-found.tsx`, resolved at generation time. */
+  notFoundFile?: SpecialFileNode
 }
 
 export interface Config {

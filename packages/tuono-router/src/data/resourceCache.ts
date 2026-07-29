@@ -29,6 +29,9 @@ interface LocationKeyParts {
 
 interface TuonoApiResponse {
   data?: unknown
+  // Server data for the `layout.rs` handlers wrapping this page, keyed by each
+  // layout's `dataKey`. Present only when a wrapping layout has a data handler.
+  layoutData?: Record<string, unknown>
   info: {
     redirect_destination?: string
     // Present (dev only) when the Rust handler panicked — see `error_json` in
@@ -72,6 +75,39 @@ export function toDataResult(props: unknown): RouteDataResult {
   return { kind: 'data', props: (props ?? {}) as Record<string, unknown> }
 }
 
+/**
+ * Resource key for a `layout.rs` handler's data. Keyed by the layout's `dataKey`
+ * alone (not the navigation) so its data persists across navigations under the
+ * same layout and is simply overwritten by each page's data fetch — matching how
+ * layouts persist in the tree.
+ */
+function buildLayoutResourceKey(dataKey: string): string {
+  return `layout::${dataKey}`
+}
+
+/**
+ * Seed the wrapping layouts' server data (from a page's SSR payload or data
+ * fetch), keyed by each layout's `dataKey`.
+ */
+export function seedLayoutData(layoutData: Record<string, unknown>): void {
+  for (const [dataKey, props] of Object.entries(layoutData)) {
+    seedResource(buildLayoutResourceKey(dataKey), toDataResult(props))
+  }
+}
+
+/**
+ * Read a layout's seeded server data synchronously (no fetch, no suspend): a
+ * layout's data always arrives via the page it wraps. Returns empty props when
+ * nothing is seeded yet (e.g. a loading-fallback navigation's first frame).
+ */
+export function readLayoutData(dataKey: string): Record<string, unknown> {
+  const resource = cache.get(buildLayoutResourceKey(dataKey))
+  if (resource?.status === 'fulfilled' && resource.value?.kind === 'data') {
+    return resource.value.props
+  }
+  return {}
+}
+
 function annotate(promise: Promise<RouteDataResult>): DataResource {
   const resource = promise as DataResource
   resource.status = 'pending'
@@ -108,6 +144,11 @@ async function fetchRouteData(
   }
   if (body.info.redirect_destination) {
     return { kind: 'redirect', destination: body.info.redirect_destination }
+  }
+  // A page's data fetch also carries its wrapping layouts' data — seed those so
+  // the layout components read them synchronously.
+  if (body.layoutData) {
+    seedLayoutData(body.layoutData)
   }
   return toDataResult(body.data)
 }

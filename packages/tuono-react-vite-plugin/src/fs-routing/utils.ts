@@ -76,8 +76,14 @@ export function removeTrailingUnderscores(s?: string): string | undefined {
   return s?.replaceAll(/(_$)/gi, '').replaceAll(/(_\/)/gi, '/')
 }
 
+/**
+ * Strip route-group segments — a path segment wrapped in parens, e.g.
+ * `(marketing)` — from a URL path, then collapse the slashes they leave behind.
+ * Groups organize files and share layouts/loading/error without contributing a
+ * URL segment.
+ */
 export function removeGroups(s: string): string {
-  return s.replaceAll('//', '/')
+  return s.replace(/\([^/]*\)/g, '').replace(/\/{2,}/g, '/')
 }
 
 export function trimPathLeft(pathToTrim: string): string {

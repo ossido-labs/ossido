@@ -89,9 +89,10 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
     // Server address log for production
     // is done on the server process.
     if let Ok(builder) = source_builder.read()
-        && let Ok(pm) = process_manager.lock() {
-            pm.log_server_address(builder.app.config.clone().unwrap_or_default());
-        }
+        && let Ok(pm) = process_manager.lock()
+    {
+        pm.log_server_address(builder.app.config.clone().unwrap_or_default());
+    }
 
     let wx = Watchexec::new(move |mut action| {
         let process_manager = process_manager.clone();
@@ -144,43 +145,43 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
         }
 
         if !paths_to_refresh_types.is_empty()
-            && let Ok(mut builder) = source_builder.write() {
-                for path in paths_to_refresh_types {
-                    // There is no need to check here if the `Type` trait is
-                    // derived since it will be checked later by the TypeJar struct.
-                    builder.refresh_typescript_file(path)
-                }
-                if builder.generate_typescript_file().is_err() {
-                    error!("Failed to generate typescript file");
-                };
+            && let Ok(mut builder) = source_builder.write()
+        {
+            for path in paths_to_refresh_types {
+                // There is no need to check here if the `Type` trait is
+                // derived since it will be checked later by the TypeJar struct.
+                builder.refresh_typescript_file(path)
             }
+            if builder.generate_typescript_file().is_err() {
+                error!("Failed to generate typescript file");
+            };
+        }
 
         if !removed_files_from_types.is_empty()
-            && let Ok(mut builder) = source_builder.write() {
-                for path in removed_files_from_types {
-                    builder.remove_typescript_file(path);
-                }
-                if builder.generate_typescript_file().is_err() {
-                    error!("Failed to generate typescript file");
-                };
+            && let Ok(mut builder) = source_builder.write()
+        {
+            for path in removed_files_from_types {
+                builder.remove_typescript_file(path);
             }
+            if builder.generate_typescript_file().is_err() {
+                error!("Failed to generate typescript file");
+            };
+        }
 
         if should_reload_rust_server || should_refresh_axum_source {
             tuono_println!("Reloading...");
-            if should_refresh_axum_source
-                && let Ok(mut builder) = source_builder.write() {
-                    builder.app.collect_routes();
-                    _ = builder.refresh_axum_source();
-                }
+            if should_refresh_axum_source && let Ok(mut builder) = source_builder.write() {
+                builder.app.collect_routes();
+                _ = builder.refresh_axum_source();
+            }
             if let Ok(mut pm) = process_manager.lock() {
                 pm.restart_process(ProcessId::RunRustDevServer);
             }
         }
 
-        if should_reload_ssr_bundle
-            && let Ok(mut pm) = process_manager.lock() {
-                pm.restart_process(ProcessId::BuildReactSSRSrc);
-            }
+        if should_reload_ssr_bundle && let Ok(mut pm) = process_manager.lock() {
+            pm.restart_process(ProcessId::BuildReactSSRSrc);
+        }
 
         action
     })?;

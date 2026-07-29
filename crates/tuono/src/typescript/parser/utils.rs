@@ -58,24 +58,26 @@ where
 {
     for attr in attrs {
         if attr.path().is_ident("serde")
-            && let Ok(meta) = attr.parse_args::<syn::Expr>() {
-                match meta {
-                    syn::Expr::Assign(assign) => {
-                        if let syn::Expr::Path(path) = *assign.left
-                            && !path.path.is_ident(attribute_name) {
-                                return T::default();
-                            }
-                        if let syn::Expr::Lit(syn::ExprLit {
-                            lit: syn::Lit::Str(lit_str),
-                            ..
-                        }) = *assign.right
-                        {
-                            return T::from_str(&lit_str.value()).unwrap_or_default();
-                        }
+            && let Ok(meta) = attr.parse_args::<syn::Expr>()
+        {
+            match meta {
+                syn::Expr::Assign(assign) => {
+                    if let syn::Expr::Path(path) = *assign.left
+                        && !path.path.is_ident(attribute_name)
+                    {
+                        return T::default();
                     }
-                    _ => return T::default(),
+                    if let syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(lit_str),
+                        ..
+                    }) = *assign.right
+                    {
+                        return T::from_str(&lit_str.value()).unwrap_or_default();
+                    }
                 }
+                _ => return T::default(),
             }
+        }
     }
     T::default()
 }
@@ -86,9 +88,10 @@ pub fn should_skip_element(attrs: &[syn::Attribute]) -> bool {
     for attr in attrs {
         if attr.path().is_ident("serde")
             && let Ok(meta) = attr.parse_args::<syn::Ident>()
-                && (meta == "skip" || meta == "skip_serializing") {
-                    return true;
-                }
+            && (meta == "skip" || meta == "skip_serializing")
+        {
+            return true;
+        }
     }
     false
 }

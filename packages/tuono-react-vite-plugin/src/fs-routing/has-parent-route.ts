@@ -20,7 +20,7 @@ export function hasParentRoute(
     (d): number => d.routePath.length * -1,
     (d): string | undefined => d.variableName,
   ])
-    // Exclude base __layout file
+    // Exclude the root `layout` file
     .filter((d) => d.routePath !== `/${LAYOUT_PATH_ID}`)
 
   for (const route of sortedNodes) {

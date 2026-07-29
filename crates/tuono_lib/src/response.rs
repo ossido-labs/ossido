@@ -105,6 +105,11 @@ impl JsonResponseInfo {
 #[derive(serde::Serialize)]
 struct JsonResponse<'a> {
     data: Option<&'a dyn Serialize>,
+    #[serde(
+        rename(serialize = "layoutData"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
     info: JsonResponseInfo,
 }
 
@@ -112,6 +117,18 @@ impl<'a> JsonResponse<'a> {
     fn new(props: &'a dyn Serialize) -> Self {
         JsonResponse {
             data: Some(props),
+            layout_data: None,
+            info: JsonResponseInfo::new(None),
+        }
+    }
+
+    fn new_with_layout(
+        props: &'a dyn Serialize,
+        layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
+    ) -> Self {
+        JsonResponse {
+            data: Some(props),
+            layout_data,
             info: JsonResponseInfo::new(None),
         }
     }
@@ -119,6 +136,7 @@ impl<'a> JsonResponse<'a> {
     fn new_redirect(destination: String) -> Self {
         JsonResponse {
             data: None,
+            layout_data: None,
             info: JsonResponseInfo::new(Some(destination)),
         }
     }
@@ -196,6 +214,160 @@ impl Response {
             // Custom never needs the "data" response since its scope
             // is outside the react domain
             Self::Custom(_) => (StatusCode::OK, Json("{}")).into_response(),
+        }
+    }
+}
+
+/// A handler's resolved output in a `Send` form, so a composite can hold it
+/// across the `await` of the next handler in the chain. Unlike [`Response`] (whose
+/// `Props` box a non-`Send` `dyn Serialize`), the props are already serialized to
+/// a `serde_json::Value`.
+pub enum HandlerData {
+    Props {
+        data: serde_json::Value,
+        http_code: StatusCode,
+        cookies: CookieJar,
+    },
+    Redirect(String),
+    Error(ServerError),
+    Custom((StatusCode, HeaderMap, String)),
+}
+
+/// Resolve a handler's `Result<Response, ServerError>` into the `Send`
+/// [`HandlerData`], serializing any props to a `Value` immediately. Called from
+/// the generated `tuono_internal_props` so the value returned across `await`
+/// boundaries is `Send`.
+pub fn resolve_handler(result: Result<Response, ServerError>) -> HandlerData {
+    match result {
+        Err(error) => HandlerData::Error(error),
+        Ok(Response::Redirect(destination)) => HandlerData::Redirect(destination),
+        Ok(Response::Custom(response)) => HandlerData::Custom(response),
+        Ok(Response::Props(Props {
+            data,
+            http_code,
+            cookies,
+        })) => HandlerData::Props {
+            data: serde_json::to_value(data.as_ref()).unwrap_or(serde_json::Value::Null),
+            http_code,
+            cookies,
+        },
+    }
+}
+
+/// Collect the layouts' data into a map keyed by `dataKey`, short-circuiting on
+/// the first redirect/error.
+enum LayoutResolution {
+    Map(serde_json::Map<String, serde_json::Value>),
+    Redirect(String),
+    Error(ServerError),
+}
+
+fn resolve_layouts(layouts: Vec<(String, HandlerData)>) -> LayoutResolution {
+    let mut map = serde_json::Map::new();
+    for (key, data) in layouts {
+        match data {
+            HandlerData::Error(error) => return LayoutResolution::Error(error),
+            HandlerData::Redirect(destination) => {
+                return LayoutResolution::Redirect(destination);
+            }
+            // A layout renders no page body of its own, so `Custom` contributes
+            // nothing to the data map.
+            HandlerData::Custom(_) => {}
+            HandlerData::Props { data, .. } => {
+                map.insert(key, data);
+            }
+        }
+    }
+    LayoutResolution::Map(map)
+}
+
+/// Render the SSR HTML for a page together with the server data of every
+/// `layout.rs` that wraps it. `layouts` is keyed by each layout's `dataKey`. A
+/// redirect or panic from any handler in the chain short-circuits.
+pub fn render_chain(
+    req: Request,
+    page: HandlerData,
+    layouts: Vec<(String, HandlerData)>,
+) -> AxumResponse {
+    let layout_map = match resolve_layouts(layouts) {
+        LayoutResolution::Error(error) => return render_error_to_string(req, error),
+        LayoutResolution::Redirect(destination) => {
+            return Redirect::permanent(&destination).into_response();
+        }
+        LayoutResolution::Map(map) => map,
+    };
+
+    match page {
+        HandlerData::Error(error) => render_error_to_string(req, error),
+        HandlerData::Redirect(destination) => Redirect::permanent(&destination).into_response(),
+        HandlerData::Custom(response) => response.into_response(),
+        HandlerData::Props {
+            data,
+            http_code,
+            cookies,
+        } => {
+            let layout_data = if layout_map.is_empty() {
+                None
+            } else {
+                Some(&layout_map)
+            };
+            let mut payload = Payload::new_with_layout(&req, &data, layout_data);
+
+            match payload
+                .client_payload()
+                .ok()
+                .and_then(|payload| Js::render_to_string(Some(&payload)).ok())
+            {
+                Some(html) => (http_code, cookies, Html(html)).into_response(),
+                None => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
+                )
+                    .into_response(),
+            }
+        }
+    }
+}
+
+/// JSON for the data endpoint of a page wrapped by layouts: `{ data, layoutData,
+/// info }`. Mirrors [`render_chain`]'s short-circuiting.
+pub fn chain_json(page: HandlerData, layouts: Vec<(String, HandlerData)>) -> AxumResponse {
+    let layout_map = match resolve_layouts(layouts) {
+        LayoutResolution::Error(error) => return error_json(error),
+        LayoutResolution::Redirect(destination) => {
+            return (
+                StatusCode::PERMANENT_REDIRECT,
+                Json(JsonResponse::new_redirect(destination)),
+            )
+                .into_response();
+        }
+        LayoutResolution::Map(map) => map,
+    };
+
+    match page {
+        HandlerData::Error(error) => error_json(error),
+        HandlerData::Redirect(destination) => (
+            StatusCode::PERMANENT_REDIRECT,
+            Json(JsonResponse::new_redirect(destination)),
+        )
+            .into_response(),
+        HandlerData::Custom(_) => (StatusCode::OK, Json("{}")).into_response(),
+        HandlerData::Props {
+            data,
+            http_code,
+            cookies,
+        } => {
+            let layout_data = if layout_map.is_empty() {
+                None
+            } else {
+                Some(&layout_map)
+            };
+            (
+                http_code,
+                cookies,
+                Json(JsonResponse::new_with_layout(&data, layout_data)),
+            )
+                .into_response()
         }
     }
 }

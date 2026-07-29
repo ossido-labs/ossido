@@ -5,7 +5,7 @@ import { DefaultLoading, DefaultError, DevErrorOverlay } from 'tuono-ui'
 
 import type { Mode } from '../types'
 import type { Route } from '../route'
-import { buildResourceKey } from '../data/resourceCache'
+import { buildResourceKey, readLayoutData } from '../data/resourceCache'
 
 import { useRouterContext } from './RouterContext'
 import { CriticalCss } from './CriticalCss'
@@ -71,7 +71,7 @@ interface TraverseRootComponentsProps {
 }
 
 /**
- * Renders the layout (`__layout`) components that wrap the selected route.
+ * Renders the layout (`layout`) components that wrap the selected route.
  * Layouts receive only `children` now — they live OUTSIDE the keyed Suspense
  * boundary, so they persist across navigation while only the page area shows
  * the loading fallback. Memoized so navigation does not re-render layouts.
@@ -91,8 +91,16 @@ const TraverseRootComponents = memo(
       // as is the case for the root route
       const routeFilePath = route.filePath || route.id
 
+      // A `layout.rs` handler's data is seeded (by SSR or the page's data fetch)
+      // and read synchronously here, then spread as the layout's props alongside
+      // `children`. Layouts without a data handler receive only `children`.
+      const layoutProps =
+        route.options.hasHandler && route.options.dataKey
+          ? readLayoutData(route.options.dataKey)
+          : undefined
+
       return (
-        <Parent>
+        <Parent {...layoutProps}>
           <CriticalCss routeFilePath={routeFilePath} mode={mode} />
           <TraverseRootComponents routes={routes} index={index + 1} mode={mode}>
             {children}

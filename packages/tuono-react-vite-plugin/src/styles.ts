@@ -140,11 +140,11 @@ export const getStylesForModule = async (
  */
 function findFileFromComponentId(id: string): string {
   if (id.endsWith('/')) {
-    return id + 'index'
+    return id + 'page'
   }
 
   if (id.includes('__root__')) {
-    return id.replaceAll('__root__', '__layout')
+    return id.replaceAll('__root__', 'layout')
   }
 
   return id

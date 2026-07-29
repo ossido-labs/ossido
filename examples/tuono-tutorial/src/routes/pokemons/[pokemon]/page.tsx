@@ -1,8 +1,8 @@
-// src/routes/pokemons/[pokemon].tsx
+// src/routes/pokemons/[pokemon]/page.tsx
 import type { JSX } from 'react'
 import { Link } from 'tuono'
 
-import PokemonView from '../../components/PokemonView'
+import PokemonView from '../../../components/PokemonView'
 
 interface Pokemon {
   id: number

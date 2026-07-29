@@ -2,84 +2,94 @@
 
 import { createRoute, __tuono__internal__lazyLoadRoute } from 'tuono'
 
-import RootLayoutImport from './routes/__layout'
+import RootLayoutImport from './routes/layout'
 
-const PostslayoutImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/__layout'),
+const PostsLayoutImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/layout'),
 )
-const AboutImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/about'),
+const PageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/page'),
 )
-const IndexImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/index'),
+const PostsPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/page'),
 )
-const PostspostImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/[post]'),
+const AboutPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/about/page'),
 )
-const PostsIndexImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/index'),
+const PostsMyPostPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/my-post/page'),
 )
-const PostsMyPostImport = __tuono__internal__lazyLoadRoute(
-  () => import('./routes/posts/my-post'),
+const PostspostPageImport = __tuono__internal__lazyLoadRoute(
+  () => import('./routes/posts/[post]/page'),
 )
 
-const rootRoute = createRoute({ isRoot: true, component: RootLayoutImport })
+const rootRoute = createRoute({
+  isRoot: true,
+  component: RootLayoutImport,
+  dataKey: '/layout',
+})
 
-const Postslayout = createRoute({ component: PostslayoutImport, isRoot: true })
-const About = createRoute({ component: AboutImport })
-const Index = createRoute({ component: IndexImport })
-const Postspost = createRoute({ component: PostspostImport })
-const PostsIndex = createRoute({ component: PostsIndexImport })
-const PostsMyPost = createRoute({ component: PostsMyPostImport })
+const PostsLayout = createRoute({ component: PostsLayoutImport, isRoot: true })
+const Page = createRoute({ component: PageImport })
+const PostsPage = createRoute({ component: PostsPageImport })
+const AboutPage = createRoute({ component: AboutPageImport })
+const PostsMyPostPage = createRoute({ component: PostsMyPostPageImport })
+const PostspostPage = createRoute({ component: PostspostPageImport })
 
 // Create/Update Routes
 
-const PostslayoutRoute = Postslayout.update({
+const PostsLayoutRoute = PostsLayout.update({
   getParentRoute: () => rootRoute,
-  filePath: '/posts/__layout',
+  filePath: '/posts/layout',
+  dataKey: '/posts/layout',
 })
 
-const AboutRoute = About.update({
-  path: '/about',
-  getParentRoute: () => rootRoute,
-  filePath: '/about',
-})
-
-const IndexRoute = Index.update({
+const PageRoute = Page.update({
   path: '/',
   getParentRoute: () => rootRoute,
   filePath: '/',
+  dataKey: '/page',
 })
 
-const PostspostRoute = Postspost.update({
-  path: '/posts/[post]',
-  getParentRoute: () => PostslayoutRoute,
-  filePath: '/posts/[post]',
-})
-
-const PostsIndexRoute = PostsIndex.update({
+const PostsPageRoute = PostsPage.update({
   path: '/posts',
-  getParentRoute: () => PostslayoutRoute,
+  getParentRoute: () => PostsLayoutRoute,
   filePath: '/posts/',
+  dataKey: '/posts/page',
 })
 
-const PostsMyPostRoute = PostsMyPost.update({
+const AboutPageRoute = AboutPage.update({
+  path: '/about',
+  getParentRoute: () => rootRoute,
+  filePath: '/about/',
+  dataKey: '/about/page',
+})
+
+const PostsMyPostPageRoute = PostsMyPostPage.update({
   path: '/posts/my-post',
-  getParentRoute: () => PostslayoutRoute,
-  filePath: '/posts/my-post',
+  getParentRoute: () => PostsLayoutRoute,
+  filePath: '/posts/my-post/',
+  dataKey: '/posts/my-post/page',
+})
+
+const PostspostPageRoute = PostspostPage.update({
+  path: '/posts/[post]',
+  getParentRoute: () => PostsLayoutRoute,
+  filePath: '/posts/[post]/',
+  dataKey: '/posts/[post]/page',
 })
 
 // Create and export the route tree
 
 export const routeTree = rootRoute.addChildren([
-  IndexRoute,
-  AboutRoute,
-  PostslayoutRoute.addChildren([
-    PostsMyPostRoute,
-    PostsIndexRoute,
-    PostspostRoute,
+  PageRoute,
+  PostsLayoutRoute.addChildren([
+    PostsPageRoute,
+    PostspostPageRoute,
+    PostsMyPostPageRoute,
   ]),
-  PostsMyPostRoute,
-  PostsIndexRoute,
-  PostspostRoute,
+  AboutPageRoute,
+  PostsPageRoute,
+  PostspostPageRoute,
+  PostsMyPostPageRoute,
 ])

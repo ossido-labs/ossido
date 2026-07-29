@@ -9,11 +9,20 @@ use proc_macro::TokenStream;
 mod api;
 mod handler;
 mod middleware;
+mod props;
 mod utils;
 
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
     handler::handler_core(args, item)
+}
+
+/// Derive `From<Self> for tuono_lib::Response`, letting a struct be returned
+/// directly from a `#[tuono_lib::handler]` (it becomes a `Props` response).
+/// The struct must also be `serde::Serialize` and `'static`.
+#[proc_macro_derive(Props)]
+pub fn derive_props(item: TokenStream) -> TokenStream {
+    props::derive_props_core(item)
 }
 
 #[proc_macro_attribute]

@@ -40,10 +40,40 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
     let application_state_extractor = crate_application_state_extractor(argument_names.clone());
     let application_state_import = import_main_application_state(argument_names.clone());
 
+    // Destructures the application state for the data-only `tuono_internal_props`
+    // entry point (see below). `ApplicationState` is referenced by full path so
+    // no import is needed, and it is only destructured when the handler actually
+    // uses state.
+    let props_state_binding = if argument_names.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            let crate::tuono_main_state::ApplicationState { #argument_names, .. } = _state;
+        }
+    };
+
     quote! {
         #application_state_import
 
         #item
+
+        // Data-only entry point used to compose a whole layout + page chain for a
+        // single request: it takes a ready `Request` and the application state by
+        // value (a composite extracts state once and clones it to every handler)
+        // and returns the raw `Response` instead of rendering it. `ApplicationState`
+        // is always defined in the generated `main.rs` (aliased to `()` when the
+        // app has no custom state), so this compiles for every handler.
+        #[allow(dead_code)]
+        pub async fn tuono_internal_props(
+            req: tuono_lib::Request,
+            _state: crate::tuono_main_state::ApplicationState,
+        ) -> tuono_lib::HandlerData {
+            #props_state_binding
+            let result = tuono_lib::catch_handler(#fn_name(req, #argument_names))
+                .await
+                .map(tuono_lib::Response::from);
+            tuono_lib::resolve_handler(result)
+        }
 
         pub async fn tuono_internal_route(
             #axum_arguments
@@ -59,8 +89,10 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
 
            // Catch an unexpected panic so it surfaces in the dev error overlay
            // (dev) or as a detail-free 500 (prod) rather than dropping the request.
+           // `Response::from` lets the handler return either a `Response` or any
+           // type that derives `tuono_lib::Props`.
            match tuono_lib::catch_handler(#fn_name(req.clone(), #argument_names)).await {
-               Ok(response) => response.render_to_string(req).into_response(),
+               Ok(response) => tuono_lib::Response::from(response).render_to_string(req).into_response(),
                Err(server_error) => tuono_lib::render_error_to_string(req, server_error),
            }
         }
@@ -78,7 +110,7 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
            let req = tuono_lib::Request::new(pathname.to_owned(), headers.to_owned(), params, None);
 
            match tuono_lib::catch_handler(#fn_name(req.clone(), #argument_names)).await {
-               Ok(response) => response.json().into_response(),
+               Ok(response) => tuono_lib::Response::from(response).json().into_response(),
                Err(server_error) => tuono_lib::error_json(server_error),
            }
         }
