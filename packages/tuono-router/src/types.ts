@@ -37,7 +37,12 @@ export interface RouteProps {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type RouteComponent = ComponentType<any> & {
-  preload: () => void
+  /**
+   * Loads the component's code chunk, resolving when it's ready (and caching it
+   * so the component then renders synchronously). Present on lazily-loaded route
+   * components; absent on eagerly-imported ones (e.g. the root layout).
+   */
+  preload?: () => Promise<void>
 }
 
 /**

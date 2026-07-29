@@ -6,9 +6,16 @@ import type { ErrorComponent } from '../types'
 interface TuonoErrorBoundaryProps {
   fallback: ErrorComponent
   /**
-   * Called by the fallback's `reset`. It bumps the navigation id, which changes
-   * this boundary's `key` in {@link RouteMatch}, remounting it with clean state
-   * and creating a fresh data resource (a refetch).
+   * Changes per navigation/retry (the route's data-resource key). When it
+   * changes the boundary clears any caught error and re-renders its children —
+   * a reset without remounting. Not remounting matters: the surrounding
+   * `<Suspense>` stays mounted, so a navigation (whose data + code are already
+   * prefetched) swaps straight to the new page instead of flashing the fallback.
+   */
+  resetKey: string
+  /**
+   * Called by the fallback's `reset`. It bumps the navigation id (which changes
+   * `resetKey`), clearing the error and creating a fresh data resource.
    */
   onReset: () => void
   children: ReactNode
@@ -16,26 +23,45 @@ interface TuonoErrorBoundaryProps {
 
 interface TuonoErrorBoundaryState {
   error: Error | null
+  resetKey: string
 }
 
 /**
  * Renders the nearest `error.tsx` (or the framework default) when a descendant
  * throws — including a rejected data resource surfaced through `use()`.
+ *
+ * Resets via {@link TuonoErrorBoundaryProps.resetKey} rather than a `key` from
+ * the caller, so its children re-render (not remount) on navigation.
  */
 export class TuonoErrorBoundary extends Component<
   TuonoErrorBoundaryProps,
   TuonoErrorBoundaryState
 > {
-  state: TuonoErrorBoundaryState = { error: null }
+  state: TuonoErrorBoundaryState = {
+    error: null,
+    resetKey: this.props.resetKey,
+  }
 
-  static getDerivedStateFromError(error: Error): TuonoErrorBoundaryState {
+  static getDerivedStateFromError(
+    error: Error,
+  ): Partial<TuonoErrorBoundaryState> {
     return { error }
   }
 
+  static getDerivedStateFromProps(
+    props: TuonoErrorBoundaryProps,
+    state: TuonoErrorBoundaryState,
+  ): Partial<TuonoErrorBoundaryState> | null {
+    // A new navigation/retry: drop the caught error and try the children again.
+    if (props.resetKey !== state.resetKey) {
+      return { error: null, resetKey: props.resetKey }
+    }
+    return null
+  }
+
   reset = (): void => {
-    // Bumping the navigation id changes this boundary's `key`, so React
-    // discards this errored instance and mounts a fresh one — no local state
-    // reset needed.
+    // Bumps the navigation id → `resetKey` changes → the error is cleared and a
+    // fresh data resource is created (a refetch).
     this.props.onReset()
   }
 

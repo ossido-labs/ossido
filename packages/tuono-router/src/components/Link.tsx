@@ -52,7 +52,7 @@ export function Link(componentProps: TuonoLinkProps): JSX.Element {
   const route = useRoute(href)
   const { ref } = useInView({
     onChange(inView) {
-      if (inView && preload) route?.component.preload()
+      if (inView && preload) route?.component.preload?.()
     },
     triggerOnce: true,
   })

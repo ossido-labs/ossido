@@ -40,20 +40,25 @@ export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
 
   return (
     <TraverseRootComponents routes={routes} mode={mode}>
-      <TuonoErrorBoundary
-        key={resourceKey}
-        fallback={ErrorComponent}
-        onReset={retry}
-      >
-        <Suspense fallback={<LoadingComponent />}>
+      {/* The <Suspense> is not keyed by the resource key, so navigation
+          re-renders (rather than remounts) the subtree. With the destination's
+          data + code prefetched by `updateLocation`, that lets the new page
+          appear in place with no fallback flash. The error boundary resets via
+          `resetKey` instead of a key change. */}
+      <Suspense fallback={<LoadingComponent />}>
+        <TuonoErrorBoundary
+          resetKey={resourceKey}
+          fallback={ErrorComponent}
+          onReset={retry}
+        >
           <RouteDataLoader
             route={route}
             resourceKey={resourceKey}
             location={location}
             mode={mode}
           />
-        </Suspense>
-      </TuonoErrorBoundary>
+        </TuonoErrorBoundary>
+      </Suspense>
     </TraverseRootComponents>
   )
 }

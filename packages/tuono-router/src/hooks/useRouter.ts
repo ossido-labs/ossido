@@ -43,19 +43,20 @@ export const useRouter = (): UseRouterResult => {
       const { scroll = true } = opts || {}
       const url = new URL(path, window.location.origin)
 
-      updateLocation({
-        href: url.href,
-        pathname: url.pathname,
-        search: Object.fromEntries(url.searchParams),
-        searchStr: url.search,
-        hash: url.hash,
-      })
-
-      history[type](path, '', path)
-
-      if (scroll) {
-        window.scroll(0, 0)
-      }
+      // The history/scroll update is applied by `updateLocation` when the
+      // navigation actually commits — which, for a route without `loading.tsx`,
+      // is after its data has been prefetched (so the URL doesn't change while
+      // the current page is still showing).
+      updateLocation(
+        {
+          href: url.href,
+          pathname: url.pathname,
+          search: Object.fromEntries(url.searchParams),
+          searchStr: url.search,
+          hash: url.hash,
+        },
+        { history: { type, path }, scroll },
+      )
     },
     [updateLocation],
   )

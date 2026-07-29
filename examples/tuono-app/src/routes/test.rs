@@ -9,7 +9,9 @@ struct TestPageProps {
 
 #[tuono_lib::handler]
 async fn test_props(_req: Request) -> Response {
+    tuono_lib::tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
     let data = TestPageProps {
+        
         timestamp: SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
