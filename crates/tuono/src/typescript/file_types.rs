@@ -1,8 +1,10 @@
-use super::utils::has_derive_type;
-use crate::typescript::parser::{parse_enum, parse_struct};
 use std::error::Error;
 use std::path::PathBuf;
+
 use tracing::trace;
+
+use super::utils::has_derive_type;
+use crate::typescript::parser::{parse_enum, parse_struct};
 
 /// Represents all the valid typescript types found in a file.
 #[derive(Debug, Clone, PartialEq, Eq)]

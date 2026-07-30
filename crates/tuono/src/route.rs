@@ -1,12 +1,13 @@
+use std::fs::File;
+use std::io;
+use std::path::PathBuf;
+use std::str::FromStr;
+
 use fs_extra::dir::create_all;
 use http::Method;
 use regex::Regex;
 use reqwest::Url;
 use reqwest::blocking::Client;
-use std::fs::File;
-use std::io;
-use std::path::PathBuf;
-use std::str::FromStr;
 use tracing::trace;
 
 fn has_dynamic_path(route: &str) -> bool {
@@ -110,22 +111,25 @@ const NO_HTML_EXTENSIONS: [&str; 2] = ["xml", "txt"];
 
 // TODO: Refine this function to catch
 // if the methods are commented.
-fn read_http_methods_from_file(path: &String) -> Vec<Method> {
-    let regex = Regex::new(r"tuono_lib::api\((.*?)\)]").expect("Failed to create API regex");
-
-    let file = fs_extra::file::read_to_string(path).expect("Failed to read API file");
+/// Extract the HTTP methods declared by `#[api(METHOD)]` attributes in a file's
+/// contents. Both the imported form (`#[api(GET)]`) and the fully-qualified
+/// `#[tuono_lib::api(GET)]` are recognised; the method is captured in group 1.
+fn parse_api_methods(content: &str) -> Vec<Method> {
+    let regex =
+        Regex::new(r"#\[\s*(?:tuono_lib::)?api\((.*?)\)\s*\]").expect("Failed to create API regex");
 
     regex
-        .find_iter(&file)
-        .map(|proc_macro| {
-            let http_method = proc_macro
-                .as_str()
-                // Extract just the element surrounded by the phrantesist.
-                .replace("tuono_lib::api(", "")
-                .replace(")]", "");
+        .captures_iter(content)
+        .map(|captures| {
+            let http_method = captures[1].trim();
             Method::from_str(http_method.to_uppercase().as_str()).unwrap_or(Method::GET)
         })
         .collect::<Vec<Method>>()
+}
+
+fn read_http_methods_from_file(path: &String) -> Vec<Method> {
+    let file = fs_extra::file::read_to_string(path).expect("Failed to read API file");
+    parse_api_methods(&file)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -188,7 +192,7 @@ impl Route {
     /// The public URL for this route: the file path with the trailing `/page`
     /// dropped and route groups removed (`/about/page` → `/about`, `/page` →
     /// `/`). Non-page paths (e.g. `/sitemap.xml`) are returned unchanged.
-    fn url_path(&self) -> String {
+    pub(crate) fn url_path(&self) -> String {
         let stripped = self.path.strip_suffix("/page").unwrap_or(&self.path);
         let stripped = strip_route_groups(stripped);
         if stripped.is_empty() {
@@ -323,6 +327,30 @@ impl Route {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_api_methods_in_both_imported_and_qualified_forms() {
+        // Imported form.
+        assert_eq!(
+            parse_api_methods("#[api(GET)]\nasync fn h() {}"),
+            vec![Method::GET]
+        );
+        // Fully-qualified form.
+        assert_eq!(
+            parse_api_methods("#[tuono_lib::api(POST)]\nasync fn h() {}"),
+            vec![Method::POST]
+        );
+        // Multiple methods in one file, case-insensitive, tolerant of spacing.
+        assert_eq!(
+            parse_api_methods("#[api(get)]\n#[ tuono_lib::api(Delete) ]"),
+            vec![Method::GET, Method::DELETE]
+        );
+    }
+
+    #[test]
+    fn parse_api_methods_ignores_files_without_the_attribute() {
+        assert!(parse_api_methods("async fn not_an_api() {}").is_empty());
+    }
 
     #[test]
     fn should_find_dynamic_paths() {

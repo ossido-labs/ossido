@@ -1,8 +1,8 @@
+use std::fs;
+
 use assert_cmd::Command;
 use clap::crate_version;
 use serial_test::serial;
-
-use std::fs;
 
 mod utils;
 

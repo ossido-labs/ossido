@@ -1,9 +1,8 @@
+use super::utils::should_skip_element;
 use crate::typescript::parser::utils::{
     RenameSerdeOptions, get_field_name, parse_generics_to_typescript_string, parse_serde_attribute,
     rust_to_typescript_type,
 };
-
-use super::utils::should_skip_element;
 
 /// Parse a rust struct and returns a tuple of the struct name and the
 /// struct compiled to a typescript interface

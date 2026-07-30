@@ -1,5 +1,6 @@
-use convert_case::{Case, Casing};
 use std::str::FromStr;
+
+use convert_case::{Case, Casing};
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{GenericArgument, GenericParam, PathArguments};

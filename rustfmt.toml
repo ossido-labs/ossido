@@ -1,0 +1,9 @@
+# Import optimisation. These two keys are still unstable, so `cargo fmt` must run
+# on nightly (`cargo +nightly fmt`); the lint/format scripts do this.
+#
+# - imports_granularity = "Module": merge the items imported from a single module
+#   onto one `use` line, while keeping a separate line per module path.
+# - group_imports = "StdExternalCrate": order imports into three blank-line
+#   separated groups — std/core/alloc, then external crates, then `crate`/`self`.
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"

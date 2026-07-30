@@ -1,7 +1,7 @@
-// src/routes/index.rs
+// src/routes/page.rs
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
-use tuono_lib::{Props, Request, Response};
+use tuono_lib::{handler, Props, Request, Response};
 
 const ALL_POKEMON: &str = "https://pokeapi.co/api/v2/pokemon?limit=151";
 
@@ -16,7 +16,7 @@ struct Pokemon {
     url: String,
 }
 
-#[tuono_lib::handler]
+#[handler]
 async fn get_all_pokemons(_req: Request, fetch: Client) -> Response {
     match fetch.get(ALL_POKEMON).send().await {
         Ok(res) => {

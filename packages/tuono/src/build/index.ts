@@ -13,6 +13,7 @@ import type { TuonoConfig } from '../config'
 import { blockingAsync } from './utils'
 import { createJsonConfig, loadConfig } from './config'
 import { ENV_PREFIX } from './constants'
+import { createTuonoViteLogger } from './logger'
 
 const require = createRequire(import.meta.url)
 
@@ -77,6 +78,10 @@ function createBaseViteConfigFromTuonoConfig(
     // `'error'` (not `'silent'`) so build failures surface instead of
     // degrading to a silent client-side fallback with hydration mismatches.
     logLevel: 'error',
+    // Tag vite's output `[FE]` so it matches the rest of the Tuono logs. The
+    // level is passed explicitly so the logger honours it (see the logger docs)
+    // — this keeps vite's info/benign-warning noise out at `'error'`.
+    customLogger: createTuonoViteLogger('error'),
     publicDir: '../public',
     cacheDir: 'cache',
     envDir: '../',

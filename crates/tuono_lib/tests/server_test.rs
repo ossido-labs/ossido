@@ -7,8 +7,9 @@ mod tuono_main_state {
 mod utils;
 use std::collections::HashMap;
 
-use crate::utils::mock_server::MockTuonoServer;
 use serial_test::serial;
+
+use crate::utils::mock_server::MockTuonoServer;
 
 #[tokio::test]
 #[serial]

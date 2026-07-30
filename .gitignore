@@ -32,3 +32,5 @@ vite.config.ts.timestamp*
 .vscode/
 
 *.tgz
+# Test coverage output (cargo-llvm-cov / vitest)
+coverage/

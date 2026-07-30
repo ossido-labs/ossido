@@ -1,4 +1,3 @@
-use crate::config::GLOBAL_CONFIG;
 use axum::extract::ws::{self, Utf8Bytes as AxumUtf8Bytes, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
@@ -6,6 +5,8 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::{Error, Message};
 use tungstenite::ClientRequestBuilder;
 use tungstenite::client::IntoClientRequest;
+
+use crate::config::GLOBAL_CONFIG;
 
 const VITE_WS_PROTOCOL: &str = "vite-hmr";
 

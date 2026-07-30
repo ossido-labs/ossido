@@ -1,7 +1,8 @@
 use tower_http::cors::{Any, CorsLayer};
 use tuono_lib::axum::http::Method;
+use tuono_lib::middleware;
 
-#[tuono_lib::middleware]
+#[middleware]
 pub fn api_cors_layer() -> CorsLayer {
     CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource

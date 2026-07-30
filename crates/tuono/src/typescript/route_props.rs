@@ -171,8 +171,9 @@ pub fn render_route_props(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::path::PathBuf;
+
+    use super::*;
 
     #[test]
     fn maps_page_to_directory_and_keeps_dynamic_segments() {

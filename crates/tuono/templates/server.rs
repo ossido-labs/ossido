@@ -14,10 +14,6 @@ use tuono_lib::{Mode, Server, axum::Router, tokio, tuono_internal_init_v8_platfo
 async fn main() {
     tuono_internal_init_v8_platform();
 
-    if MODE == Mode::Prod {
-        println!("\n  ⚡ Tuono v/*VERSION*/");
-    }
-
     //MAIN_FILE_DEFINITION//
 
     // ROUTE_BUILDER

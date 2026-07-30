@@ -1,8 +1,9 @@
-use fs_extra::dir::create_all;
 use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+
+use fs_extra::dir::create_all;
 use tempfile::{TempDir, tempdir};
 
 #[derive(Debug)]

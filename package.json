@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "turbo dev --filter=./devtools/* --filter=./packages/*",
     "build": "turbo build --filter=./devtools/* --filter=./packages/*",
-    "lint": "turbo lint --filter=./devtools/* --filter=./packages/*",
-    "format:fix": "turbo format:fix --filter=./devtools/* --filter=./packages/*",
+    "lint": "turbo lint --filter=./devtools/* --filter=./packages/* && cargo +nightly fmt --all --check",
+    "lint:rust": "cargo +nightly fmt --all --check",
+    "format:fix": "turbo format:fix --filter=./devtools/* --filter=./packages/* && cargo +nightly fmt --all",
+    "format:rust:fix": "cargo +nightly fmt --all",
     "format": "turbo format --filter=./devtools/* --filter=./packages/*",
     "typecheck": "turbo typecheck --filter=./devtools/* --filter=./packages/*",
     "test": "turbo test --filter=./devtools/* --filter=./packages/*",
@@ -35,6 +37,7 @@
   "devDependencies": {
     "@playwright/test": "1.54.1",
     "@types/node": "22.16.5",
+    "@vitest/coverage-v8": "4.1.10",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "turbo": "2.5.5",

@@ -1,7 +1,10 @@
-use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use std::io;
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+use crate::log::{Level, LogFormat};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ServerConfig {
@@ -20,9 +23,52 @@ impl Default for ServerConfig {
     }
 }
 
+/// Forwarding of browser `console.*` to the dev server console (dev only).
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct BrowserLogConfig {
+    pub enabled: bool,
+    pub level: Level,
+}
+
+impl Default for BrowserLogConfig {
+    fn default() -> Self {
+        BrowserLogConfig {
+            enabled: true,
+            level: Level::Info,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct LoggingConfig {
+    #[serde(default)]
+    pub format: LogFormat,
+    /// Print the route tree on `tuono dev` start-up.
+    #[serde(rename = "routeTree", default = "default_true")]
+    pub route_tree: bool,
+    #[serde(default)]
+    pub browser: BrowserLogConfig,
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        LoggingConfig {
+            format: LogFormat::default(),
+            route_tree: true,
+            browser: BrowserLogConfig::default(),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Config {
     pub server: ServerConfig,
+    #[serde(default)]
+    pub logging: LoggingConfig,
 }
 
 impl Config {

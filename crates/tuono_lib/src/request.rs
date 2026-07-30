@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use axum::http::{HeaderMap, Uri};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Location must match client side interface
 #[derive(Serialize, Debug)]

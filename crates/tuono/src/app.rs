@@ -1,21 +1,22 @@
-use crate::mode::Mode;
-use crate::route::Route;
-use crate::route_directory_info::RouteDirectoryInfo;
-use glob::{GlobError, glob};
-use http::Method;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::collections::hash_set::HashSet;
-use std::collections::{HashMap, hash_map::Entry};
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
 use std::io::prelude::*;
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::Child;
-use std::process::Command;
-use std::process::Stdio;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
+
+use glob::{GlobError, glob};
+use http::Method;
 use tracing::error;
 use tuono_internal::config::Config;
+use tuono_internal::log::{self, Level};
+
+use crate::mode::Mode;
+use crate::route::Route;
+use crate::route_directory_info::RouteDirectoryInfo;
 
 pub const IGNORE_EXTENSIONS: [&str; 3] = ["css", "scss", "sass"];
 // The file that marks a route (its URL is the containing directory).
@@ -59,6 +60,19 @@ pub fn is_api_path(entry: &Path, base_path: &Path) -> bool {
         .replace(&format!("{base_path_str}{ROUTES_FOLDER_PATH}"), "")
         .replace('\\', "/")
         .starts_with("/api/")
+}
+
+/// Whether `port` can be bound on every address `host:port` resolves to. Binding
+/// each resolved address (not just the first that succeeds) detects a conflict
+/// regardless of the IPv4/IPv6 family the port is held on.
+fn port_is_available(host: &str, port: u16) -> bool {
+    use std::net::{TcpListener, ToSocketAddrs};
+    match format!("{host}:{port}").to_socket_addrs() {
+        Ok(mut addrs) => addrs.all(|addr| TcpListener::bind(addr).is_ok()),
+        // Resolution failed — best-effort single bind; the server bind is the
+        // backstop.
+        Err(_) => TcpListener::bind(format!("{host}:{port}")).is_ok(),
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -175,27 +189,19 @@ impl App {
         // At this point the config should be available
         let config = self.config.as_ref().unwrap();
 
-        let rust_listener =
-            std::net::TcpListener::bind(format!("{}:{}", config.server.host, config.server.port));
-
-        if let Err(_e) = rust_listener {
-            eprintln!("Error: Failed to bind to port {}", config.server.port);
-            eprintln!(
-                "Please ensure that port {} is not already in use by another process or application.",
-                config.server.port
-            );
-            std::process::exit(1);
+        // The rust server, plus the vite dev server on `port + 1` in dev.
+        let mut ports = vec![config.server.port];
+        if mode == Mode::Dev {
+            ports.push(config.server.port + 1);
         }
 
-        if mode == Mode::Dev {
-            let vite_port = config.server.port + 1;
-            let vite_listener =
-                std::net::TcpListener::bind(format!("{}:{}", config.server.host, vite_port));
-
-            if let Err(_e) = vite_listener {
-                eprintln!("Error: Failed to bind to port {vite_port}");
-                eprintln!(
-                    "Please ensure that port {vite_port} is not already in use by another process or application."
+        for port in ports {
+            if !port_is_available(&config.server.host, port) {
+                log::backend(
+                    Level::Error,
+                    format!(
+                        "Port {port} is already in use. Stop the process using it, or set a different `server.port` in tuono.config.ts."
+                    ),
                 );
                 std::process::exit(1);
             }

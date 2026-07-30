@@ -1,8 +1,10 @@
-use crate::mode::{GLOBAL_MODE, Mode};
-use ssr_rs::{Ssr, SsrError};
 use std::cell::RefCell;
 use std::fs::read_to_string;
 use std::path::PathBuf;
+
+use ssr_rs::{Ssr, SsrError};
+
+use crate::mode::{GLOBAL_MODE, Mode};
 
 /// For the server side rendering we need to split the implementation between dev and prod.
 /// This completely remove the multi-thread optimization on dev but allow the dev server to

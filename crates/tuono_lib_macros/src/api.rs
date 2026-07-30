@@ -1,52 +1,71 @@
-use crate::utils::{
-    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
-    params_argument, request_argument,
-};
-use proc_macro::{Span, TokenStream};
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
-use syn::{FnArg, Ident, ItemFn, Pat, parse_macro_input};
+use syn::{FnArg, Ident, ItemFn, Pat};
+
+use crate::utils::{
+    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
+    is_logger_pat, params_argument, request_argument,
+};
 
 pub fn api_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as ItemFn);
-    let http_method = parse_macro_input!(attrs as Ident)
-        .to_string()
-        .to_lowercase();
+    let item = match syn::parse2::<ItemFn>(item) {
+        Ok(item) => item,
+        Err(err) => return err.to_compile_error(),
+    };
+    let http_method = match syn::parse2::<Ident>(attrs) {
+        Ok(method) => method.to_string().to_lowercase(),
+        Err(err) => return err.to_compile_error(),
+    };
 
     let api_fn_name = Ident::new(
         &format!("{http_method}_tuono_internal_api"),
-        Span::call_site().into(),
+        Span::call_site(),
     );
 
     let fn_name = &item.sig.ident;
     let return_type = &item.sig.output;
 
+    // All arguments after the request, passed to the handler in declared order.
     let mut argument_names: Punctuated<Pat, Comma> = Punctuated::new();
-    let mut axum_arguments: Punctuated<FnArg, Comma> = Punctuated::new();
+    // The subset destructured from `ApplicationState` (i.e. not the `logger`).
+    let mut state_field_names: Punctuated<Pat, Comma> = Punctuated::new();
+    // Any `logger` parameters, provided automatically by the framework.
+    let mut logger_pats: Vec<Pat> = Vec::new();
 
-    // Fn Arguments minus the first which always is the request
+    // The first argument is always the request; the rest are application-state
+    // fields or a `logger` (provided by the framework, no state needed).
     for (i, arg) in item.sig.inputs.iter().enumerate() {
         if i == 0 {
-            axum_arguments.insert(i, params_argument());
             continue;
         }
-
-        if i == 1 {
-            axum_arguments.insert(1, create_struct_fn_arg())
-        }
-
         if let FnArg::Typed(pat_type) = arg {
-            let index = i - 1;
-            let argument_name = *pat_type.pat.clone();
-            argument_names.insert(index, argument_name.clone());
+            let pat = *pat_type.pat.clone();
+            argument_names.push(pat.clone());
+            if is_logger_pat(&pat) {
+                logger_pats.push(pat);
+            } else {
+                state_field_names.push(pat);
+            }
         }
     }
 
-    axum_arguments.insert(axum_arguments.len(), request_argument());
+    let mut axum_arguments: Punctuated<FnArg, Comma> = Punctuated::new();
+    axum_arguments.push(params_argument());
+    if !state_field_names.is_empty() {
+        axum_arguments.push(create_struct_fn_arg());
+    }
+    axum_arguments.push(request_argument());
 
-    let application_state_extractor = crate_application_state_extractor(argument_names.clone());
-    let application_state_import = import_main_application_state(argument_names.clone());
+    let application_state_extractor = crate_application_state_extractor(state_field_names.clone());
+    let application_state_import = import_main_application_state(state_field_names.clone());
+
+    // Binds each declared `logger` parameter to a request-scoped logger (emitted
+    // after `#modified_request` builds `req`).
+    let logger_bindings = quote! {
+        #( let #logger_pats = tuono_lib::Logger::new(&req); )*
+    };
 
     let modified_request = if http_method == "post"
         || http_method == "put"
@@ -80,9 +99,86 @@ pub fn api_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
            #application_state_extractor
 
            #modified_request
+           #logger_bindings
 
            #fn_name(req.clone(), #argument_names).await
         }
     }
-    .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expand(method: TokenStream, item: TokenStream) -> String {
+        api_core(method, item).to_string().replace(' ', "")
+    }
+
+    #[test]
+    fn a_get_api_names_the_fn_and_reads_the_request_without_a_body() {
+        let out = expand(
+            quote! { GET },
+            quote! { async fn list(req: Request) -> Response { todo!() } },
+        );
+        assert!(out.contains("pubasyncfnget_tuono_internal_api"));
+        // GET keeps the original function and does not read the request body.
+        assert!(out.contains("asyncfnlist(req:Request)"));
+        assert!(!out.contains("into_parts"));
+        assert!(!out.contains("to_bytes"));
+    }
+
+    #[test]
+    fn a_post_api_reads_the_request_body() {
+        let out = expand(
+            quote! { POST },
+            quote! { async fn create(req: Request) -> Response { todo!() } },
+        );
+        assert!(out.contains("pubasyncfnpost_tuono_internal_api"));
+        // Body methods consume and buffer the request body.
+        assert!(out.contains("into_parts"));
+        assert!(out.contains("to_bytes"));
+    }
+
+    #[test]
+    fn put_and_patch_also_read_the_body() {
+        for method in ["PUT", "PATCH"] {
+            let token: TokenStream = method.parse().unwrap();
+            let out = expand(
+                token,
+                quote! { async fn edit(req: Request) -> Response { todo!() } },
+            );
+            assert!(out.contains("into_parts"), "method {method} should buffer");
+        }
+    }
+
+    #[test]
+    fn a_stateful_api_extracts_application_state() {
+        let out = expand(
+            quote! { GET },
+            quote! { async fn list(req: Request, db: Db) -> Response { todo!() } },
+        );
+        assert!(out.contains("tuono_lib::axum::extract::State(state)"));
+        assert!(out.contains("usecrate::tuono_main_state::ApplicationState"));
+        assert!(out.contains("list(req.clone(),db)"));
+    }
+
+    #[test]
+    fn a_logger_parameter_is_bound_in_an_api_handler() {
+        let out = expand(
+            quote! { GET },
+            quote! { async fn list(req: Request, logger: Logger) -> Response { todo!() } },
+        );
+        assert!(out.contains("letlogger=tuono_lib::Logger::new(&req)"));
+        assert!(!out.contains("State(state)"));
+    }
+
+    #[test]
+    fn an_invalid_http_method_becomes_a_compile_error() {
+        // A numeric literal is not a valid method identifier.
+        let out = expand(
+            quote! { 123 },
+            quote! { async fn list(req: Request) -> Response { todo!() } },
+        );
+        assert!(out.contains("compile_error!"));
+    }
 }

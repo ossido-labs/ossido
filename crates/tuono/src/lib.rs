@@ -9,6 +9,7 @@ mod mode;
 mod process_manager;
 mod route;
 mod route_directory_info;
+mod route_tree;
 mod source_builder;
 mod symbols;
 mod typescript;

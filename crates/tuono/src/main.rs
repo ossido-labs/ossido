@@ -3,6 +3,9 @@ use tracing_subscriber::EnvFilter;
 use tuono::cli::app;
 
 fn main() {
+    // Respect `NO_COLOR` before any coloured output is produced.
+    tuono_internal::log::honor_no_color();
+
     tracing_subscriber::fmt()
         // Time not needed since the execution is synchronous
         .without_time()

@@ -1,7 +1,7 @@
 // src/routes/pokemons/GOAT.rs
-use tuono_lib::{Request, Response};
+use tuono_lib::{handler, Request, Response};
 
-#[tuono_lib::handler]
+#[handler]
 async fn redirect_to_goat(_req: Request) -> Response {
     Response::Redirect("/pokemons/mewtwo".to_string())
 }

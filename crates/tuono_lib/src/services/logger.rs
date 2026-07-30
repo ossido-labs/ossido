@@ -1,12 +1,14 @@
-use colored::Colorize;
-use http::{Request, Response, method::Method};
-use pin_project::pin_project;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+use http::method::Method;
+use http::{Request, Response};
+use pin_project::pin_project;
 use tokio::time::Instant;
 use tower::{Layer, Service};
+use tuono_internal::log::{self, Level};
 
 #[derive(Clone)]
 pub struct LoggerLayer {}
@@ -87,18 +89,31 @@ where
             Poll::Pending => return Poll::Pending,
         };
 
-        if this.path.starts_with("/__tuono/data") {
+        // The data endpoints and the browser-log intake are noisy/internal.
+        if this.path.starts_with("/__tuono/data") || this.path.starts_with("/__tuono/logs") {
             return Poll::Ready(res);
         }
 
         let status_code = res.as_ref().unwrap().status();
 
-        println!(
-            "  {} {} {} in {}ms",
-            this.method,
-            this.path,
-            status_code.as_str().green(),
-            this.start.elapsed().as_millis()
+        // Surface server/client error responses at a matching level.
+        let level = if status_code.is_server_error() {
+            Level::Error
+        } else if status_code.is_client_error() {
+            Level::Warn
+        } else {
+            Level::Info
+        };
+
+        log::backend(
+            level,
+            format!(
+                "{} {} {} in {}ms",
+                this.method,
+                this.path,
+                status_code.as_u16(),
+                this.start.elapsed().as_millis()
+            ),
         );
 
         Poll::Ready(res)

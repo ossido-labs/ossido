@@ -1,12 +1,12 @@
-use crate::config::GLOBAL_CONFIG;
-use crate::manifest::MANIFEST;
-use crate::mode::{GLOBAL_MODE, Mode};
-use crate::server_error::ServerError;
 use erased_serde::Serialize;
 use serde::Serialize as SerdeSerialize;
 use tuono_internal::config::ServerConfig;
 
+use crate::config::GLOBAL_CONFIG;
+use crate::manifest::MANIFEST;
+use crate::mode::{GLOBAL_MODE, Mode};
 use crate::request::{Location, Request};
+use crate::server_error::ServerError;
 
 /// Empty stand-in for the `data` field when rendering an error payload, which
 /// carries no route data. `'static` so it coerces to the payload's lifetime.
@@ -104,9 +104,10 @@ impl<'a> Payload<'a> {
 #[cfg(test)]
 mod tests {
 
+    use axum::http::Uri;
+
     use super::*;
     use crate::manifest::ViteManifest;
-    use axum::http::Uri;
 
     const MANIFEST_EXAMPLE: &str = r#"{
         "../src/routes/page.tsx": {

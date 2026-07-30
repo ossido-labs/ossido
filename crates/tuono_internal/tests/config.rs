@@ -1,6 +1,7 @@
 mod utils;
-use serial_test::serial;
 use std::io::ErrorKind;
+
+use serial_test::serial;
 use tuono_internal::config::Config;
 use utils::TempTuonoProject;
 

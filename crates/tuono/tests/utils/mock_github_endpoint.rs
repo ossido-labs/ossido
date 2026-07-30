@@ -1,5 +1,6 @@
-use clap::crate_version;
 use std::env;
+
+use clap::crate_version;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

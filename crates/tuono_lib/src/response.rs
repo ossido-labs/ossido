@@ -1,12 +1,13 @@
-use crate::Request;
-use crate::mode::{GLOBAL_MODE, Mode};
-use crate::server_error::ServerError;
-use crate::{Payload, ssr::Js};
 use axum::Json;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response as AxumResponse};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use erased_serde::Serialize;
+
+use crate::mode::{GLOBAL_MODE, Mode};
+use crate::server_error::ServerError;
+use crate::ssr::Js;
+use crate::{Payload, Request};
 
 const INTERNAL_SERVER_ERROR_HTML: &str = "500 Internal server error";
 
@@ -29,6 +30,9 @@ struct JsonErrorInfo {
 /// boots the client with the error payload so the overlay renders; in
 /// production it returns a detail-free `500` (no source/stack leaked).
 pub fn render_error_to_string(req: Request, error: ServerError) -> AxumResponse {
+    // Surface the error in the server console (pretty template / json).
+    error.log();
+
     let mode = *GLOBAL_MODE.get().expect("Failed to get GLOBAL_MODE");
 
     if mode == Mode::Prod {
@@ -58,6 +62,9 @@ pub fn render_error_to_string(req: Request, error: ServerError) -> AxumResponse 
 /// development it carries the structured error under `info.serverError`; in
 /// production it returns a detail-free `500`.
 pub fn error_json(error: ServerError) -> AxumResponse {
+    // Surface the error in the server console (pretty template / json).
+    error.log();
+
     let mode = *GLOBAL_MODE.get().expect("Failed to get GLOBAL_MODE");
 
     let server_error = if mode == Mode::Prod {
@@ -398,5 +405,250 @@ mod tests {
             props.cookies.get("test").unwrap(),
             &Cookie::new("test", "cookie")
         );
+    }
+
+    // ---- helpers -----------------------------------------------------------
+
+    /// A `HandlerData::Props` with `serde_json` `data` and a default `200`/no
+    /// cookies, mirroring what `resolve_handler` produces for the common case.
+    fn props(data: serde_json::Value) -> HandlerData {
+        HandlerData::Props {
+            data,
+            http_code: StatusCode::OK,
+            cookies: CookieJar::new(),
+        }
+    }
+
+    /// A minimal `ServerError` (no captured location/backtrace) for exercising
+    /// the error short-circuit without a real panic.
+    fn server_error() -> ServerError {
+        ServerError {
+            name: "RustPanic".to_string(),
+            message: "boom".to_string(),
+            stack: String::new(),
+            source: None,
+        }
+    }
+
+    /// Drive an `AxumResponse` to completion and return its status + parsed JSON
+    /// body (`Value::Null` if the body is not valid JSON).
+    async fn read_json(response: AxumResponse) -> (StatusCode, serde_json::Value) {
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("failed to read response body");
+        let value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+        (status, value)
+    }
+
+    // ---- resolve_handler ---------------------------------------------------
+
+    #[test]
+    fn resolve_handler_serializes_props_and_keeps_status_and_cookies() {
+        let mut inner = Props::new(serde_json::json!({ "hello": "world" }));
+        inner.status(StatusCode::CREATED);
+        inner.add_cookie(Cookie::new("session", "abc"));
+
+        match resolve_handler(Ok(Response::Props(inner))) {
+            HandlerData::Props {
+                data,
+                http_code,
+                cookies,
+            } => {
+                assert_eq!(data, serde_json::json!({ "hello": "world" }));
+                assert_eq!(http_code, StatusCode::CREATED);
+                assert_eq!(cookies.get("session").unwrap().value(), "abc");
+            }
+            _ => panic!("expected HandlerData::Props"),
+        }
+    }
+
+    #[test]
+    fn resolve_handler_maps_redirect_custom_and_error() {
+        assert!(matches!(
+            resolve_handler(Ok(Response::Redirect("/next".to_string()))),
+            HandlerData::Redirect(dest) if dest == "/next"
+        ));
+
+        let custom = (
+            StatusCode::IM_A_TEAPOT,
+            HeaderMap::new(),
+            "brew".to_string(),
+        );
+        assert!(matches!(
+            resolve_handler(Ok(Response::Custom(custom))),
+            HandlerData::Custom((StatusCode::IM_A_TEAPOT, _, body)) if body == "brew"
+        ));
+
+        assert!(matches!(
+            resolve_handler(Err(server_error())),
+            HandlerData::Error(error) if error.message == "boom"
+        ));
+    }
+
+    // ---- resolve_layouts (chain short-circuit core) ------------------------
+
+    #[test]
+    fn resolve_layouts_collects_props_in_order_and_skips_custom() {
+        let layouts = vec![
+            ("/layout".to_string(), props(serde_json::json!({ "a": 1 }))),
+            (
+                "/dash/layout".to_string(),
+                HandlerData::Custom((StatusCode::OK, HeaderMap::new(), String::new())),
+            ),
+            (
+                "/dash/settings/layout".to_string(),
+                props(serde_json::json!({ "b": 2 })),
+            ),
+        ];
+
+        match resolve_layouts(layouts) {
+            LayoutResolution::Map(map) => {
+                // Both props layouts are keyed; the `Custom` layout contributes
+                // nothing to the data map.
+                assert_eq!(map.get("/layout"), Some(&serde_json::json!({ "a": 1 })));
+                assert_eq!(
+                    map.get("/dash/settings/layout"),
+                    Some(&serde_json::json!({ "b": 2 }))
+                );
+                assert!(!map.contains_key("/dash/layout"));
+                assert_eq!(map.len(), 2);
+            }
+            _ => panic!("expected a resolved map"),
+        }
+    }
+
+    #[test]
+    fn resolve_layouts_empty_is_an_empty_map() {
+        match resolve_layouts(Vec::new()) {
+            LayoutResolution::Map(map) => assert!(map.is_empty()),
+            _ => panic!("expected an empty map"),
+        }
+    }
+
+    #[test]
+    fn resolve_layouts_short_circuits_on_first_redirect() {
+        let layouts = vec![
+            ("/layout".to_string(), props(serde_json::json!({ "a": 1 }))),
+            (
+                "/dash/layout".to_string(),
+                HandlerData::Redirect("/login".to_string()),
+            ),
+            // Never reached; if it were, it would still not override the redirect.
+            (
+                "/dash/settings/layout".to_string(),
+                props(serde_json::json!({ "b": 2 })),
+            ),
+        ];
+
+        assert!(matches!(
+            resolve_layouts(layouts),
+            LayoutResolution::Redirect(dest) if dest == "/login"
+        ));
+    }
+
+    #[test]
+    fn resolve_layouts_short_circuits_on_first_error() {
+        let layouts = vec![
+            ("/layout".to_string(), HandlerData::Error(server_error())),
+            (
+                "/dash/layout".to_string(),
+                HandlerData::Redirect("/login".to_string()),
+            ),
+        ];
+
+        // The error wins because it appears first in chain order, even though a
+        // later layout would redirect.
+        assert!(matches!(
+            resolve_layouts(layouts),
+            LayoutResolution::Error(error) if error.message == "boom"
+        ));
+    }
+
+    // ---- chain_json (data endpoint, no V8 needed) --------------------------
+
+    #[tokio::test]
+    async fn chain_json_page_props_without_layouts_omits_layout_data() {
+        let (status, body) = read_json(chain_json(
+            props(serde_json::json!({ "heading": "About" })),
+            Vec::new(),
+        ))
+        .await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["data"], serde_json::json!({ "heading": "About" }));
+        assert_eq!(
+            body["info"]["redirect_destination"],
+            serde_json::Value::Null
+        );
+        // `layoutData` is skipped entirely when there are no layouts.
+        assert!(body.get("layoutData").is_none());
+    }
+
+    #[tokio::test]
+    async fn chain_json_page_props_with_layouts_includes_layout_data() {
+        let layouts = vec![(
+            "/(marketing)/layout".to_string(),
+            props(serde_json::json!({ "banner": "Hello" })),
+        )];
+
+        let (status, body) = read_json(chain_json(
+            props(serde_json::json!({ "heading": "About" })),
+            layouts,
+        ))
+        .await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["data"], serde_json::json!({ "heading": "About" }));
+        assert_eq!(
+            body["layoutData"]["/(marketing)/layout"],
+            serde_json::json!({ "banner": "Hello" })
+        );
+    }
+
+    #[tokio::test]
+    async fn chain_json_page_redirect_reports_destination() {
+        let (status, body) = read_json(chain_json(
+            HandlerData::Redirect("/login".to_string()),
+            Vec::new(),
+        ))
+        .await;
+
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(body["info"]["redirect_destination"], "/login");
+        assert_eq!(body["data"], serde_json::Value::Null);
+    }
+
+    #[tokio::test]
+    async fn chain_json_layout_redirect_short_circuits_the_page() {
+        // A redirect from a layout must win before the page is ever considered.
+        let layouts = vec![(
+            "/layout".to_string(),
+            HandlerData::Redirect("/login".to_string()),
+        )];
+
+        let (status, body) = read_json(chain_json(
+            props(serde_json::json!({ "heading": "never rendered" })),
+            layouts,
+        ))
+        .await;
+
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(body["info"]["redirect_destination"], "/login");
+        assert_eq!(body["data"], serde_json::Value::Null);
+    }
+
+    #[tokio::test]
+    async fn chain_json_page_custom_returns_empty_object() {
+        let (status, body) = read_json(chain_json(
+            HandlerData::Custom((StatusCode::OK, HeaderMap::new(), "ignored".to_string())),
+            Vec::new(),
+        ))
+        .await;
+
+        assert_eq!(status, StatusCode::OK);
+        // `Custom` sits outside the React data contract, so the data endpoint
+        // returns a placeholder `"{}"`.
+        assert_eq!(body, serde_json::Value::String("{}".to_string()));
     }
 }

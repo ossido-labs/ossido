@@ -50,6 +50,11 @@ jobs:
       - name: Install NodeJS Dependencies
         uses: ./.github/actions/install-node-dependencies
 
+      # `pnpm run lint` also checks Rust formatting (`cargo +nightly fmt`), whose
+      # import grouping/merging is a nightly-only rustfmt feature.
+      - name: Install nightly rustfmt
+        run: rustup toolchain install nightly --profile minimal --component rustfmt
+
       - name: Check formatting
         run: pnpm run format
 

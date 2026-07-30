@@ -13,7 +13,14 @@ describe('createJsonConfig', () => {
   })
 
   it('should process config with only server property', async () => {
-    const sampleConfig = { server: { host: 'h', origin: null, port: 1 } }
+    const sampleConfig = {
+      server: { host: 'h', origin: null, port: 1 },
+      logging: {
+        format: 'pretty' as const,
+        routeTree: true,
+        browser: { enabled: true, level: 'info' as const },
+      },
+    }
 
     await createJsonConfig(sampleConfig)
 
@@ -25,7 +32,14 @@ describe('createJsonConfig', () => {
   })
 
   it('should process config with plugins', async () => {
-    const sampleConfig = { server: { host: 'h', origin: null, port: 1 } }
+    const sampleConfig = {
+      server: { host: 'h', origin: null, port: 1 },
+      logging: {
+        format: 'pretty' as const,
+        routeTree: true,
+        browser: { enabled: true, level: 'info' as const },
+      },
+    }
 
     await createJsonConfig({ ...sampleConfig, vite: { plugins: [react()] } })
 
@@ -37,7 +51,14 @@ describe('createJsonConfig', () => {
   })
 
   it('should process config with only server property including origin', async () => {
-    const sampleConfig = { server: { host: 'h', origin: 'o', port: 1 } }
+    const sampleConfig = {
+      server: { host: 'h', origin: 'o', port: 1 },
+      logging: {
+        format: 'pretty' as const,
+        routeTree: true,
+        browser: { enabled: true, level: 'info' as const },
+      },
+    }
 
     await createJsonConfig(sampleConfig)
 

@@ -80,5 +80,13 @@ export const normalizeConfig = (config: TuonoConfig): InternalTuonoConfig => {
       optimizeDeps: config.vite?.optimizeDeps,
       plugins: config.vite?.plugins ?? [],
     },
+    logging: {
+      format: config.logging?.format ?? 'pretty',
+      routeTree: config.logging?.routeTree ?? true,
+      browser: {
+        enabled: config.logging?.browser?.enabled ?? true,
+        level: config.logging?.browser?.level ?? 'info',
+      },
+    },
   }
 }

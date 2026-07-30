@@ -1,8 +1,6 @@
-use std::fs;
-use std::io;
 use std::io::prelude::*;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use clap::crate_version;
 use tracing::error;
@@ -10,8 +8,7 @@ use tracing::error;
 use crate::app::{App, ROUTES_FOLDER_PATH};
 use crate::mode::Mode;
 use crate::route::AxumInfo;
-use crate::route_directory_info::MIDDLEWARE_FILENAME;
-use crate::route_directory_info::RouteDirectoryInfo;
+use crate::route_directory_info::{MIDDLEWARE_FILENAME, RouteDirectoryInfo};
 use crate::typescript::{TypesJar, collect_layout_props, collect_route_props, render_route_props};
 
 #[cfg(not(target_os = "windows"))]
@@ -391,13 +388,34 @@ impl SourceBuilder {
             }
 
             let page_module = &page_info.module_import;
+
+            // The page + every wrapping layout fetch their data concurrently via
+            // `tokio::join!`: the composite polls all `tuono_internal_props`
+            // futures on the one request task so their awaits overlap (latency is
+            // ~max, not the sum). `join!` needs a statically-known arity, which we
+            // have here because the chain length is fixed at codegen time. The
+            // page is the first future so it destructures to `page`; each layout
+            // binds to `layout_{i}` in chain order. `render_chain`/`chain_json`
+            // still short-circuit on the first redirect/error in chain order, so
+            // resolving eagerly does not change observable behaviour.
+            let join_futures = std::iter::once(format!(
+                "{page_module}::tuono_internal_props(req.clone(), state.clone())"
+            ))
+            .chain(layouts.iter().map(|(_, module)| {
+                format!("{module}::tuono_internal_props(req.clone(), state.clone())")
+            }))
+            .collect::<Vec<_>>()
+            .join(",\n                        ");
+
+            let bindings = std::iter::once("page".to_string())
+                .chain((0..layouts.len()).map(|i| format!("layout_{i}")))
+                .collect::<Vec<_>>()
+                .join(", ");
+
             let layout_entries = layouts
                 .iter()
-                .map(|(data_key, module)| {
-                    format!(
-                        r#"("{data_key}".to_string(), {module}::tuono_internal_props(req.clone(), state.clone()).await)"#
-                    )
-                })
+                .enumerate()
+                .map(|(i, (data_key, _))| format!(r#"("{data_key}".to_string(), layout_{i})"#))
                 .collect::<Vec<_>>()
                 .join(", ");
 
@@ -409,8 +427,10 @@ impl SourceBuilder {
                     request: tuono_lib::axum::extract::Request,
                 ) -> impl tuono_lib::axum::response::IntoResponse {{
                     let req = tuono_lib::Request::new(request.uri().to_owned(), request.headers().to_owned(), params, None);
+                    let ({bindings}) = tuono_lib::tokio::join!(
+                        {join_futures}
+                    );
                     let layouts = vec![{layout_entries}];
-                    let page = {page_module}::tuono_internal_props(req.clone(), state.clone()).await;
                     tuono_lib::render_chain(req, page, layouts)
                 }}
 
@@ -420,8 +440,10 @@ impl SourceBuilder {
                     request: tuono_lib::axum::extract::Request,
                 ) -> impl tuono_lib::axum::response::IntoResponse {{
                     let req = tuono_lib::Request::new(request.uri().to_owned(), request.headers().to_owned(), params, None);
+                    let ({bindings}) = tuono_lib::tokio::join!(
+                        {join_futures}
+                    );
                     let layouts = vec![{layout_entries}];
-                    let page = {page_module}::tuono_internal_props(req.clone(), state.clone()).await;
                     tuono_lib::chain_json(page, layouts)
                 }}
                 "#

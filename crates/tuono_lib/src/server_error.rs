@@ -77,13 +77,15 @@ static INSTALL_HOOK: Once = Once::new();
 
 /// Install a panic hook (idempotent) that records each panic's source location
 /// and backtrace into a thread-local so [`catch_handler`] can attach them to the
-/// resulting [`ServerError`]. The previous hook is still invoked, so panics keep
-/// logging to stderr as usual.
+/// resulting [`ServerError`]. It replaces the default hook (which prints the raw
+/// `thread '…' panicked at …` dump) — a caught handler panic is instead surfaced
+/// as the rich `[BE] ERROR` template + the client overlay.
 ///
 /// Only called in development; production never captures backtraces.
 pub fn install_dev_panic_hook() {
     INSTALL_HOOK.call_once(|| {
-        let previous = panic::take_hook();
+        // Drop the default hook; the captured panic is reported via the logger.
+        let _ = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
             let location = info.location().map(|loc| PanicLocation {
                 file: loc.file().to_string(),
@@ -97,7 +99,6 @@ pub fn install_dev_panic_hook() {
                     backtrace,
                 });
             });
-            previous(info);
         }));
     });
 }
@@ -137,6 +138,56 @@ impl ServerError {
             message,
             stack,
             source,
+        }
+    }
+
+    /// Log this error to the server console
+    pub fn log(&self) {
+        tuono_internal::log::error(tuono_internal::log::Source::Backend, &self.to_report());
+    }
+
+    fn to_report(&self) -> tuono_internal::log::ErrorReport {
+        use tuono_internal::log::{CodeLocation, ErrorReport};
+
+        // Only the panic-site frame is shown; the full backtrace is too noisy
+        // for the console (it lives on in the client overlay).
+        let stack = self
+            .stack
+            .lines()
+            .find(|line| line.trim_start().starts_with("at "))
+            .map(|line| vec![line.trim().to_string()])
+            .unwrap_or_default();
+
+        let location = self.source.as_ref().map(|source| {
+            // The compiler records the file `#[path]`d from `.tuono/` (e.g.
+            // `.tuono/../src/routes/…`). Canonicalize it, then show it relative
+            // to the project so the path is clean and clickable.
+            let abs = std::fs::canonicalize(&source.file).ok();
+            let display = abs
+                .as_ref()
+                .and_then(|abs| {
+                    let cwd = std::env::current_dir().ok()?;
+                    abs.strip_prefix(&cwd)
+                        .ok()
+                        .map(|rel| rel.to_string_lossy().into_owned())
+                })
+                .unwrap_or_else(|| source.file.trim_start_matches("../").to_string());
+
+            CodeLocation {
+                file: display,
+                abs_file: abs.map(|path| path.to_string_lossy().into_owned()),
+                line: source.line,
+                column: source.column,
+                content: source.content.clone(),
+            }
+        });
+
+        ErrorReport {
+            name: self.name.clone(),
+            message: self.message.clone(),
+            stack,
+            location,
+            extra: Vec::new(),
         }
     }
 }

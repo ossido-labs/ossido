@@ -1,12 +1,14 @@
-use crate::symbols::TYPE_TRAIT;
-use crate::typescript::FileTypes;
-use glob::glob;
 use std::collections::HashMap;
 use std::env;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
+
+use glob::glob;
 use tracing::{error, trace};
 use tuono_internal::tuono_println;
+
+use crate::symbols::TYPE_TRAIT;
+use crate::typescript::FileTypes;
 
 #[derive(Debug, Clone, Default)]
 pub struct TypesJar {

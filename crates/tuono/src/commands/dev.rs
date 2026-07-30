@@ -1,26 +1,24 @@
-use once_cell::sync::Lazy;
-use regex::Regex;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant};
+
+use console::Term;
+use miette::{IntoDiagnostic, Result};
+use once_cell::sync::Lazy;
+use regex::Regex;
+use spinners::{Spinner, Spinners};
 use tracing::error;
 use tuono_internal::tuono_println;
+use watchexec::Watchexec;
 use watchexec_events::Tag;
 use watchexec_events::filekind::FileEventKind;
-
-use crate::process_manager::{ProcessId, ProcessManager};
-
-use miette::{IntoDiagnostic, Result};
-use watchexec::Watchexec;
 use watchexec_signals::Signal;
 
+use crate::process_manager::{ProcessId, ProcessManager};
 use crate::source_builder::SourceBuilder;
-use console::Term;
-use spinners::{Spinner, Spinners};
 
 fn is_css_module(file_name: Cow<str>) -> bool {
     static RE: Lazy<Regex> =
@@ -75,12 +73,15 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
 
     let env_files = detect_existing_env_files();
 
+    // Time the build/bundle work so the intro can report how long it took.
+    let build_started = Instant::now();
     unsafe {
         // It is safe to call this function because here
         // only one thread is running and the lock is not
         // needed by any other thread.
         start_all_processes(process_manager.clone()).await;
     }
+    let ready_in = build_started.elapsed();
 
     // Remove the spinner
     sp.stop();
@@ -91,7 +92,11 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
     if let Ok(builder) = source_builder.read()
         && let Ok(pm) = process_manager.lock()
     {
-        pm.log_server_address(builder.app.config.clone().unwrap_or_default());
+        let config = builder.app.config.clone().unwrap_or_default();
+        pm.log_server_address(&config, ready_in);
+        if config.logging.route_tree {
+            crate::route_tree::print_route_tree(&builder.app);
+        }
     }
 
     let wx = Watchexec::new(move |mut action| {

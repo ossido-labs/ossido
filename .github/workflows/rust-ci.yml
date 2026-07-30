@@ -62,7 +62,12 @@ jobs:
       - name: Setup rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - run: cargo fmt --all -- --check
+      # The rustfmt import grouping/merging (see rustfmt.toml) is unstable, so the
+      # format check runs on nightly. Clippy stays on the default stable toolchain.
+      - name: Install nightly rustfmt
+        run: rustup toolchain install nightly --profile minimal --component rustfmt
+
+      - run: cargo +nightly fmt --all -- --check
       - run: cargo clippy -- -D warnings
 
   ci_ok:

@@ -1,7 +1,7 @@
-use crate::mode::Mode;
 use std::collections::HashSet;
-use std::env;
-use std::fs;
+use std::{env, fs};
+
+use crate::mode::Mode;
 
 /// Read the env variables from the .env files
 /// and set them in the OS env
@@ -48,12 +48,13 @@ pub unsafe fn load_env_vars(mode: Mode) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::{env, fs};
+
+    use serial_test::serial;
+
     use super::*;
     use crate::mode::Mode;
-    use serial_test::serial;
-    use std::collections::HashMap;
-    use std::env;
-    use std::fs;
 
     struct MockEnv {
         files: Vec<String>,

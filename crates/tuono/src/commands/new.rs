@@ -1,12 +1,14 @@
+use std::env;
+use std::fs::{self, File, OpenOptions, create_dir};
+use std::io::prelude::*;
+use std::io::{self};
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
 use clap::crate_version;
 use reqwest::blocking;
 use reqwest::blocking::Client;
 use serde::Deserialize;
-use std::env;
-use std::fs::{self, File, OpenOptions, create_dir};
-use std::io::{self, prelude::*};
-use std::path::{Path, PathBuf};
-use std::process::Command;
 use tracing::trace;
 
 #[derive(Deserialize, Debug)]

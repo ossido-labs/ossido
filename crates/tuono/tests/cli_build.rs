@@ -1,6 +1,7 @@
+use std::fs;
+
 use assert_cmd::Command;
 use serial_test::serial;
-use std::fs;
 use tracing::Level;
 
 mod utils;
@@ -180,15 +181,21 @@ fn it_successfully_composes_layout_handlers_into_pages() {
     assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod layout;");
     assert_contains_ignoring_whitespace(&temp_main_rs_content, "mod about_page;");
 
-    // …and the page's routes are served by composites that run the layout +
-    // page data handlers keyed by their route file paths.
+    // …and the page's routes are served by composites that fetch the layout +
+    // page data concurrently via `tokio::join!`, then key each layout's data by
+    // its route file path.
+    assert_contains_ignoring_whitespace(&temp_main_rs_content, r#"tuono_lib::tokio::join!("#);
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
-        r#"("/layout".to_string(), layout::tuono_internal_props("#,
+        r#"layout::tuono_internal_props(req.clone(), state.clone())"#,
     );
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,
-        r#"about_page::tuono_internal_props("#,
+        r#"about_page::tuono_internal_props(req.clone(), state.clone())"#,
+    );
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#"("/layout".to_string(), layout_0)"#,
     );
     assert_contains_ignoring_whitespace(
         &temp_main_rs_content,

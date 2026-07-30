@@ -1,11 +1,11 @@
-use once_cell::sync::Lazy;
-use once_cell::sync::OnceCell;
-use regex::Regex;
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+
+use once_cell::sync::{Lazy, OnceCell};
+use regex::Regex;
+use serde::Deserialize;
 
 const VITE_MANIFEST_PATH: &str = "./out/client/.vite/manifest.json";
 

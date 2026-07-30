@@ -1,5 +1,6 @@
-use crate::symbols::TYPE_TRAIT;
 use syn::{Attribute, Meta};
+
+use crate::symbols::TYPE_TRAIT;
 
 pub fn has_derive_type(attrs: &[Attribute]) -> bool {
     for attr in attrs {
@@ -26,8 +27,9 @@ pub fn has_derive_type(attrs: &[Attribute]) -> bool {
 #[cfg(test)]
 mod tests {
 
-    use super::*;
     use syn::{ItemEnum, ItemStruct, ItemType, parse_quote};
+
+    use super::*;
 
     #[test]
     fn it_correctly_checks_if_derive_type_is_present() {

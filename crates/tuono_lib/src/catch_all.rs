@@ -1,7 +1,10 @@
-use crate::{Payload, ssr::Js};
+use std::collections::HashMap;
+
 use axum::extract::{Path, Request};
 use axum::response::Html;
-use std::collections::HashMap;
+
+use crate::Payload;
+use crate::ssr::Js;
 
 pub async fn catch_all(
     Path(params): Path<HashMap<String, String>>,

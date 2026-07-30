@@ -1,11 +1,12 @@
-use crate::config::GLOBAL_CONFIG;
-use axum::body::Body;
-use axum::extract::{Path, Query};
 use std::collections::HashMap;
 
+use axum::body::Body;
+use axum::extract::{Path, Query};
 use axum::http::{HeaderName, HeaderValue};
 use axum::response::{IntoResponse, Response};
 use reqwest::Client;
+
+use crate::config::GLOBAL_CONFIG;
 
 pub async fn vite_reverse_proxy(
     Path(path): Path<String>,

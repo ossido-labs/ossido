@@ -1,15 +1,17 @@
-use crate::app::{ROUTES_FOLDER_PATH, is_collectible_route};
-use crate::route::Route;
-use quote::quote;
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt::Debug;
-use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::{fs, io};
+
+use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{Attribute, Expr, FnArg, Ident, Item, ItemFn, parse_quote};
+
+use crate::app::{ROUTES_FOLDER_PATH, is_collectible_route};
+use crate::route::Route;
 
 pub const MIDDLEWARE_FILENAME: &str = "middleware";
 
@@ -192,14 +194,16 @@ impl MiddlewareData {
         Some(MiddlewareData { middlewares })
     }
 
-    // Given an array of syn::Attribute, returns true if the segments are "tuono_lib" and "middleware"
+    // Given an array of syn::Attribute, returns true if it is the `middleware`
+    // attribute — either imported (`#[middleware]`) or fully-qualified
+    // (`#[tuono_lib::middleware]`).
     pub fn has_middleware_attr(attrs: &[Attribute]) -> bool {
         attrs.iter().any(|attr| {
             let path = attr.path();
 
             let segments: Vec<_> = path.segments.iter().map(|s| s.ident.to_string()).collect();
 
-            segments == ["tuono_lib", "middleware"]
+            segments == ["tuono_lib", "middleware"] || segments == ["middleware"]
         })
     }
 
@@ -222,10 +226,12 @@ impl MiddlewareData {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs::File;
     use std::io::Write;
+
     use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn test_has_middlewares() {
@@ -334,8 +340,13 @@ mod tests {
 
     #[test]
     fn test_has_middleware_attr() {
+        // Fully-qualified form.
         let attr: Attribute = syn::parse_quote!(#[tuono_lib::middleware]);
         assert!(MiddlewareData::has_middleware_attr(&[attr]));
+
+        // Imported form (`use tuono_lib::middleware;` then `#[middleware]`).
+        let imported: Attribute = syn::parse_quote!(#[middleware]);
+        assert!(MiddlewareData::has_middleware_attr(&[imported]));
 
         let attr2: Attribute = syn::parse_quote!(#[other_attr]);
         assert!(!MiddlewareData::has_middleware_attr(&[attr2]));

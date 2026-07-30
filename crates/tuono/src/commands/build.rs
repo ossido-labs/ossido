@@ -1,8 +1,9 @@
-use fs_extra::dir::{CopyOptions, copy};
-use spinners::{Spinner, Spinners};
 use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
+
+use fs_extra::dir::{CopyOptions, copy};
+use spinners::{Spinner, Spinners};
 use tracing::{error, trace};
 
 use crate::app::App;
@@ -36,6 +37,10 @@ pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
 
     // Remove the spinner
     app_build_spinner.stop_with_message("\u{2705}Build completed".into());
+
+    // `tuono build` always prints the route tree (the dev-only `logging.routeTree`
+    // option does not apply here).
+    crate::route_tree::print_route_tree(&app);
 
     if ssg {
         let mut app_build_static_spinner =

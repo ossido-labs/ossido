@@ -1,11 +1,14 @@
-use fs_extra::dir::create_all;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Once;
 use std::{env, fs};
+
+use fs_extra::dir::create_all;
 use tempfile::{TempDir, tempdir};
+use tuono_lib::axum::Router;
 use tuono_lib::axum::routing::{get, post};
-use tuono_lib::{Mode, Server, axum::Router, tuono_internal_init_v8_platform};
+use tuono_lib::{Mode, Server, tuono_internal_init_v8_platform};
 
 use crate::utils::catch_all::get_tuono_internal_api as catch_all;
 use crate::utils::dynamic_parameter::get_tuono_internal_api as dynamic_parameter;
@@ -15,8 +18,6 @@ use crate::utils::health_check::get_tuono_internal_api as health_check;
 use crate::utils::post_api::post_tuono_internal_api as post_api;
 use crate::utils::route as html_route;
 use crate::utils::route::tuono_internal_api as route_api;
-
-use std::sync::Once;
 
 static INIT: Once = Once::new();
 

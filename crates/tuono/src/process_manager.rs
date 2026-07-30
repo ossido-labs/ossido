@@ -1,15 +1,12 @@
 use std::collections::HashMap;
-
-use clap::crate_version;
 use std::path::Path;
 use std::sync::Arc;
-use tokio::task::JoinHandle;
 
+use clap::crate_version;
 use colored::Colorize;
-
+use tokio::task::JoinHandle;
 use tracing::trace;
 use tuono_internal::config::Config;
-use tuono_internal::tuono_println;
 use watchexec_supervisor::command::{Command, Program};
 use watchexec_supervisor::job::{Job, start_job};
 
@@ -22,6 +19,16 @@ const DEV_SSR_BIN_SRC: &str = "node_modules\\.bin\\tuono-dev-ssr.cmd";
 const DEV_WATCH_BIN_SRC: &str = "node_modules/.bin/tuono-dev-watch";
 #[cfg(not(target_os = "windows"))]
 const DEV_SSR_BIN_SRC: &str = "node_modules/.bin/tuono-dev-ssr";
+
+/// Best-effort local network IP (e.g. `192.168.x.x`) for the "Network" URL.
+/// Opens a UDP socket and inspects which local interface would route to a
+/// public address — no packet is actually sent. Returns `None` when offline or
+/// no routable interface exists.
+fn local_ip() -> Option<std::net::IpAddr> {
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("8.8.8.8:80").ok()?;
+    socket.local_addr().ok().map(|addr| addr.ip())
+}
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub enum ProcessId {
@@ -90,19 +97,51 @@ impl ProcessManager {
         self.start_process(ProcessId::RunRustDevServer);
     }
 
-    pub fn log_server_address(&self, config: Config) {
-        let server_address = format!("{}:{}", config.server.host, config.server.port);
-        // Format the server address as a valid URL so that it becomes clickable in the CLI
+    pub fn log_server_address(&self, config: &Config, ready_in: std::time::Duration) {
+        let port = config.server.port;
+
+        // A flush-left intro banner (not routed through the `[BE]` logger). URLs
+        // are full so they become clickable in the terminal.
         // @see https://github.com/tuono-labs/tuono/issues/460
-        let server_base_url = format!("http://{server_address}");
+        //
+        // Colours come from `colored`, which emits ANSI escape sequences and
+        // auto-disables when output is not a TTY or `NO_COLOR` is set.
+        println!();
+        println!(
+            "{} {} {}",
+            "⚡".yellow(),
+            "Tuono".bright_white().bold(),
+            format!("v{}", crate_version!()).dimmed()
+        );
 
         println!();
-        tuono_println!("⚡ Tuono v{}", crate_version!());
-
-        tuono_println!("Development server at: {}\n", server_base_url.blue().bold());
-        if let Some(origin) = config.server.origin {
-            tuono_println!("Origin: {}\n", origin.blue().bold());
+        println!(
+            "{}{}",
+            format!("{:<9}", "Local:").dimmed(),
+            format!("http://localhost:{port}").blue().bold()
+        );
+        if let Some(ip) = local_ip() {
+            println!(
+                "{}{}",
+                format!("{:<9}", "Network:").dimmed(),
+                format!("http://{ip}:{port}").blue().bold()
+            );
         }
+        if let Some(origin) = &config.server.origin {
+            println!(
+                "{}{}",
+                format!("{:<9}", "Origin:").dimmed(),
+                origin.blue().bold()
+            );
+        }
+
+        println!();
+        println!(
+            "{}",
+            format!("✔ Ready in {}ms", ready_in.as_millis())
+                .green()
+                .bold()
+        );
     }
 
     pub fn restart_process(&mut self, id: ProcessId) {

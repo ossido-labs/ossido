@@ -26,6 +26,11 @@ describe('normalizeConfig', () => {
         optimizeDeps: undefined,
         plugins: [],
       },
+      logging: {
+        format: 'pretty',
+        routeTree: true,
+        browser: { enabled: true, level: 'info' },
+      },
     })
   })
 
@@ -42,6 +47,11 @@ describe('normalizeConfig', () => {
         css: undefined,
         optimizeDeps: undefined,
         plugins: [],
+      },
+      logging: {
+        format: 'pretty',
+        routeTree: true,
+        browser: { enabled: true, level: 'info' },
       },
     })
   })

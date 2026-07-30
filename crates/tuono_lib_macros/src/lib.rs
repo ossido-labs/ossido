@@ -14,7 +14,7 @@ mod utils;
 
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
-    handler::handler_core(args, item)
+    handler::handler_core(args.into(), item.into()).into()
 }
 
 /// Derive `From<Self> for tuono_lib::Response`, letting a struct be returned
@@ -22,17 +22,17 @@ pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
 /// The struct must also be `serde::Serialize` and `'static`.
 #[proc_macro_derive(Props)]
 pub fn derive_props(item: TokenStream) -> TokenStream {
-    props::derive_props_core(item)
+    props::derive_props_core(item.into()).into()
 }
 
 #[proc_macro_attribute]
 pub fn api(args: TokenStream, item: TokenStream) -> TokenStream {
-    api::api_core(args, item)
+    api::api_core(args.into(), item.into()).into()
 }
 
 #[proc_macro_attribute]
 pub fn middleware(args: TokenStream, item: TokenStream) -> TokenStream {
-    middleware::middleware_core(args, item)
+    middleware::middleware_core(args.into(), item.into()).into()
 }
 
 /// Automatically generate typescript's types
