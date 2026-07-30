@@ -126,17 +126,23 @@ impl SourceBuilder {
 
     fn generate_axum_source(&self) -> String {
         let Self { app, mode, .. } = &self;
-        let mut main_file_definition: &str = " let router = Router::new()";
+        let mut main_file_definition: String = " let router = Router::new()".to_string();
         let mut main_file_usage: &str = ";";
-        // `ApplicationState` is always referenced by the handlers' data entry
-        // point (`tuono_internal_props`) and by the layout composites, so it is
-        // aliased to the unit state unless the app defines a custom one below.
+        // `ApplicationState` is referenced by the handlers' data entry point
+        // (`tuono_internal_props`) and by the layout composites, so it is aliased
+        // to the unit state unless the app defines a custom one below. The
+        // `allow(dead_code)` covers apps with no Rust handlers at all, where the
+        // alias ends up unreferenced.
         let mut mainfile_import: &str =
-            "mod tuono_main_state { pub type ApplicationState = (); }\n";
+            "mod tuono_main_state { #[allow(dead_code)] pub type ApplicationState = (); }\n";
         let mode_str = mode.as_str();
         if app.has_app_state {
-            main_file_definition = "let user_custom_state = tuono_main_state::main().await;\n
-            let router = Router::new()";
+            // Only `.await` the state initialiser when `app.rs`'s `main` is async.
+            let await_suffix = if app.app_state_is_async { ".await" } else { "" };
+            main_file_definition = format!(
+                "let user_custom_state = tuono_main_state::main(){await_suffix};\n\
+                 let router = Router::new()"
+            );
             main_file_usage = ".with_state(user_custom_state);";
             mainfile_import = r#"#[path="../src/app.rs"]
             mod tuono_main_state;
@@ -162,7 +168,7 @@ impl SourceBuilder {
                 format!("const MODE: Mode = {mode_str};").as_ref(),
             )
             .replace("//MAIN_FILE_IMPORT//", mainfile_import)
-            .replace("//MAIN_FILE_DEFINITION//", main_file_definition)
+            .replace("//MAIN_FILE_DEFINITION//", &main_file_definition)
             .replace("//MAIN_FILE_USAGE//", main_file_usage);
 
         let mut import_http_handler = String::new();

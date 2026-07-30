@@ -62,6 +62,11 @@ impl Server {
         // Respect `NO_COLOR` and pick the output style before anything is logged.
         log::honor_no_color();
         log::set_format(config.logging.format);
+        // `DEBUG=1` (or `DEBUG=true`) turns on per-request lifecycle tracing.
+        log::set_debug(matches!(
+            std::env::var("DEBUG").as_deref(),
+            Ok("1") | Ok("true")
+        ));
 
         let _ = GLOBAL_MODE.set(mode);
         let _ = GLOBAL_CONFIG.set(config.clone());

@@ -3,7 +3,7 @@ import type { JSX } from 'react'
 
 import type { TuonoErrorProps, TuonoErrorWithSource } from '../types'
 
-import type { ResolvedDevError } from './devErrorSource'
+import type { ResolvedDevError, ResolvedFrame } from './devErrorSource'
 import {
   buildServerSourceExcerpt,
   errorLabel,
@@ -164,10 +164,39 @@ const STYLES = `
   cursor: pointer;
 }
 .tuono-err-frame-toggle:hover { background: var(--tuono-color-surface-hover); }
+.tuono-err-frame-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tuono-err-frame-badge {
+  flex: none;
+  padding: 0 10px;
+  border-radius: var(--tuono-radius-pill);
+  background: var(--tuono-color-success-surface);
+  border: 1px solid var(--tuono-color-success);
+  color: var(--tuono-color-success-text);
+  font-family: var(--tuono-font-sans);
+  font-size: var(--tuono-font-size-xs);
+  font-weight: var(--tuono-font-weight-bold);
+  letter-spacing: var(--tuono-letter-spacing-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 `
 
 /** Stack frames shown before the "show more" toggle is expanded. */
 const MAX_VISIBLE_FRAMES = 5
+
+/**
+ * Whether a frame points at the app's own source — a non-vendor frame whose
+ * (resolved) path sits under a `src/` directory. The `isApp` guard keeps a
+ * dependency's own `src/` (e.g. `node_modules/foo/src/…`) from matching.
+ */
+function isAppSourceFrame(frame: ResolvedFrame): boolean {
+  return frame.isApp && !!frame.file && /(^|\/)src\//.test(frame.file)
+}
 
 export function DevErrorOverlay({
   error,
@@ -274,9 +303,14 @@ export function DevErrorOverlay({
                     : 'tuono-err-frame tuono-err-frame--vendor'
                 }
               >
-                <span className="tuono-err-fn">
-                  {frame.fn ?? '<anonymous>'}
-                </span>
+                <div className="tuono-err-frame-head">
+                  <span className="tuono-err-fn">
+                    {frame.fn ?? '<anonymous>'}
+                  </span>
+                  {isAppSourceFrame(frame) && (
+                    <span className="tuono-err-frame-badge">app</span>
+                  )}
+                </div>
                 {frame.file && (
                   <div className="tuono-err-loc">
                     {frame.file}

@@ -34,7 +34,7 @@ const templateStyle = /*css*/ `
   --cyan: #c7c7cf;
   --dim: #8a8a94;
 
-  --window-background: #1b1b1f;
+  --window-background: #0a0a0e;
   --window-color: #e6e6e6;
 }
 

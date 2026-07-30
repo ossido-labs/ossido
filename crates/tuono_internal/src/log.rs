@@ -137,6 +137,63 @@ fn active_format() -> LogFormat {
     FORMAT.get().copied().unwrap_or_default()
 }
 
+static DEBUG: OnceLock<bool> = OnceLock::new();
+
+/// Enable/disable request-lifecycle debug tracing for this process (from the
+/// `DEBUG` env var). When on, each request logs a timed waterfall of its
+/// sub-tasks (handlers, SSR render, …). Idempotent — the first call wins.
+pub fn set_debug(enabled: bool) {
+    let _ = DEBUG.set(enabled);
+}
+
+/// Whether request-lifecycle debug tracing is enabled (see [`set_debug`]).
+pub fn debug_enabled() -> bool {
+    DEBUG.get().copied().unwrap_or(false)
+}
+
+/// One timed sub-task within a request trace.
+pub struct TraceSpan {
+    pub label: String,
+    pub millis: f64,
+}
+
+/// Emit a full request trace: a header summarising the request, followed by each
+/// timed sub-task. Pretty mode renders an indented waterfall; json mode emits one
+/// object with a `spans` array. Only used under [`debug_enabled`].
+pub fn debug_trace(level: Level, header: &str, path: &str, spans: &[TraceSpan]) {
+    match active_format() {
+        LogFormat::Pretty => {
+            let base = pretty_line(Source::Backend, level, header);
+            let mut out = format!("{base} {} {}", "-".dimmed(), path.dimmed());
+            for span in spans {
+                out.push_str(&format!(
+                    "\n    {} {}",
+                    format!("{:>8.2}ms", span.millis).dimmed(),
+                    span.label.dimmed(),
+                ));
+            }
+            println!("{out}");
+        }
+        LogFormat::Json => {
+            let spans: Vec<_> = spans
+                .iter()
+                .map(|span| serde_json::json!({ "label": span.label, "durationMs": span.millis }))
+                .collect();
+            println!(
+                "{}",
+                serde_json::json!({
+                    "severity": level.severity(),
+                    "message": header,
+                    "timestamp": now_rfc3339(),
+                    "source": Source::Backend.tag(),
+                    "path": path,
+                    "spans": spans,
+                })
+            );
+        }
+    }
+}
+
 fn now_local_hms() -> String {
     jiff::Zoned::now().strftime("%H:%M:%S").to_string()
 }

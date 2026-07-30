@@ -35,11 +35,11 @@
   --tuono-letter-spacing-wide: 0.04em;
 
   /* Colours (dark theme) -------------------------------------------------- */
-  --tuono-color-bg: #1b1b1f;
-  --tuono-color-surface: #232329;
-  --tuono-color-surface-hover: #35353c;
-  --tuono-color-surface-raised: #2b2b31;
-  --tuono-color-border: #2e2e35;
+  --tuono-color-bg: #0a0a0e;
+  --tuono-color-surface: #101014;
+  --tuono-color-surface-hover: #1c1c22;
+  --tuono-color-surface-raised: #151519;
+  --tuono-color-border: rgba(255, 255, 255, 0.1);
   --tuono-color-border-strong: #3a3a42;
 
   --tuono-color-text: #e6e6e6;
@@ -51,6 +51,10 @@
   --tuono-color-accent-text: #ff8fa3;
   --tuono-color-on-accent: #ffffff;
   --tuono-color-danger-surface: #4a1d27;
+
+  --tuono-color-success: #22c55e;
+  --tuono-color-success-text: #4ade80;
+  --tuono-color-success-surface: #16331f;
 
   /* Radii ----------------------------------------------------------------- */
   --tuono-radius-sm: 6px;

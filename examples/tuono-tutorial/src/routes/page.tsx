@@ -1,6 +1,6 @@
-// src/routes/index.tsx
 import type { JSX } from 'react'
 
+import { Wordmark } from '../components/wordmark'
 import PokemonLink from '../components/PokemonLink'
 
 interface IndexProps {
@@ -11,35 +11,38 @@ export default function IndexPage({ results }: IndexProps): JSX.Element {
   return (
     <>
       <title>Tuono tutorial</title>
+      <img src="/lightning.webp" className="background" alt="" />
 
-      <header className="header">
-        <a
-          href="https://crates.io/crates/tuono"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Crates
-        </a>
-        <a
-          href="https://www.npmjs.com/package/tuono"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Npm
-        </a>
-      </header>
-      <div className="title-wrap">
+      <div className="hero">
         <h1 className="title">
-          TU<span>O</span>NO
+          <span>TU</span>
+          {/* The logo stands in for the "O" visually; keep a hidden "O" so the
+              heading still reads "TUONO" to screen readers, and hide the SVG. */}
+          <span className="visually-hidden">O</span>
+          <Wordmark aria-hidden />
+          <span>NO</span>
         </h1>
-        <div className="logo">
-          <img src="rust.svg" className="rust" />
-          <img src="react.svg" className="react" />
+        <p className="subtitle">Pick a Pokémon — a Tuono tutorial Pokédex</p>
+        <div className="links">
+          <a
+            href="https://crates.io/crates/tuono"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Crates
+          </a>
+          <a
+            href="https://www.npmjs.com/package/tuono"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Npm
+          </a>
         </div>
       </div>
-      <ul style={{ flexWrap: 'wrap', display: 'flex', gap: 10 }}>
-        <PokemonLink name="GOAT" id={0} />
 
+      <ul className="pokemon-grid">
+        <PokemonLink name="GOAT" id={0} />
         {results.map((pokemon, i) => (
           <PokemonLink key={pokemon.name} name={pokemon.name} id={i + 1} />
         ))}

@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::collections::hash_set::HashSet;
-use std::fs::File;
 use std::io;
-use std::io::BufReader;
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
@@ -105,17 +102,50 @@ pub struct App {
     pub route_map: HashMap<String, Route>,
     pub base_path: PathBuf,
     pub has_app_state: bool,
+    /// Whether `app.rs`'s `main` is `async` — the generated code only `.await`s
+    /// the state initialiser when it is.
+    pub app_state_is_async: bool,
     pub config: Option<Config>,
     pub route_directory_info: RouteDirectoryInfo,
 }
 
-fn has_app_state(base_path: PathBuf) -> std::io::Result<bool> {
-    let full_path = base_path.join("src/app.rs");
-    let file = File::open(full_path)?;
-    let mut buf_reader = BufReader::new(file);
-    let mut contents = String::new();
-    buf_reader.read_to_string(&mut contents)?;
-    Ok(contents.contains("pub fn main") || contents.contains("pub async fn main"))
+/// The `app.rs` state initialiser: whether a `pub … fn main` exists and, if so,
+/// whether it is `async` (so the generated code knows whether to `.await` it).
+struct AppStateInit {
+    present: bool,
+    is_async: bool,
+}
+
+fn detect_app_state(base_path: &Path) -> AppStateInit {
+    let none = AppStateInit {
+        present: false,
+        is_async: false,
+    };
+
+    let Ok(contents) = std::fs::read_to_string(base_path.join("src/app.rs")) else {
+        return none;
+    };
+
+    // Parse the file and inspect the `pub fn main` signature directly, so
+    // formatting (spacing, comments, attributes) can't fool the detection.
+    let Ok(file) = syn::parse_file(&contents) else {
+        return none;
+    };
+
+    file.items
+        .iter()
+        .find_map(|item| match item {
+            syn::Item::Fn(func)
+                if func.sig.ident == "main" && matches!(func.vis, syn::Visibility::Public(_)) =>
+            {
+                Some(AppStateInit {
+                    present: true,
+                    is_async: func.sig.asyncness.is_some(),
+                })
+            }
+            _ => None,
+        })
+        .unwrap_or(none)
 }
 
 impl App {
@@ -124,10 +154,12 @@ impl App {
         let base_path_str = base_path.to_string_lossy();
         let routes_path_str = format!("{base_path_str}{ROUTES_FOLDER_PATH}");
         let routes_path = Path::new(&routes_path_str);
+        let app_state = detect_app_state(&base_path);
         let mut app = App {
             route_map: HashMap::new(),
             base_path: base_path.clone(),
-            has_app_state: has_app_state(base_path).unwrap_or(false),
+            has_app_state: app_state.present,
+            app_state_is_async: app_state.is_async,
             config: None,
             route_directory_info: RouteDirectoryInfo::new(routes_path).unwrap_or_default(),
         };

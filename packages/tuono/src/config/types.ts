@@ -50,4 +50,19 @@ export interface TuonoConfig {
     plugins?: Array<PluginOption>
   }
   logging?: TuonoConfigLogging
+  dev?: TuonoConfigDev
+}
+
+/** Development-only tweaks. */
+export interface TuonoConfigDev {
+  /**
+   * Compute and inject per-route critical CSS during dev navigation, preventing
+   * a flash of unstyled content (vite injects CSS via JS, which otherwise
+   * arrives a beat late). Default `true`.
+   *
+   * Computing it walks the route's module/CSS graph, which adds latency to
+   * navigation. Set `false` for the snappiest dev navigation, accepting a brief
+   * unstyled flash on first visit to a route.
+   */
+  criticalCss?: boolean
 }

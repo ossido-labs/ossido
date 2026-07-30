@@ -137,19 +137,24 @@ async function fetchRouteData(
   if (body?.info.serverError) {
     throw serverErrorToError(body.info.serverError)
   }
+  // A redirecting handler responds with a 308 whose destination lives in the
+  // body (there is no `Location` header — this is a data envelope, not an HTTP
+  // redirect the browser should follow). Handle it before the ok-status check,
+  // since 308 is not an "ok" status.
+  if (body?.info.redirect_destination) {
+    return { kind: 'redirect', destination: body.info.redirect_destination }
+  }
+
   if (!res.ok || !body) {
     throw new Error(
       `Failed to load server data for "${location.pathname}" (status ${res.status})`,
     )
   }
-  if (body.info.redirect_destination) {
-    return { kind: 'redirect', destination: body.info.redirect_destination }
-  }
+
   // A page's data fetch also carries its wrapping layouts' data — seed those so
   // the layout components read them synchronously.
-  if (body.layoutData) {
-    seedLayoutData(body.layoutData)
-  }
+  if (body.layoutData) seedLayoutData(body.layoutData)
+
   return toDataResult(body.data)
 }
 

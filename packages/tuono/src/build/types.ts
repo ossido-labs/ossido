@@ -15,8 +15,14 @@ export interface InternalTuonoConfigLogging {
   }
 }
 
+/** Fully-resolved dev config (defaults filled). */
+export interface InternalTuonoConfigDev {
+  criticalCss: boolean
+}
+
 export interface InternalTuonoConfig
-  extends Omit<TuonoConfig, 'server' | 'logging'> {
+  extends Omit<TuonoConfig, 'server' | 'logging' | 'dev'> {
   server: TuonoConfigServer
   logging: InternalTuonoConfigLogging
+  dev: InternalTuonoConfigDev
 }

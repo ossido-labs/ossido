@@ -2,25 +2,32 @@
   width: 100%;
   max-width: 216px;
   position: relative;
-  background: white;
-  margin-bottom: 10px;
-  border: solid #f0f0f0 1px;
+  background: var(--tuono-surface);
+  margin-bottom: 0;
+  border: solid 1px var(--tuono-border);
   text-decoration: none;
-  color: black;
-  padding: 5px 5px 5px 15px;
-  border-radius: 10px;
+  color: var(--tuono-text);
+  text-transform: capitalize;
+  font-weight: 500;
+  padding: 6px 6px 6px 18px;
+  border-radius: 12px;
   display: flex;
   justify-content: space-between;
-  transition: 0.2s;
   align-items: center;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .link:hover {
-  box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px;
+  border-color: rgba(97, 218, 251, 0.55);
+  background: rgba(97, 218, 251, 0.06);
+  transform: translateY(-2px);
 }
 
 .link img {
-  width: 70px;
-  background: white;
-  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
 }

@@ -23,6 +23,18 @@ export interface NavigationCommitOptions {
 
 const isServerSide = typeof window === 'undefined'
 
+/**
+ * For a route with a `loading.tsx`, wait up to this long for the destination to
+ * become ready before committing (and thereby showing the loading fallback). A
+ * navigation that resolves within this window commits with its data already
+ * resolved — so `use()` reads it synchronously and no fallback flashes. Only
+ * genuinely slow navigations fall through and show the loading screen.
+ */
+const FALLBACK_DELAY_MS = 100
+
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms))
+
 // Kept in sync with `CriticalCss`. Its `<link rel="stylesheet" precedence>` is
 // dev-only, so the presence of one also tells us we're in dev.
 const CRITICAL_CSS_PATH = '/vite-server/tuono_internal__critical_css'
@@ -152,15 +164,9 @@ export function RouterContextProvider({
 
       const targetRoute = matchRoute(router.routesById, newLocation.pathname)
 
-      // With a `loading.tsx` (or on the server, or an unknown route) commit
-      // immediately — its fallback is meant to show right away. Otherwise wait
-      // for everything the destination needs to render before committing, so the
-      // current page stays until then and the new one appears fully (no blank).
-      if (
-        !targetRoute ||
-        isServerSide ||
-        targetRoute.options.loadingComponent
-      ) {
+      // On the server, or for an unknown route (which renders the not-found
+      // fallback), commit immediately.
+      if (!targetRoute || isServerSide) {
         commit()
         return
       }
@@ -209,9 +215,20 @@ export function RouterContextProvider({
         return
       }
 
-      // Commit once everything settles — a rejected resource still navigates so
-      // the error boundary can surface it.
-      Promise.all(pending).then(commit, commit)
+      // A rejected resource still navigates so the error boundary can surface it.
+      const ready = Promise.all(pending)
+
+      if (targetRoute.options.loadingComponent) {
+        // The route has a loading fallback: commit as soon as the destination is
+        // ready, or after a short grace period — whichever comes first. Fast
+        // navigations commit with data resolved (no fallback flash); slow ones
+        // commit early and the loading component shows while data finishes.
+        Promise.race([ready, wait(FALLBACK_DELAY_MS)]).then(commit, commit)
+      } else {
+        // No loading fallback: wait for everything so the destination appears
+        // fully (the current page stays visible until then, never a blank).
+        ready.then(commit, commit)
+      }
     },
     [router, navigationId],
   )

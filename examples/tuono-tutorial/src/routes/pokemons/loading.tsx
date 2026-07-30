@@ -5,9 +5,9 @@ import type { JSX } from 'react'
 
 export default function PokemonLoading(): JSX.Element {
   return (
-    <div>
+    <>
       <title>Pokemon: loading...</title>
-      <div>Loading...</div>
-    </div>
+      <p className="loading">Loading…</p>
+    </>
   )
 }

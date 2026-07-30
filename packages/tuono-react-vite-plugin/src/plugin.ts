@@ -11,7 +11,18 @@ const ROUTES_DIRECTORY_PATH = './src/routes'
 
 let lock = false
 
-export function TuonoReactPlugin(): Plugin {
+interface TuonoReactPluginOptions {
+  /**
+   * Compute and serve per-route critical CSS in dev (prevents a flash of
+   * unstyled content on navigation). Default `true`. Set `false` to skip the
+   * (expensive) computation — navigation is faster at the cost of a brief FOUC.
+   */
+  criticalCss?: boolean
+}
+
+export function TuonoReactPlugin(options?: TuonoReactPluginOptions): Plugin {
+  const criticalCssEnabled = options?.criticalCss ?? true
+
   const generate = async (): Promise<void> => {
     if (lock) return
     lock = true
@@ -37,6 +48,13 @@ export function TuonoReactPlugin(): Plugin {
   // { [filePath]: cssContent }
   const cssModulesManifest: Record<string, string> = {}
 
+  // Computing a route's critical CSS is expensive (it transforms the module and
+  // walks its whole import graph), and it is requested on every navigation — and
+  // twice per navigation (the router preloads it, then the `<link rel=stylesheet>`
+  // fetches it). Cache the result per `componentId` and drop the whole cache on
+  // any hot update, since a component/CSS change can alter any route's graph.
+  const criticalCssCache = new Map<string, string | undefined>()
+
   return {
     name: 'vite-plugin-tuono-react',
     configResolved: async (): Promise<void> => {
@@ -49,6 +67,11 @@ export function TuonoReactPlugin(): Plugin {
       if (['create', 'update', 'delete'].includes(context.event)) {
         await handleFile(file)
       }
+    },
+    handleHotUpdate: (): void => {
+      // A component or stylesheet edit can change any route's critical CSS, so
+      // invalidate the whole cache; it repopulates lazily on the next request.
+      criticalCssCache.clear()
     },
     transform: (code, id): void => {
       if (isCssModulesFile(id)) {
@@ -65,15 +88,29 @@ export function TuonoReactPlugin(): Plugin {
         // Give the request handler access to the critical CSS in dev to avoid a
         // flash of unstyled content since Vite injects CSS file contents via JS
         if (url.pathname === CRITICAL_CSS_PATH) {
+          // Disabled via config: skip the expensive graph walk and serve nothing.
+          if (!criticalCssEnabled) {
+            res.writeHead(200, { 'Content-Type': 'text/css' })
+            res.end('')
+            return
+          }
+
           const componentId = url.searchParams.get('componentId')
-          const css = await getStylesForComponentId(
-            server,
-            componentId,
-            cssModulesManifest,
-          )
+          const cacheKey = componentId ?? ''
+
+          if (!criticalCssCache.has(cacheKey)) {
+            criticalCssCache.set(
+              cacheKey,
+              await getStylesForComponentId(
+                server,
+                componentId,
+                cssModulesManifest,
+              ),
+            )
+          }
 
           res.writeHead(200, { 'Content-Type': 'text/css' })
-          res.end(css)
+          res.end(criticalCssCache.get(cacheKey) ?? '')
           return
         }
         next()

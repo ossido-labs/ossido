@@ -200,8 +200,13 @@ pub async fn catch_handler<F, T>(fut: F) -> Result<T, ServerError>
 where
     F: Future<Output = T>,
 {
-    match AssertUnwindSafe(fut).catch_unwind().await {
-        Ok(value) => Ok(value),
-        Err(payload) => Err(ServerError::from_panic(payload)),
-    }
+    // Timed under `DEBUG=1` so each handler in the chain appears in the request
+    // trace; a no-op otherwise.
+    crate::debug::time_async("handler", async {
+        match AssertUnwindSafe(fut).catch_unwind().await {
+            Ok(value) => Ok(value),
+            Err(payload) => Err(ServerError::from_panic(payload)),
+        }
+    })
+    .await
 }

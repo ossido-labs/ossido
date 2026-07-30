@@ -13,11 +13,12 @@ interface Pokemon {
 
 export default function PokemonPage(pokemon: Pokemon): JSX.Element {
   return (
-    <div>
-      <Link href="/">Back</Link>
-
+    <>
       <title>{`Pokemon: ${pokemon.name}`}</title>
+      <Link href="/" className="back-link">
+        Back
+      </Link>
       <PokemonView pokemon={pokemon} />
-    </div>
+    </>
   )
 }

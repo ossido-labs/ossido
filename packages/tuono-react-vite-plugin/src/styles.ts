@@ -68,26 +68,37 @@ export const getStylesForModule = async (
     let node: ModuleNode | undefined =
       await viteDevServer.moduleGraph.getModuleByUrl(moduleFilePath)
 
-    // If the module is only present in the client module graph, the module
-    // won't have been found on the first request to the server. If so, we
-    // request the module so it's in the module graph, then try again.
+    // If the module is only present in the client module graph, it won't have
+    // been found on the first request to the server. Prime it into the graph,
+    // then try again.
+    //
+    // Route ids are extension-less (e.g. `.../routes/page`), and while a normal
+    // `import` resolves that against the configured `resolve.extensions`,
+    // `transformRequest` does not — so a non-default extension like `.mdx` fails
+    // to load. Resolve the real id first (running the full resolver/plugins) so
+    // those routes work too.
     if (!node) {
-      try {
-        await viteDevServer.transformRequest(moduleFilePath)
-      } catch (err) {
-        console.error(err)
-      }
+      const resolved = await viteDevServer.pluginContainer
+        .resolveId(moduleFilePath)
+        .catch(() => null)
+      const idToLoad = resolved?.id ?? moduleFilePath
 
-      node = await viteDevServer.moduleGraph.getModuleByUrl(moduleFilePath)
+      await viteDevServer.transformRequest(idToLoad).catch(() => undefined)
+
+      node =
+        (await viteDevServer.moduleGraph.getModuleByUrl(idToLoad)) ??
+        (await viteDevServer.moduleGraph.getModuleByUrl(moduleFilePath))
     }
 
+    // Critical CSS is best-effort: if the route's module still can't be resolved
+    // (e.g. a loader vite can't reach here), skip it silently — the route still
+    // loads its styles the normal way, so this is not an error worth surfacing.
     if (!node) {
-      console.error(`Could not resolve module for file: ${moduleFilePath}`)
       return
     }
     await findNodeDependencies(viteDevServer, node, deps)
-  } catch (error) {
-    console.error(error)
+  } catch {
+    return
   }
 
   for (const dep of deps) {

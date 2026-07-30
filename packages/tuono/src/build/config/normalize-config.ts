@@ -88,5 +88,8 @@ export const normalizeConfig = (config: TuonoConfig): InternalTuonoConfig => {
         level: config.logging?.browser?.level ?? 'info',
       },
     },
+    dev: {
+      criticalCss: config.dev?.criticalCss ?? true,
+    },
   }
 }

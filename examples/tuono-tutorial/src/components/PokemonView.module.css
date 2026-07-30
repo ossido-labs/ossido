@@ -1,26 +1,33 @@
 .pokemon {
   display: flex;
   justify-content: space-between;
-  margin-top: 20px;
+  align-items: center;
+  width: 100%;
+  gap: 24px;
   border-radius: 18px;
-  box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px;
-  padding: 16px 32px;
-  background: white;
+  border: 1px solid var(--tuono-border);
+  background: var(--tuono-surface);
+  padding: 24px 36px;
 }
 
 .name {
-  font-size: 50px;
+  font-size: clamp(36px, 6vw, 50px);
   font-weight: 700;
+  color: #fff;
+  text-transform: capitalize;
 }
 
 .pokemon img {
-  width: 250px;
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
 }
 
 .spec {
   display: flex;
   font-size: 18px;
   margin-top: 10px;
+  color: var(--tuono-text-dim);
 
   > dt {
     margin-right: 6px;
@@ -28,5 +35,6 @@
 }
 
 .label {
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--tuono-text);
 }

@@ -2,7 +2,7 @@ use axum::extract::ws::{self, Utf8Bytes as AxumUtf8Bytes, WebSocket, WebSocketUp
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::{Error, Message};
+use tokio_tungstenite::tungstenite::Message;
 use tungstenite::ClientRequestBuilder;
 use tungstenite::client::IntoClientRequest;
 
@@ -74,12 +74,10 @@ async fn handle_socket(mut tuono_socket: WebSocket) {
                     ws::Message::Close(_) => Message::Close(None),
                 };
 
-                vite_sender
-                    .send(msg_to_vite)
-                    .await
-                    .expect("Failed to tunnel msg to vite's WebSocket");
-
-                msg
+                // If vite's socket has gone, stop forwarding rather than panic.
+                if vite_sender.send(msg_to_vite).await.is_err() {
+                    return;
+                }
             } else {
                 // Close browser's WebSocket connection.
                 return;
@@ -105,10 +103,12 @@ async fn handle_socket(mut tuono_socket: WebSocket) {
                 }
             };
 
-            if let Err(err) = tuono_sender.send(msg_to_browser).await
-                && err.to_string() != Error::AlreadyClosed.to_string()
-            {
-                eprintln!("Failed to send back message from vite to browser: {err}")
+            // A failed send means the browser went away (navigated, reloaded,
+            // closed the tab). A broken pipe / reset / already-closed socket is
+            // expected in dev — stop forwarding quietly rather than logging it as
+            // an error. The browser reopens the HMR socket when it reconnects.
+            if tuono_sender.send(msg_to_browser).await.is_err() {
+                break;
             }
         }
     });

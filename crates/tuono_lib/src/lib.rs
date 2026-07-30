@@ -5,6 +5,7 @@
 
 mod catch_all;
 mod config;
+pub mod debug;
 mod env;
 mod logger;
 mod manifest;

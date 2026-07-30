@@ -108,7 +108,7 @@ function createBaseViteConfigFromTuonoConfig(
       // @ts-expect-error see above comment
       react({ include: pluginFilesInclude }),
 
-      TuonoReactPlugin(),
+      TuonoReactPlugin({ criticalCss: tuonoConfig.dev?.criticalCss ?? true }),
     ],
   }
 

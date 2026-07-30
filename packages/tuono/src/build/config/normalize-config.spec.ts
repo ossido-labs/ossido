@@ -31,6 +31,7 @@ describe('normalizeConfig', () => {
         routeTree: true,
         browser: { enabled: true, level: 'info' },
       },
+      dev: { criticalCss: true },
     })
   })
 
@@ -53,6 +54,7 @@ describe('normalizeConfig', () => {
         routeTree: true,
         browser: { enabled: true, level: 'info' },
       },
+      dev: { criticalCss: true },
     })
   })
 
@@ -169,6 +171,26 @@ describe('normalizeConfig', () => {
               { find: '3', replacement: 'file://pluto' },
             ],
           }) as unknown,
+        }),
+      )
+    })
+  })
+
+  describe('dev', () => {
+    it('should default criticalCss to true', () => {
+      expect(normalizeConfig({})).toStrictEqual(
+        expect.objectContaining({
+          dev: { criticalCss: true },
+        }),
+      )
+    })
+
+    it('should honour criticalCss set to false', () => {
+      const config: TuonoConfig = { dev: { criticalCss: false } }
+
+      expect(normalizeConfig(config)).toStrictEqual(
+        expect.objectContaining({
+          dev: { criticalCss: false },
         }),
       )
     })

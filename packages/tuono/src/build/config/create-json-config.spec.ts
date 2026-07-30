@@ -20,6 +20,7 @@ describe('createJsonConfig', () => {
         routeTree: true,
         browser: { enabled: true, level: 'info' as const },
       },
+      dev: { criticalCss: true },
     }
 
     await createJsonConfig(sampleConfig)
@@ -39,6 +40,7 @@ describe('createJsonConfig', () => {
         routeTree: true,
         browser: { enabled: true, level: 'info' as const },
       },
+      dev: { criticalCss: true },
     }
 
     await createJsonConfig({ ...sampleConfig, vite: { plugins: [react()] } })
@@ -58,6 +60,7 @@ describe('createJsonConfig', () => {
         routeTree: true,
         browser: { enabled: true, level: 'info' as const },
       },
+      dev: { criticalCss: true },
     }
 
     await createJsonConfig(sampleConfig)
