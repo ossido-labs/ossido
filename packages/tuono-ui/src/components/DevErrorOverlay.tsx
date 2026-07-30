@@ -150,13 +150,32 @@ const STYLES = `
 }
 .tuono-err-btn:hover { background: var(--tuono-color-surface-hover); }
 .tuono-err-hint { margin-top: var(--tuono-space-4); color: var(--tuono-color-text-faint); font-size: var(--tuono-font-size-xs); }
+.tuono-err-frame-toggle {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  text-align: left;
+  border: none;
+  border-top: 1px solid var(--tuono-color-border);
+  background: var(--tuono-color-surface-raised);
+  color: var(--tuono-color-text-subtle);
+  font: inherit;
+  font-size: var(--tuono-font-size-sm);
+  cursor: pointer;
+}
+.tuono-err-frame-toggle:hover { background: var(--tuono-color-surface-hover); }
 `
+
+/** Stack frames shown before the "show more" toggle is expanded. */
+const MAX_VISIBLE_FRAMES = 5
 
 export function DevErrorOverlay({
   error,
   reset,
 }: TuonoErrorProps): JSX.Element {
   const [resolved, setResolved] = useState<ResolvedDevError | null>(null)
+  // Long stacks are collapsed to the first few frames until expanded.
+  const [framesExpanded, setFramesExpanded] = useState(false)
 
   // Frames available synchronously for the first paint; replaced once the stack
   // is mapped to original source locations.
@@ -192,6 +211,9 @@ export function DevErrorOverlay({
 
   const frames = resolved?.frames ?? fallbackFrames
   const excerpt = resolved?.excerpt ?? null
+  const hiddenFrameCount = Math.max(0, frames.length - MAX_VISIBLE_FRAMES)
+  const visibleFrames =
+    framesExpanded ? frames : frames.slice(0, MAX_VISIBLE_FRAMES)
   // The constructor (class) name, shown on its own line under the badge.
   const label = errorLabel(error)
 
@@ -243,7 +265,7 @@ export function DevErrorOverlay({
 
         {frames.length > 0 && (
           <div className="tuono-err-stack">
-            {frames.map((frame, index) => (
+            {visibleFrames.map((frame, index) => (
               <div
                 key={index}
                 className={
@@ -263,6 +285,20 @@ export function DevErrorOverlay({
                 )}
               </div>
             ))}
+            {hiddenFrameCount > 0 && (
+              <button
+                type="button"
+                className="tuono-err-frame-toggle"
+                onClick={(): void => {
+                  setFramesExpanded((expanded) => !expanded)
+                }}
+                aria-expanded={framesExpanded}
+              >
+                {framesExpanded
+                  ? 'Show fewer frames'
+                  : `Show ${hiddenFrameCount} more frame${hiddenFrameCount === 1 ? '' : 's'}`}
+              </button>
+            )}
           </div>
         )}
 

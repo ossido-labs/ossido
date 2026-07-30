@@ -3,12 +3,30 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use colored::Colorize;
 use http::method::Method;
 use http::{Request, Response};
 use pin_project::pin_project;
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tuono_internal::log::{self, Level};
+
+/// Colour an HTTP method by verb (GET green, POST blue, DELETE red, …) so the
+/// request log scans at a glance. Uncommon methods keep the default colour.
+/// `colored` auto-disables when output is not a TTY or `NO_COLOR` is set.
+fn colorize_method(method: &Method) -> colored::ColoredString {
+    let text = method.as_str();
+    match *method {
+        Method::GET => text.green(),
+        Method::POST => text.blue(),
+        Method::PUT => text.yellow(),
+        // Orange (truecolor) to distinguish PATCH from PUT's yellow.
+        Method::PATCH => text.truecolor(255, 165, 0),
+        Method::DELETE => text.red(),
+        Method::HEAD | Method::OPTIONS => text.cyan(),
+        _ => text.normal(),
+    }
+}
 
 #[derive(Clone)]
 pub struct LoggerLayer {}
@@ -105,15 +123,15 @@ where
             Level::Info
         };
 
+        // The request duration is dimmed (secondary to the method/path/status).
+        // `colored` auto-disables when output is not a TTY or `NO_COLOR` is set,
+        // so production/json logs stay free of escape codes.
+        let duration = format!("in {}ms", this.start.elapsed().as_millis()).dimmed();
+        let method = colorize_method(this.method);
+
         log::backend(
             level,
-            format!(
-                "{} {} {} in {}ms",
-                this.method,
-                this.path,
-                status_code.as_u16(),
-                this.start.elapsed().as_millis()
-            ),
+            format!("{method} {} {} {duration}", this.path, status_code.as_u16()),
         );
 
         Poll::Ready(res)

@@ -8,7 +8,10 @@ use http::Method;
 use regex::Regex;
 use reqwest::Url;
 use reqwest::blocking::Client;
+use syn::{Attribute, Ident, Item, Meta};
 use tracing::trace;
+
+use crate::macro_attr::is_tuono_attr;
 
 fn has_dynamic_path(route: &str) -> bool {
     let regex = Regex::new(r"\[(.*?)\]").expect("Failed to create the regex");
@@ -109,22 +112,42 @@ impl AxumInfo {
 // TODO: to be extended with common scenarios
 const NO_HTML_EXTENSIONS: [&str; 2] = ["xml", "txt"];
 
-// TODO: Refine this function to catch
-// if the methods are commented.
-/// Extract the HTTP methods declared by `#[api(METHOD)]` attributes in a file's
-/// contents. Both the imported form (`#[api(GET)]`) and the fully-qualified
-/// `#[tuono_lib::api(GET)]` are recognised; the method is captured in group 1.
-fn parse_api_methods(content: &str) -> Vec<Method> {
-    let regex =
-        Regex::new(r"#\[\s*(?:tuono_lib::)?api\((.*?)\)\s*\]").expect("Failed to create API regex");
+/// The HTTP method declared by a single attribute, if it is an `#[api(METHOD)]`
+/// (imported or fully-qualified `#[tuono_lib::api(METHOD)]`). An unrecognised
+/// method identifier falls back to `GET`.
+fn api_method_from_attr(attr: &Attribute) -> Option<Method> {
+    let Meta::List(list) = &attr.meta else {
+        return None;
+    };
+    if !is_tuono_attr(&list.path, "api") {
+        return None;
+    }
 
-    regex
-        .captures_iter(content)
-        .map(|captures| {
-            let http_method = captures[1].trim();
-            Method::from_str(http_method.to_uppercase().as_str()).unwrap_or(Method::GET)
+    // The method is the single identifier inside the parens, e.g. `GET`.
+    let method = syn::parse2::<Ident>(list.tokens.clone())
+        .ok()
+        .and_then(|ident| Method::from_str(&ident.to_string().to_uppercase()).ok())
+        .unwrap_or(Method::GET);
+    Some(method)
+}
+
+/// Extract the HTTP methods declared by `#[api(METHOD)]` attributes in a file's
+/// contents by parsing the file's AST (robust to comments, string literals and
+/// formatting, unlike text matching). A file that does not parse yields no
+/// methods; the subsequent compile surfaces the syntax error.
+fn parse_api_methods(content: &str) -> Vec<Method> {
+    let Ok(file) = syn::parse_file(content) else {
+        return Vec::new();
+    };
+
+    file.items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Fn(func) => Some(&func.attrs),
+            _ => None,
         })
-        .collect::<Vec<Method>>()
+        .flat_map(|attrs| attrs.iter().filter_map(api_method_from_attr))
+        .collect()
 }
 
 fn read_http_methods_from_file(path: &String) -> Vec<Method> {
@@ -340,16 +363,25 @@ mod tests {
             parse_api_methods("#[tuono_lib::api(POST)]\nasync fn h() {}"),
             vec![Method::POST]
         );
-        // Multiple methods in one file, case-insensitive, tolerant of spacing.
+        // Multiple methods in one file, case-insensitive.
         assert_eq!(
-            parse_api_methods("#[api(get)]\n#[ tuono_lib::api(Delete) ]"),
+            parse_api_methods(
+                "#[api(get)]\nasync fn a() {}\n#[tuono_lib::api(Delete)]\nasync fn b() {}"
+            ),
             vec![Method::GET, Method::DELETE]
         );
     }
 
     #[test]
-    fn parse_api_methods_ignores_files_without_the_attribute() {
-        assert!(parse_api_methods("async fn not_an_api() {}").is_empty());
+    fn parse_api_methods_ignores_non_api_attributes_and_bodies() {
+        // A function with no `#[api]` attribute, and an `api(...)` call in the
+        // body that text matching would have wrongly picked up.
+        assert!(parse_api_methods("async fn not_an_api() { let _ = api(\"GET\"); }").is_empty());
+    }
+
+    #[test]
+    fn parse_api_methods_returns_empty_for_unparseable_input() {
+        assert!(parse_api_methods("#[api(GET)] this is not valid rust {{{").is_empty());
     }
 
     #[test]

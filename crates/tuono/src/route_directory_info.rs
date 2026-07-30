@@ -10,10 +10,8 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{Attribute, Expr, FnArg, Ident, Item, ItemFn, parse_quote};
 
-use crate::app::{ROUTES_FOLDER_PATH, is_collectible_route};
+use crate::app::{MIDDLEWARE_FILENAME, ROUTES_FOLDER_PATH, is_collectible_route};
 use crate::route::Route;
-
-pub const MIDDLEWARE_FILENAME: &str = "middleware";
 
 #[derive(Clone, Debug, Default)]
 pub struct RouteDirectoryInfo {
@@ -194,17 +192,13 @@ impl MiddlewareData {
         Some(MiddlewareData { middlewares })
     }
 
-    // Given an array of syn::Attribute, returns true if it is the `middleware`
+    // Given an array of syn::Attribute, returns true if any is the `middleware`
     // attribute — either imported (`#[middleware]`) or fully-qualified
     // (`#[tuono_lib::middleware]`).
     pub fn has_middleware_attr(attrs: &[Attribute]) -> bool {
-        attrs.iter().any(|attr| {
-            let path = attr.path();
-
-            let segments: Vec<_> = path.segments.iter().map(|s| s.ident.to_string()).collect();
-
-            segments == ["tuono_lib", "middleware"] || segments == ["middleware"]
-        })
+        attrs
+            .iter()
+            .any(|attr| crate::macro_attr::is_tuono_attr(attr.path(), "middleware"))
     }
 
     // Reads a middleware.rs file and returns a Vector of Strings representing functions that were decorated with the tuono_lib::middleware macro

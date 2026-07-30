@@ -12,6 +12,22 @@ jsError.stack = `TypeError: Cannot read properties of undefined (reading "map")
     at IndexPage (http://localhost:3101/vite-server/@fs/Users/me/app/src/routes/index.tsx:12:24)
     at renderWithHooks (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:4392:19)`
 
+// A deep stack (> 5 frames) to exercise the "show more frames" toggle.
+const longStackError = new Error(
+  'Cannot read properties of undefined (reading "map")',
+)
+longStackError.stack = [
+  'TypeError: Cannot read properties of undefined (reading "map")',
+  '    at PokemonList (http://localhost:3101/vite-server/@fs/Users/me/app/src/components/PokemonList.tsx:18:22)',
+  '    at IndexPage (http://localhost:3101/vite-server/@fs/Users/me/app/src/routes/index.tsx:12:24)',
+  '    at renderWithHooks (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:4392:19)',
+  '    at mountIndeterminateComponent (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:5867:13)',
+  '    at beginWork (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:6486:16)',
+  '    at performUnitOfWork (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:8916:12)',
+  '    at workLoopSync (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:8837:9)',
+  '    at renderRootSync (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:8810:11)',
+].join('\n')
+
 const rustError: TuonoErrorWithSource = new Error(
   'Boom! This panic was raised inside a Rust route handler',
 )
@@ -126,6 +142,11 @@ export const JavaScriptError: Story = {
 /** A Rust handler panic — the server-embedded source excerpt is highlighted. */
 export const RustPanic: Story = {
   args: { error: rustError },
+}
+
+/** A deep stack: only the first 5 frames show until "show more frames". */
+export const LongStack: Story = {
+  args: { error: longStackError },
 }
 
 /** Interactive: click the button to throw a real render error into a boundary. */

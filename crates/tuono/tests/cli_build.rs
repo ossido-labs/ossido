@@ -8,8 +8,8 @@ mod utils;
 use utils::assert_contains_ignoring_whitespace;
 use utils::temp_tuono_project::TempTuonoProject;
 
-const POST_API_FILE: &str = r"#[tuono_lib::api(POST)]";
-const GET_API_FILE: &str = r"#[tuono_lib::api(GET)]";
+const POST_API_FILE: &str = "#[tuono_lib::api(POST)]\nasync fn post_handler() {}\n";
+const GET_API_FILE: &str = "#[tuono_lib::api(GET)]\nasync fn get_handler() {}\n";
 const HANDLER_FILE: &str = "#[tuono_lib::handler]\nasync fn handler(_req: tuono_lib::Request) -> tuono_lib::Response { todo!() }";
 
 fn tracing_message(level: Level, module: &str, message: &str) -> String {
@@ -130,11 +130,14 @@ fn it_successfully_import_mixed_case_routes() {
     for method in ["get", "post", "put", "delete", "patch"] {
         temp_tuono_project.add_file_with_content(
             &format!("./src/routes/api/{method}_lower.rs"),
-            &format!(r"#[tuono_lib::api({method})]"),
+            &format!("#[tuono_lib::api({method})]\nasync fn handler() {{}}"),
         );
         temp_tuono_project.add_file_with_content(
             &format!("./src/routes/api/{method}_upper.rs"),
-            &format!(r"#[tuono_lib::api({})]", method.to_uppercase()),
+            &format!(
+                "#[tuono_lib::api({})]\nasync fn handler() {{}}",
+                method.to_uppercase()
+            ),
         );
     }
 

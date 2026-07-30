@@ -41,7 +41,7 @@ function levelColor(level: FeLevel): string {
 
 function formatLine(level: FeLevel, message: string): string {
   const tag = paint(`${BOLD}${CYAN}`, '[FE]')
-  const lvl = paint(levelColor(level), level.padEnd(5))
+  const lvl = paint(levelColor(level), level)
   const time = paint(DIM, timestamp())
   return `${tag} ${lvl} ${time} - ${message}`
 }

@@ -125,6 +125,9 @@ fn format_route_tree(app: &App) -> String {
 pub fn print_route_tree(app: &App) {
     println!();
     print!("{}", format_route_tree(app));
+    // Trailing blank line so the tree is visually separated from whatever
+    // follows (in dev, the streaming app logs).
+    println!();
 }
 
 #[cfg(test)]

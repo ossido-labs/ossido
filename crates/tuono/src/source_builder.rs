@@ -5,10 +5,10 @@ use std::{fs, io};
 use clap::crate_version;
 use tracing::error;
 
-use crate::app::{App, ROUTES_FOLDER_PATH};
+use crate::app::{App, MIDDLEWARE_FILENAME, ROUTES_FOLDER_PATH};
 use crate::mode::Mode;
 use crate::route::AxumInfo;
-use crate::route_directory_info::{MIDDLEWARE_FILENAME, RouteDirectoryInfo};
+use crate::route_directory_info::RouteDirectoryInfo;
 use crate::typescript::{TypesJar, collect_layout_props, collect_route_props, render_route_props};
 
 #[cfg(not(target_os = "windows"))]

@@ -24,6 +24,9 @@ pub const PAGE_FILENAME: &str = "page";
 // The layout component/handler filename. `layout.tsx` is a client-only wrapper
 // component; `layout.rs` is its optional server data handler.
 pub const LAYOUT_FILENAME: &str = "layout";
+// The middleware filename. It is collected via the middleware path (its `#[middleware]`
+// functions become tower layers), never as a route — not even under `/api/`.
+pub const MIDDLEWARE_FILENAME: &str = "middleware";
 /// Whether an entry under `src/routes` is a collectible route: a `page.*` leaf,
 /// a `layout.rs` data handler, or an API handler. Everything else (special
 /// files, colocated components, `layout.tsx`) is ignored. Shared by both
@@ -46,6 +49,12 @@ pub fn is_collectible_route(entry: &Path, base_path: &Path) -> bool {
     // a client-only component rendered through the route tree.
     if file_name == LAYOUT_FILENAME && extension == "rs" {
         return true;
+    }
+    // `middleware.rs` is collected via the middleware path, not as a route —
+    // even under `/api/`, where `is_api_path` would otherwise match it and it
+    // would wrongly appear in `route_map` / the route tree.
+    if file_name == MIDDLEWARE_FILENAME {
+        return false;
     }
     is_api_path(entry, base_path)
 }
@@ -288,6 +297,31 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Uses unix-style paths; the collection/path logic is identical across
+    // platforms (only the separator differs, which `is_api_path` normalises).
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn middleware_files_are_not_collectible_routes() {
+        let base_path = Path::new("/home/user/app");
+
+        // A genuine API handler under `/api/` is a route.
+        assert!(is_collectible_route(
+            Path::new("/home/user/app/src/routes/api/health.rs"),
+            base_path,
+        ));
+        // `middleware.rs` under `/api/` must NOT be collected as a route (it was
+        // previously matched by `is_api_path` and leaked into the route tree).
+        assert!(!is_collectible_route(
+            Path::new("/home/user/app/src/routes/api/middleware.rs"),
+            base_path,
+        ));
+        // A top-level `middleware.rs` is likewise not a route.
+        assert!(!is_collectible_route(
+            Path::new("/home/user/app/src/routes/middleware.rs"),
+            base_path,
+        ));
+    }
 
     #[test]
     fn should_collect_routes() {

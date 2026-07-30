@@ -5,6 +5,7 @@
 mod app;
 pub mod cli;
 mod commands;
+mod macro_attr;
 mod mode;
 mod process_manager;
 mod route;

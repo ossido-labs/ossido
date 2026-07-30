@@ -193,7 +193,7 @@ pub fn backend_request(level: Level, message: impl Display, path: &str) {
     match active_format() {
         LogFormat::Pretty => {
             let base = pretty_line(Source::Backend, level, &message);
-            println!("{base}  {}  {}", "·".dimmed(), path.dimmed());
+            println!("{base} {} {}", "-".dimmed(), path.dimmed());
         }
         LogFormat::Json => {
             println!(
@@ -227,7 +227,7 @@ fn emit(source: Source, level: Level, message: &str) {
 
 fn pretty_line(source: Source, level: Level, message: &str) -> String {
     let tag = source.colored_tag();
-    let level_str = level.colorize(&format!("{:<5}", level.label()));
+    let level_str = level.colorize(level.label());
     let time = now_local_hms().dimmed();
     format!("{tag} {level_str} {time} - {message}")
 }
@@ -462,12 +462,12 @@ mod tests {
     #[test]
     fn pretty_line_follows_the_tag_level_time_message_shape() {
         let line = strip_csi(&pretty_line(Source::Backend, Level::Info, "hello"));
-        // `[BE] INFO  HH:MM:SS - hello` — the level is padded to 5.
-        assert!(line.starts_with("[BE] INFO  "), "got: {line}");
+        // `[BE] INFO HH:MM:SS - hello` — a single space between each field.
+        assert!(line.starts_with("[BE] INFO "), "got: {line}");
         assert!(line.ends_with(" - hello"), "got: {line}");
         // The timestamp between the level and the ` - ` is `HH:MM:SS`.
         let time = line
-            .trim_start_matches("[BE] INFO  ")
+            .trim_start_matches("[BE] INFO ")
             .trim_end_matches(" - hello");
         assert_eq!(time.len(), 8, "expected HH:MM:SS, got: {time:?}");
         assert_eq!(time.matches(':').count(), 2);
