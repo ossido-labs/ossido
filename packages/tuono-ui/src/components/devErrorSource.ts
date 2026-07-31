@@ -45,6 +45,13 @@ export interface HighlightedLine {
   isErrorLine: boolean
 }
 
+/** A single source line as plain text — shown before highlighting is ready. */
+export interface PlainLine {
+  number: number
+  text: string
+  isErrorLine: boolean
+}
+
 export interface SourceExcerpt {
   file: string
   line: number
@@ -52,9 +59,20 @@ export interface SourceExcerpt {
   lines: Array<HighlightedLine>
 }
 
-export interface ResolvedDevError {
-  frames: Array<ResolvedFrame>
-  excerpt: SourceExcerpt | null
+/** The excerpt in plain text, before starry-night has highlighted it. */
+export interface PlainExcerpt {
+  file: string
+  line: number
+  column: number
+  lines: Array<PlainLine>
+}
+
+/** Source content around a throwing location — the input to an excerpt. */
+export interface RawExcerptSource {
+  content: string
+  file: string
+  line: number
+  column: number
 }
 
 type StarryNight = Awaited<ReturnType<typeof createStarryNight>>
@@ -277,6 +295,27 @@ function splitLines(nodes: Array<HastNode>): Array<Array<HastNode>> {
   return lines
 }
 
+/**
+ * Slice the source into the context window around the throwing line, as plain
+ * text. Synchronous and dependency-free, so the excerpt can render immediately;
+ * syntax highlighting then swaps in over the same layout (see
+ * {@link highlightExcerpt}).
+ */
+export function extractExcerpt(src: RawExcerptSource): PlainExcerpt {
+  const allLines = src.content.split('\n')
+  const start = Math.max(1, src.line - SOURCE_CONTEXT)
+  const end = Math.min(allLines.length, src.line + SOURCE_CONTEXT)
+  const lines: Array<PlainLine> = []
+  for (let number = start; number <= end; number++) {
+    lines.push({
+      number,
+      text: allLines[number - 1] ?? '',
+      isErrorLine: number === src.line,
+    })
+  }
+  return { file: src.file, line: src.line, column: src.column, lines }
+}
+
 function buildExcerpt(
   starryNight: StarryNight,
   toHtml: ToHtml,
@@ -323,18 +362,25 @@ async function getStarryNight(): Promise<StarryNight> {
 }
 
 /**
- * Highlight an excerpt from source content the server already provided (a Rust
- * panic site — see `ServerErrorSource`). No sourcemap resolution is involved:
- * the content is highlighted directly (starry-night picks the grammar from the
- * file extension, e.g. `.rs`). Returns `null` if the dev-only libraries fail to
- * load.
+ * Eagerly kick off the heavy, dev-only imports (starry-night + its grammars,
+ * trace-mapping, hast-util-to-html) so the first error's source excerpt renders
+ * without waiting on library loading. Safe to call repeatedly — the imports are
+ * cached. Call it when the overlay host mounts.
  */
-export async function buildServerSourceExcerpt(source: {
-  file: string
-  line: number
-  column: number
-  content: string
-}): Promise<SourceExcerpt | null> {
+export function warmDevErrorSource(): void {
+  void getStarryNight()
+  void import('@jridgewell/trace-mapping')
+  void import('hast-util-to-html')
+}
+
+/**
+ * Syntax-highlight a source excerpt (starry-night picks the grammar from the
+ * file extension, e.g. `.tsx` or `.rs`). Returns `null` if the dev-only
+ * libraries fail to load — the caller keeps showing the plain excerpt.
+ */
+export async function highlightExcerpt(
+  src: RawExcerptSource,
+): Promise<SourceExcerpt | null> {
   try {
     const [starryNight, htmlModule] = await Promise.all([
       getStarryNight(),
@@ -344,10 +390,10 @@ export async function buildServerSourceExcerpt(source: {
     return buildExcerpt(
       starryNight,
       toHtml,
-      source.content,
-      prettyPath(source.file),
-      source.line,
-      source.column,
+      src.content,
+      src.file,
+      src.line,
+      src.column,
     )
   } catch {
     return null
@@ -355,27 +401,25 @@ export async function buildServerSourceExcerpt(source: {
 }
 
 /**
- * Resolve stack frames to original locations and produce a syntax-highlighted
- * excerpt around the top application frame. Falls back to unmapped frames if any
- * of the dev-only libraries fail to load.
+ * Resolve stack frames to original locations (via each module's sourcemap) and
+ * return the raw source content of the top application frame — WITHOUT
+ * highlighting it, so the caller can render a plain excerpt immediately and
+ * highlight it asynchronously. Falls back to unmapped frames if trace-mapping
+ * fails to load.
  */
-export async function resolveDevError(
+export async function resolveDevErrorFrames(
   stack: string | undefined,
-): Promise<ResolvedDevError> {
+): Promise<{ frames: Array<ResolvedFrame>; source: RawExcerptSource | null }> {
   const rawFrames = parseStack(stack)
 
   try {
-    const [traceMapping, starryNight, htmlModule] = await Promise.all([
-      import('@jridgewell/trace-mapping'),
-      getStarryNight(),
-      import('hast-util-to-html'),
-    ])
-    const { TraceMap, originalPositionFor, sourceContentFor } = traceMapping
-    const toHtml = htmlModule.toHtml as unknown as ToHtml
+    const { TraceMap, originalPositionFor, sourceContentFor } = await import(
+      '@jridgewell/trace-mapping'
+    )
 
     const mapCache = new Map<string, TraceMap | null>()
     const frames: Array<ResolvedFrame> = []
-    let excerpt: SourceExcerpt | null = null
+    let source: RawExcerptSource | null = null
 
     for (const frame of rawFrames) {
       if (!frame.file || frame.line == null) {
@@ -408,13 +452,14 @@ export async function resolveDevError(
 
       frames.push({ fn: frame.fn, file, line, column, isApp })
 
-      if (!excerpt && isApp && content) {
-        excerpt = buildExcerpt(starryNight, toHtml, content, file, line, column)
+      // Keep the top application frame's source for the excerpt.
+      if (!source && isApp && content) {
+        source = { content, file, line, column }
       }
     }
 
-    return { frames, excerpt }
+    return { frames, source }
   } catch {
-    return { frames: initialFrames(stack), excerpt: null }
+    return { frames: initialFrames(stack), source: null }
   }
 }

@@ -1,6 +1,7 @@
 import { hydrateRoot } from 'react-dom/client'
 import { createRouter } from 'tuono-router'
 import type { createRoute } from 'tuono-router'
+import { warmDevErrorSource } from 'tuono-ui'
 
 import { TuonoEntryPoint } from '../shared/TuonoEntryPoint'
 import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants'
@@ -10,9 +11,12 @@ import { installBrowserLogForwarding } from './browserLogForwarding'
 type RouteTree = ReturnType<typeof createRoute>
 
 export function hydrate(routeTree: RouteTree): void {
-  // In development, mirror the browser console into the dev server console.
+  // In development, mirror the browser console into the dev server console and
+  // prefetch the error-overlay's source-highlighting libraries up front (not on
+  // first error), so a highlighted excerpt is ready the moment one is needed.
   if (window[SERVER_PAYLOAD_VARIABLE_NAME]?.mode === 'Dev') {
     installBrowserLogForwarding()
+    warmDevErrorSource()
   }
 
   // Create a new router instance

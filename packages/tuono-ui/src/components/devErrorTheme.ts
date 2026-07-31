@@ -1,7 +1,10 @@
 // Auto-generated: starry-night core + dark themes, scoped to the dev error
 // overlay. Source: @wooorm/starry-night (GitHub PrettyLights).
+//
+// The syntax variables must be declared on the overlay root that wraps the
+// highlighted code (`.tuono-err-window`) so the `.pl-*` rules below resolve.
 export const SYNTAX_THEME_CSS = `
-.tuono-err-root {
+.tuono-err-window {
   --color-prettylights-syntax-brackethighlighter-angle: #9198a1;
   --color-prettylights-syntax-brackethighlighter-unmatched: #f85149;
   --color-prettylights-syntax-carriage-return-bg: #b62324;

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 
+import { devErrorStore } from 'tuono-ui'
+
 import { Route } from '../route'
 import type { RouteComponent } from '../types'
 import type { ParsedLocation } from '../components/RouterContext'
@@ -125,7 +127,7 @@ describe('<RouteMatch />', () => {
     expect(screen.getByTestId('loading')).toBeDefined()
   })
 
-  it('shows the youch-like dev overlay for a thrown error in dev mode', () => {
+  it('reports a thrown error to the dev error store in dev mode', () => {
     seedResource(buildResourceKey(0, location), { kind: 'data', props: {} })
     const throwingRoute = new Route({
       component: (() => {
@@ -148,8 +150,13 @@ describe('<RouteMatch />', () => {
     render(<RouteMatch route={throwingRoute} mode="Dev" />)
     consoleError.mockRestore()
 
-    // Dev overlay surfaces the error message (source is fetched async).
-    expect(screen.getByText('boom')).toBeDefined()
+    // In dev the boundary reports the error to the shared store — the floating
+    // DevErrorOverlayHost (mounted at the router root) renders it, not RouteMatch.
+    expect(
+      devErrorStore
+        .getSnapshot()
+        .entries.some((entry) => entry.error?.message === 'boom'),
+    ).toBe(true)
   })
 
   it('shows a detail-free fallback for a thrown error in production', () => {

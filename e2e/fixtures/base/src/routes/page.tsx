@@ -7,7 +7,11 @@ export default function IndexPage({ subtitle }: MyResponse): JSX.Element {
     <>
       <h1>TUONO</h1>
       <h2>{subtitle}</h2>
-      <Link href={'/second-route'}>Routing link</Link>
+      <nav>
+        <Link href={'/second-route'}>Routing link</Link>
+        <Link href={'/throws'}>Throws</Link>
+        <Link href={'/rust-error'}>Rust error</Link>
+      </nav>
     </>
   )
 }

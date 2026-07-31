@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import { memo, Suspense, useMemo } from 'react'
 
-import { DefaultLoading, DefaultError, DevErrorOverlay } from 'tuono-ui'
+import { DefaultLoading, DefaultError, DevErrorReporter } from 'tuono-ui'
 
 import type { Mode } from '../types'
 import type { Route } from '../route'
@@ -32,11 +32,12 @@ export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
   const resourceKey = buildResourceKey(navigationId, location)
 
   const LoadingComponent = route.options.loadingComponent ?? DefaultLoading
-  // The dev overlay leaks source/stack, so it is only used in development;
-  // production falls back to a detail-free page.
+  // In dev the boundary reports the error to the shared store (rendered by the
+  // floating DevErrorOverlayHost); production falls back to a detail-free page
+  // so source/stack are never leaked to end users.
   const ErrorComponent =
     route.options.errorComponent ??
-    (mode === 'Dev' ? DevErrorOverlay : DefaultError)
+    (mode === 'Dev' ? DevErrorReporter : DefaultError)
 
   return (
     <TraverseRootComponents routes={routes} mode={mode}>

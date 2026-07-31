@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
+import { DevErrorOverlayHost } from 'tuono-ui'
 
 import type { ServerInitialLocation, Mode, ServerErrorPayload } from '../types'
 import type { Router } from '../router'
@@ -61,6 +62,10 @@ export function RouterProvider({
       serverInitialLocation={serverInitialLocation}
     >
       <Matches mode={mode} />
+      {/* Dev-only: the floating overlay host that surfaces every kind of dev
+          error (render/SSR panics, uncaught errors, rejections, Vite build
+          errors). Renders null until something is reported. */}
+      {mode === 'Dev' && <DevErrorOverlayHost />}
     </RouterContextProvider>
   )
 }
