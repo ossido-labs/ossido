@@ -20,8 +20,10 @@ export interface InternalTuonoConfigDev {
   criticalCss: boolean
 }
 
-export interface InternalTuonoConfig
-  extends Omit<TuonoConfig, 'server' | 'logging' | 'dev'> {
+export interface InternalTuonoConfig extends Omit<
+  TuonoConfig,
+  'server' | 'logging' | 'dev'
+> {
   server: TuonoConfigServer
   logging: InternalTuonoConfigLogging
   dev: InternalTuonoConfigDev

@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import type { TuonoPage } from 'tuono/types'
 
-import { Wordmark } from '../components/wordmark.tsx'
+import { Wordmark } from '../components/Wordmark.tsx'
 
 interface NavLink {
   href: string
@@ -44,7 +44,7 @@ function NavCard({ href, label, desc }: NavLink): JSX.Element {
     <a className="nav-card" href={href} target="_blank" rel="noreferrer">
       {body}
     </a>
-  );
+  )
 }
 
 const IndexPage: TuonoPage<'/'> = ({ subtitle }) => {

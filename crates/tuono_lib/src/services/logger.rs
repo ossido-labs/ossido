@@ -13,7 +13,7 @@ use tuono_internal::log::{self, Level};
 /// Colour an HTTP method by verb (GET green, POST blue, DELETE red, …) so the
 /// request log scans at a glance. Uncommon methods keep the default colour.
 /// `colored` auto-disables when output is not a TTY or `NO_COLOR` is set.
-fn colorize_method(method: &Method) -> colored::ColoredString {
+pub(crate) fn colorize_method(method: &Method) -> colored::ColoredString {
     let text = method.as_str();
     match *method {
         Method::GET => text.green(),

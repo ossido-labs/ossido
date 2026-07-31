@@ -158,7 +158,8 @@ async function getRouteNodes(
           // `page.rs` (page data) and `layout.rs` (layout data) are handler
           // nodes; API handlers and middleware are wired on the Rust side only.
           const rsBaseName = removeExt(dirent.name)
-          if (rsBaseName !== PAGE_FILE_ID && rsBaseName !== LAYOUT_PATH_ID) return
+          if (rsBaseName !== PAGE_FILE_ID && rsBaseName !== LAYOUT_PATH_ID)
+            return
 
           const filePath = replaceBackslash(path.join(dir, dirent.name))
           const filePathNoExt = removeExt(filePath)
@@ -176,7 +177,13 @@ async function getRouteNodes(
 
   await recurse('./')
 
-  return { routeNodes, rustHandlersNodes, loadingFiles, errorFiles, notFoundFiles }
+  return {
+    routeNodes,
+    rustHandlersNodes,
+    loadingFiles,
+    errorFiles,
+    notFoundFiles,
+  }
 }
 
 export async function routeGenerator(

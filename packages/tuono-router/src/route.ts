@@ -95,8 +95,7 @@ export class Route {
     // or route-group `layout` is also pathless, but it has a parent — it must
     // get its own id (from its filePath) so it doesn't overwrite the root in
     // `routesById`.
-    const isRoot =
-      !this.parentRoute && !this.options.path && !this.options.id
+    const isRoot = !this.parentRoute && !this.options.path && !this.options.id
 
     if (isRoot) {
       this.path = ROOT_ROUTE_ID

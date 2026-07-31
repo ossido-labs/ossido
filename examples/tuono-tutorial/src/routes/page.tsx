@@ -1,6 +1,6 @@
 import type { JSX } from 'react'
 
-import { Wordmark } from '../components/wordmark'
+import { Wordmark } from '../components/Wordmark.tsx'
 import PokemonLink from '../components/PokemonLink'
 
 interface IndexProps {

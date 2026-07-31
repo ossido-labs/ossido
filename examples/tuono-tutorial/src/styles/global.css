@@ -34,7 +34,6 @@ img.background {
   mix-blend-mode: screen;
 }
 
-/* Present for assistive tech, but visually removed and taking no layout space. */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -77,7 +76,6 @@ body {
   opacity: 1;
 }
 
-/* A centred content column (not a full-viewport hero — the page scrolls a list). */
 main {
   width: 100%;
   max-width: 820px;
@@ -90,6 +88,7 @@ main {
 }
 
 /* Hero ---------------------------------------------------------------------- */
+
 .hero {
   display: flex;
   flex-direction: column;
@@ -110,11 +109,6 @@ main {
   user-select: none;
 }
 
-.title .logo {
-  height: 0.9em;
-  width: 0.9em;
-}
-
 .subtitle {
   max-width: 40ch;
   font-size: clamp(16px, 2.3vw, 22px);
@@ -122,7 +116,6 @@ main {
   color: var(--tuono-text-dim);
 }
 
-/* A small row of secondary links under the hero. */
 .links {
   display: flex;
   gap: 20px;
@@ -142,6 +135,7 @@ main {
 }
 
 /* Pokémon list ------------------------------------------------------------- */
+
 .pokemon-grid {
   display: flex;
   flex-wrap: wrap;
@@ -151,7 +145,6 @@ main {
   width: 100%;
 }
 
-/* A subtle "back" link on sub-pages, matching the card treatment. */
 .back-link {
   align-self: flex-start;
   display: inline-flex;

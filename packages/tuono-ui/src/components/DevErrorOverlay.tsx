@@ -241,8 +241,9 @@ export function DevErrorOverlay({
   const frames = resolved?.frames ?? fallbackFrames
   const excerpt = resolved?.excerpt ?? null
   const hiddenFrameCount = Math.max(0, frames.length - MAX_VISIBLE_FRAMES)
-  const visibleFrames =
-    framesExpanded ? frames : frames.slice(0, MAX_VISIBLE_FRAMES)
+  const visibleFrames = framesExpanded
+    ? frames
+    : frames.slice(0, MAX_VISIBLE_FRAMES)
   // The constructor (class) name, shown on its own line under the badge.
   const label = errorLabel(error)
 

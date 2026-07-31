@@ -17,6 +17,10 @@ interface ForwardedEntry {
   error?: ForwardedError
   /** A client-side navigation event (rather than a `console.*` call). */
   navigation?: boolean
+  /** For a navigation that loaded data: the data response's HTTP status. */
+  status?: number
+  /** For a navigation that loaded data: how long the load took, in ms. */
+  durationMs?: number
 }
 
 const CONSOLE_METHODS = [
@@ -29,8 +33,28 @@ const CONSOLE_METHODS = [
 ] as const
 
 const LOGS_ENDPOINT = '/__tuono/logs'
+// A route's server data is loaded from `/__tuono/data{pathname}{searchStr}`, so
+// the request URL encodes the navigation path — that's how a data load is
+// correlated back to the navigation that triggered it.
+const DATA_ROUTE_PREFIX = '/__tuono/data'
 const FLUSH_DELAY_MS = 60
 const MAX_FRAMES = 6
+// Cap the in-flight/recent data-load map so an un-consumed entry (e.g. an error
+// retry that refetches without navigating) can't grow it without bound.
+const MAX_TRACKED_DATA_LOADS = 50
+
+/** The outcome of a route's data fetch, correlated to a navigation by path. */
+interface NavDataLoad {
+  status: number
+  durationMs: number
+}
+
+/** Mirror the backend's status→level mapping so a failed data load stands out. */
+function levelForStatus(status: number): string {
+  if (status >= 500) return 'error'
+  if (status >= 400) return 'warn'
+  return 'info'
+}
 
 function formatArg(arg: unknown): string {
   if (typeof arg === 'string') return arg
@@ -134,21 +158,87 @@ export function installBrowserLogForwarding(): void {
     enqueue('error', [event.reason])
   })
 
+  // Observe route data loads so a navigation's log line can carry the load's
+  // status + duration (mirroring the backend request log). Keyed by the
+  // navigation path — the `/__tuono/data{path}` URL encodes it — and consumed by
+  // the matching navigation report.
+  const dataLoads = new Map<string, Promise<NavDataLoad | null>>()
+  const originalFetch =
+    typeof window.fetch === 'function' ? window.fetch.bind(window) : undefined
+  if (originalFetch) {
+    window.fetch = (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      const request = originalFetch(input, init)
+      try {
+        const raw =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url
+        const { pathname, search } = new URL(raw, location.origin)
+        if (pathname.startsWith(DATA_ROUTE_PREFIX)) {
+          // Strip the prefix to recover the navigation path (`pathname+search`).
+          const navPath =
+            pathname.slice(DATA_ROUTE_PREFIX.length) + search || '/'
+          const start = performance.now()
+          if (dataLoads.size >= MAX_TRACKED_DATA_LOADS) {
+            const oldest = dataLoads.keys().next().value
+            if (oldest !== undefined) dataLoads.delete(oldest)
+          }
+          dataLoads.set(
+            navPath,
+            request.then(
+              (res) => ({
+                status: res.status,
+                durationMs: performance.now() - start,
+              }),
+              () => null,
+            ),
+          )
+        }
+      } catch {
+        // Correlation is best-effort; never let it interfere with the fetch.
+      }
+      return request
+    }
+  }
+
   // Report client-side navigations so the dev server logs them too. The router
   // commits every navigation via history.pushState/replaceState; back/forward
   // fire popstate. (The initial load is a normal request the server already
   // logs, and does not go through these.)
-  const reportNavigation = (): void => {
+  const emitNavigation = async (): Promise<void> => {
     try {
-      queue.push({
-        level: 'info',
-        message: window.location.pathname + window.location.search,
-        navigation: true,
-      })
+      const path = window.location.pathname + window.location.search
+      const load = dataLoads.get(path)
+      dataLoads.delete(path)
+      const timing = load ? await load : null
+      queue.push(
+        timing
+          ? {
+              level: levelForStatus(timing.status),
+              message: path,
+              navigation: true,
+              status: timing.status,
+              durationMs: timing.durationMs,
+            }
+          : { level: 'info', message: path, navigation: true },
+      )
       schedule()
     } catch {
       // Never let reporting break navigation.
     }
+  }
+
+  // Defer via a microtask so the router's own popstate handler (which starts the
+  // data fetch) has run before we correlate — the fetch is then already tracked.
+  const reportNavigation = (): void => {
+    queueMicrotask(() => {
+      void emitNavigation()
+    })
   }
 
   const patchHistory = (method: 'pushState' | 'replaceState'): void => {

@@ -35,7 +35,6 @@ img.background {
   mix-blend-mode: screen;
 }
 
-/* Present for assistive tech, but visually removed and taking no layout space. */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -55,7 +54,6 @@ body {
   background: #0a0a0e;
 }
 
-/* Subtle home link in the corner — the way back from any sub-page. */
 .brand {
   position: fixed;
   top: 22px;
@@ -89,6 +87,7 @@ main {
 }
 
 /* Hero ---------------------------------------------------------------------- */
+
 .hero {
   display: flex;
   flex-direction: column;
@@ -122,6 +121,7 @@ main {
 }
 
 /* Nav grid (start-page cards) ---------------------------------------------- */
+
 .nav-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

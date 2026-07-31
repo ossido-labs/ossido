@@ -7,16 +7,21 @@
   }
 }
 
-#cog {
+.logo {
+  height: 0.9em;
+  width: 0.9em;
+}
+
+.cog {
   transform-origin: center;
   animation: rotate 6s linear infinite;
 }
 
-#cog-background {
+.cogBackground {
   fill: #1b1b1f55;
 }
 
-#orbit {
+.orbit {
   transform-origin: center;
   animation: rotate 12s linear infinite reverse;
 }

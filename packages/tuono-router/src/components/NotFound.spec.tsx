@@ -37,7 +37,9 @@ describe('<NotFound />', () => {
 
   describe('when a root not-found.tsx exists', () => {
     it('should render the custom not-found inside the root layout', () => {
-      const customNotFound = vi.fn(() => <span />) as unknown as NotFoundComponent
+      const customNotFound = vi.fn(() => (
+        <span />
+      )) as unknown as NotFoundComponent
       const root = new Route({
         isRoot: true,
         component: rootRouteComponentMock as unknown as RouteComponent,

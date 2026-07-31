@@ -6,7 +6,7 @@ export default function PokemonSkeleton(): JSX.Element {
   return (
     <div className={styles.pokemon} style={{ height: 270 }}>
       <div>
-        <h1 className={styles.name}>...</h1>
+        <h1 className={styles.name}>Loading...</h1>
         <dl className={styles.spec}>
           <dt className={styles.label}>Weight: </dt>
           <dd>...lbs</dd>

@@ -19,8 +19,7 @@ const GREEN = '\x1b[32m'
  * Colours are disabled when `NO_COLOR` is set to a non-empty value (matching the
  * Rust side / the `NO_COLOR` convention), so `NO_COLOR=1 tuono dev` is plain.
  */
-const COLOR_ENABLED =
-  typeof process === 'undefined' || !process.env.NO_COLOR
+const COLOR_ENABLED = typeof process === 'undefined' || !process.env.NO_COLOR
 
 type FeLevel = 'INFO' | 'WARN' | 'ERROR'
 

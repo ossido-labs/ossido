@@ -4,6 +4,8 @@
 //! `/__tuono/logs`; they are printed in the server console tagged `[FE]`,
 //! filtered by the `logging.browser` config.
 
+use colored::Colorize;
+use http::method::Method;
 use serde::Deserialize;
 use tuono_internal::log::{self, ErrorReport, Level, Source};
 
@@ -35,6 +37,12 @@ pub struct BrowserLogEntry {
     /// When `true`, this is a client-side navigation (the `message` is the path).
     #[serde(default)]
     pub navigation: bool,
+    /// For a navigation that loaded data: the data response's HTTP status.
+    #[serde(default)]
+    pub status: Option<u16>,
+    /// For a navigation that loaded data: how long the load took, in ms.
+    #[serde(rename = "durationMs", default)]
+    pub duration_ms: Option<f64>,
 }
 
 /// Print forwarded browser logs, honouring the `logging.browser` config. Takes
@@ -59,10 +67,20 @@ pub async fn browser_logs(body: String) {
             continue;
         }
 
-        // A client-side navigation: log the destination path with an arrow so it
-        // stands out from ordinary console output.
+        // A client-side navigation: log it in the same shape as the backend
+        // request log — a colour-coded method (always GET), the path, and (when
+        // the navigation loaded data) the data response's status and dimmed
+        // duration, exactly as the request log renders them.
         if entry.navigation {
-            log::frontend(level, format!("→ {}", entry.message));
+            let method = crate::services::logger::colorize_method(&Method::GET);
+            let message = match (entry.status, entry.duration_ms) {
+                (Some(status), Some(ms)) => {
+                    let duration = format!("in {ms:.0}ms").dimmed();
+                    format!("{method} {} {status} {duration}", entry.message)
+                }
+                _ => format!("{method} {}", entry.message),
+            };
+            log::frontend(level, message);
             continue;
         }
 
@@ -123,7 +141,8 @@ mod tests {
         assert_eq!(Level::from_str_lenient(&entries[1].level), Level::Error);
     }
 
-    /// A client-side navigation report carries `navigation: true` and the path.
+    /// A client-side navigation report carries `navigation: true` and the path,
+    /// plus the data-load status + duration when the navigation loaded data.
     #[test]
     fn parses_a_navigation_entry() {
         let entry: BrowserLogEntry = serde_json::from_str(
@@ -132,6 +151,15 @@ mod tests {
         .unwrap();
         assert!(entry.navigation);
         assert_eq!(entry.message, "/pokemons/pikachu");
+        assert!(entry.status.is_none());
+        assert!(entry.duration_ms.is_none());
+
+        let entry: BrowserLogEntry = serde_json::from_str(
+            r#"{ "level": "info", "message": "/x", "navigation": true, "status": 200, "durationMs": 12.4 }"#,
+        )
+        .unwrap();
+        assert_eq!(entry.status, Some(200));
+        assert_eq!(entry.duration_ms, Some(12.4));
     }
 
     /// Only `level` is required; everything else falls back to defaults so a

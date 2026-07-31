@@ -21,7 +21,7 @@
     "repo:root:format": "oxfmt --check . !assets/** !crates/** !examples/** !devtools/** !packages/**",
     "repo:root:format:fix": "oxfmt . !assets/** !crates/** !examples/** !devtools/** !packages/**",
     "check-packages": "turbo build test lint format typecheck --filter=!./examples",
-    "check-examples": "bun run \"/^examples:(format|typecheck)$/\"",
+    "check-examples": "bun run examples:format && bun run examples:typecheck",
     "check-all": "bun run check-packages && bun run check-examples && bun run repo:root:format"
   },
   "workspaces": {

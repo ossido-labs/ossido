@@ -17,6 +17,8 @@ interface ForwardedEntry {
   message: string
   error?: { name: string; message: string; stack: Array<string> }
   navigation?: boolean
+  status?: number
+  durationMs?: number
 }
 
 type EventHandler = (event: unknown) => void
@@ -45,7 +47,11 @@ beforeEach(() => {
 
   sendBeacon = vi.fn(() => true)
   eventHandlers = {}
-  currentLocation = { origin: 'http://localhost:3000', pathname: '/', search: '' }
+  currentLocation = {
+    origin: 'http://localhost:3000',
+    pathname: '/',
+    search: '',
+  }
 
   vi.stubGlobal('navigator', { sendBeacon })
   vi.stubGlobal('location', currentLocation)
@@ -163,7 +169,8 @@ describe('installBrowserLogForwarding', () => {
 
     currentLocation.pathname = '/pokemons/pikachu'
     history.pushState({}, '', '/pokemons/pikachu')
-    vi.advanceTimersByTime(FLUSH_DELAY_MS)
+    // The report is deferred to a microtask, so drain them while advancing.
+    await vi.advanceTimersByTimeAsync(FLUSH_DELAY_MS)
 
     const batch = await lastBeaconBatch()
     expect(batch).toEqual([
@@ -177,9 +184,37 @@ describe('installBrowserLogForwarding', () => {
     currentLocation.pathname = '/pokemons'
     currentLocation.search = '?page=2'
     eventHandlers.popstate?.(new Event('popstate'))
-    vi.advanceTimersByTime(FLUSH_DELAY_MS)
+    await vi.advanceTimersByTimeAsync(FLUSH_DELAY_MS)
 
     const [entry] = await lastBeaconBatch()
-    expect(entry).toMatchObject({ navigation: true, message: '/pokemons?page=2' })
+    expect(entry).toMatchObject({
+      navigation: true,
+      message: '/pokemons?page=2',
+    })
+  })
+
+  it('attaches the data-load status and duration when a navigation fetches data', async () => {
+    // The route's data load must be observed, so install with a stubbed fetch.
+    const dataFetch = vi.fn(
+      (): Promise<Response> =>
+        Promise.resolve(new Response('{}', { status: 200 })),
+    )
+    ;(window as unknown as { fetch: typeof fetch }).fetch = dataFetch
+    await install()
+
+    // The router loads a route's data from `/__tuono/data{path}` before it
+    // commits the navigation via pushState.
+    void window.fetch('/__tuono/data/pokemons/pikachu')
+    currentLocation.pathname = '/pokemons/pikachu'
+    history.pushState({}, '', '/pokemons/pikachu')
+    await vi.advanceTimersByTimeAsync(FLUSH_DELAY_MS)
+
+    const [entry] = await lastBeaconBatch()
+    expect(entry).toMatchObject({
+      navigation: true,
+      message: '/pokemons/pikachu',
+      status: 200,
+    })
+    expect(typeof entry?.durationMs).toBe('number')
   })
 })
