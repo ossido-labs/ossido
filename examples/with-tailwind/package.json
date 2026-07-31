@@ -2,6 +2,9 @@
   "name": "with-tailwind",
   "description": "Basic tuono application with tailwind",
   "version": "0.0.1",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.0.0",

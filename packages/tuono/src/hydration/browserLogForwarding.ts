@@ -15,6 +15,8 @@ interface ForwardedEntry {
   level: string
   message: string
   error?: ForwardedError
+  /** A client-side navigation event (rather than a `console.*` call). */
+  navigation?: boolean
 }
 
 const CONSOLE_METHODS = [
@@ -131,4 +133,32 @@ export function installBrowserLogForwarding(): void {
   window.addEventListener('unhandledrejection', (event) => {
     enqueue('error', [event.reason])
   })
+
+  // Report client-side navigations so the dev server logs them too. The router
+  // commits every navigation via history.pushState/replaceState; back/forward
+  // fire popstate. (The initial load is a normal request the server already
+  // logs, and does not go through these.)
+  const reportNavigation = (): void => {
+    try {
+      queue.push({
+        level: 'info',
+        message: window.location.pathname + window.location.search,
+        navigation: true,
+      })
+      schedule()
+    } catch {
+      // Never let reporting break navigation.
+    }
+  }
+
+  const patchHistory = (method: 'pushState' | 'replaceState'): void => {
+    const original = history[method].bind(history)
+    history[method] = (...args: Parameters<History['pushState']>): void => {
+      original(...args)
+      reportNavigation()
+    }
+  }
+  patchHistory('pushState')
+  patchHistory('replaceState')
+  window.addEventListener('popstate', reportNavigation)
 }

@@ -19,6 +19,8 @@ const SERVER_ENTRY_DATA: &str = include_str!("../templates/server.ts");
 const CLIENT_ENTRY_DATA: &str = include_str!("../templates/client.ts");
 #[cfg(not(target_os = "windows"))]
 const AXUM_ENTRY_POINT: &str = include_str!("../templates/server.rs");
+#[cfg(not(target_os = "windows"))]
+const TSCONFIG_DATA: &str = include_str!("../templates/tsconfig.json");
 
 #[cfg(not(target_os = "windows"))]
 const MAIN_FILE_PATH: &str = "./.tuono/main.rs";
@@ -37,6 +39,8 @@ const SERVER_ENTRY_DATA: &str = include_str!("..\\templates\\server.ts");
 const CLIENT_ENTRY_DATA: &str = include_str!("..\\templates\\client.ts");
 #[cfg(target_os = "windows")]
 const AXUM_ENTRY_POINT: &str = include_str!("..\\templates\\server.rs");
+#[cfg(target_os = "windows")]
+const TSCONFIG_DATA: &str = include_str!("..\\templates\\tsconfig.json");
 
 #[cfg(target_os = "windows")]
 const MAIN_FILE_PATH: &str = ".\\.tuono\\main.rs";
@@ -111,6 +115,10 @@ impl SourceBuilder {
         let dev_folder = Path::new(DEV_FOLDER);
         self.create_file(dev_folder.join("server-main.tsx"), SERVER_ENTRY_DATA)?;
         self.create_file(dev_folder.join("client-main.tsx"), CLIENT_ENTRY_DATA)?;
+        // A local tsconfig so the generated `.tuono` sources (which import from
+        // `../src`) type-check in editors — it inherits the project's compiler
+        // options and scopes to the generated entry files.
+        self.create_file(dev_folder.join("tsconfig.json"), TSCONFIG_DATA)?;
 
         self.types_jar
             .generate_typescript_file(&self.base_path, &self.route_props_typescript())?;

@@ -33,10 +33,10 @@ jobs:
         uses: ./.github/actions/install-node-dependencies
 
       - name: Build project
-        run: pnpm build
+        run: bun run build
 
       - name: Test project
-        run: pnpm test
+        run: bun run test
 
   lint_and_fmt:
     name: Check format and lint
@@ -50,19 +50,19 @@ jobs:
       - name: Install NodeJS Dependencies
         uses: ./.github/actions/install-node-dependencies
 
-      # `pnpm run lint` also checks Rust formatting (`cargo +nightly fmt`), whose
+      # `bun run lint` also checks Rust formatting (`cargo +nightly fmt`), whose
       # import grouping/merging is a nightly-only rustfmt feature.
       - name: Install nightly rustfmt
         run: rustup toolchain install nightly --profile minimal --component rustfmt
 
       - name: Check formatting
-        run: pnpm run format
+        run: bun run format
 
       - name: Lint
-        run: pnpm run lint
+        run: bun run lint
 
       - name: Typecheck
-        run: pnpm run typecheck
+        run: bun run typecheck
 
   ci_ok:
     name: Typescript CI OK

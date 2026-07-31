@@ -16,6 +16,7 @@ interface ForwardedEntry {
   level: string
   message: string
   error?: { name: string; message: string; stack: Array<string> }
+  navigation?: boolean
 }
 
 type EventHandler = (event: unknown) => void
@@ -24,6 +25,7 @@ const FLUSH_DELAY_MS = 60
 
 let sendBeacon: ReturnType<typeof vi.fn>
 let eventHandlers: Record<string, EventHandler>
+let currentLocation: { origin: string; pathname: string; search: string }
 
 /** Read the JSON batch handed to the most recent `sendBeacon` call. */
 async function lastBeaconBatch(): Promise<Array<ForwardedEntry>> {
@@ -43,10 +45,16 @@ beforeEach(() => {
 
   sendBeacon = vi.fn(() => true)
   eventHandlers = {}
+  currentLocation = { origin: 'http://localhost:3000', pathname: '/', search: '' }
 
   vi.stubGlobal('navigator', { sendBeacon })
-  vi.stubGlobal('location', { origin: 'http://localhost:3000' })
+  vi.stubGlobal('location', currentLocation)
+  vi.stubGlobal('history', {
+    pushState: (): void => undefined,
+    replaceState: (): void => undefined,
+  })
   vi.stubGlobal('window', {
+    location: currentLocation,
     addEventListener: (type: string, handler: EventHandler) => {
       eventHandlers[type] = handler
     },
@@ -148,5 +156,30 @@ describe('installBrowserLogForwarding', () => {
 
     const batch = await lastBeaconBatch()
     expect(batch).toHaveLength(1)
+  })
+
+  it('reports a client-side navigation via history.pushState', async () => {
+    await install()
+
+    currentLocation.pathname = '/pokemons/pikachu'
+    history.pushState({}, '', '/pokemons/pikachu')
+    vi.advanceTimersByTime(FLUSH_DELAY_MS)
+
+    const batch = await lastBeaconBatch()
+    expect(batch).toEqual([
+      { level: 'info', message: '/pokemons/pikachu', navigation: true },
+    ])
+  })
+
+  it('reports back/forward navigation via popstate', async () => {
+    await install()
+
+    currentLocation.pathname = '/pokemons'
+    currentLocation.search = '?page=2'
+    eventHandlers.popstate?.(new Event('popstate'))
+    vi.advanceTimersByTime(FLUSH_DELAY_MS)
+
+    const [entry] = await lastBeaconBatch()
+    expect(entry).toMatchObject({ navigation: true, message: '/pokemons?page=2' })
   })
 })

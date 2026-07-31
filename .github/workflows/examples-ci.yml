@@ -81,17 +81,17 @@ jobs:
         run: cargo build
 
       - name: Build typescript
-        run: pnpm run build
+        run: bun run build
 
       - name: Check "build"
         working-directory: ./examples/${{ matrix.example_name }}
         run: ../../target/debug/tuono build
 
       - name: Check formatting
-        run: pnpm run format
+        run: bun run format
 
       - name: Typecheck
-        run: pnpm run typecheck
+        run: bun run typecheck
 
   ci_ok:
     name: Examples CI OK

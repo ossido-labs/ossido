@@ -21,7 +21,8 @@ pub struct BrowserError {
     pub stack: Vec<String>,
 }
 
-/// A single forwarded console call.
+/// A single forwarded browser event — a `console.*` call or a client-side
+/// navigation.
 #[derive(Debug, Deserialize)]
 pub struct BrowserLogEntry {
     /// The console method (`log`/`info`/`warn`/`error`/`debug`/`trace`).
@@ -31,6 +32,9 @@ pub struct BrowserLogEntry {
     /// Structured error, if the console call included an `Error`.
     #[serde(default)]
     pub error: Option<BrowserError>,
+    /// When `true`, this is a client-side navigation (the `message` is the path).
+    #[serde(default)]
+    pub navigation: bool,
 }
 
 /// Print forwarded browser logs, honouring the `logging.browser` config. Takes
@@ -52,6 +56,13 @@ pub async fn browser_logs(body: String) {
     for entry in entries {
         let level = Level::from_str_lenient(&entry.level);
         if level < browser.level {
+            continue;
+        }
+
+        // A client-side navigation: log the destination path with an arrow so it
+        // stands out from ordinary console output.
+        if entry.navigation {
+            log::frontend(level, format!("→ {}", entry.message));
             continue;
         }
 
@@ -112,6 +123,17 @@ mod tests {
         assert_eq!(Level::from_str_lenient(&entries[1].level), Level::Error);
     }
 
+    /// A client-side navigation report carries `navigation: true` and the path.
+    #[test]
+    fn parses_a_navigation_entry() {
+        let entry: BrowserLogEntry = serde_json::from_str(
+            r#"{ "level": "info", "message": "/pokemons/pikachu", "navigation": true }"#,
+        )
+        .unwrap();
+        assert!(entry.navigation);
+        assert_eq!(entry.message, "/pokemons/pikachu");
+    }
+
     /// Only `level` is required; everything else falls back to defaults so a
     /// bare `console.log()` with no argument still parses.
     #[test]
@@ -120,6 +142,8 @@ mod tests {
         assert_eq!(entry.level, "log");
         assert_eq!(entry.message, "");
         assert!(entry.error.is_none());
+        // `navigation` defaults to false for ordinary console entries.
+        assert!(!entry.navigation);
 
         // An error object may itself carry only a subset of fields.
         let entry: BrowserLogEntry =
