@@ -222,8 +222,20 @@ impl App {
         }
     }
 
-    pub fn has_dynamic_routes(&self) -> bool {
-        self.route_map.iter().any(|(_, route)| route.is_dynamic)
+    /// Dynamic page routes that cannot be statically generated because they
+    /// declare no `#[static_paths]` enumerator. Empty means `tuono build
+    /// --static` can proceed. Returned as sorted URL paths for a stable message.
+    pub fn dynamic_routes_without_static_paths(&self) -> Vec<String> {
+        let mut routes: Vec<String> = self
+            .route_map
+            .values()
+            .filter(|route| {
+                route.is_dynamic && !route.is_layout && !route.is_api() && !route.has_static_paths
+            })
+            .map(|route| route.url_path())
+            .collect();
+        routes.sort();
+        routes
     }
 
     pub fn check_server_availability(&self, mode: Mode) {
@@ -249,16 +261,23 @@ impl App {
         }
     }
 
-    pub fn build_react_prod(&self) {
+    pub fn build_react_prod(&self, static_export: bool) {
         if !Path::new(BUILD_JS_SCRIPT).exists() {
             error!("Failed to find the build script. Please run `npm install`");
             std::process::exit(1);
         }
 
-        let output = Command::new(BUILD_JS_SCRIPT).output().unwrap_or_else(|_| {
-            error!("Failed to build the react source");
-            std::process::exit(1);
-        });
+        let output = Command::new(BUILD_JS_SCRIPT)
+            // For a static export, bake `__TUONO_STATIC__` into the client bundle
+            // (via the vite `define`) so the router fetches the pre-rendered
+            // `.json` data files — there is no server to resolve the
+            // extensionless `/__tuono/data{path}` route at serve time.
+            .env("TUONO_STATIC", if static_export { "true" } else { "false" })
+            .output()
+            .unwrap_or_else(|_| {
+                error!("Failed to build the react source");
+                std::process::exit(1);
+            });
 
         if !output.status.success() {
             error!("Failed to build the react source");
@@ -599,8 +618,10 @@ mod tests {
             })
     }
 
+    // These fixture routes don't exist on disk, so `route_declares_static_paths`
+    // returns false — every dynamic route here counts as "missing".
     #[test]
-    fn has_dynamic_routes_works() {
+    fn dynamic_routes_without_static_paths_lists_the_dynamic_ones() {
         let mut app = App::new();
         app.base_path = "/home/user/Documents/tuono".into();
 
@@ -608,12 +629,14 @@ mod tests {
             "/home/user/Documents/tuono/src/routes/page.rs",
             "/home/user/Documents/tuono/src/routes/posts/[post]/page.rs",
         ];
-
         routes
             .into_iter()
             .for_each(|route| app.collect_route(Ok(PathBuf::from(route))));
 
-        assert!(app.has_dynamic_routes());
+        assert_eq!(
+            app.dynamic_routes_without_static_paths(),
+            vec!["/posts/[post]".to_string()]
+        );
 
         let mut app2 = App::new();
         app2.base_path = "/home/user/Documents/tuono".into();
@@ -622,25 +645,30 @@ mod tests {
             "/home/user/Documents/tuono/src/routes/[post]/page.rs",
             "/home/user/Documents/tuono/src/routes/posts/[post]/page.rs",
         ];
-
         routes
             .into_iter()
             .for_each(|route| app2.collect_route(Ok(PathBuf::from(route))));
 
-        assert!(app2.has_dynamic_routes());
+        // Sorted for a stable message.
+        assert_eq!(
+            app2.dynamic_routes_without_static_paths(),
+            vec!["/[post]".to_string(), "/posts/[post]".to_string()]
+        );
+    }
 
-        let mut app3 = App::new();
-        app3.base_path = "/home/user/Documents/tuono".into();
+    #[test]
+    fn dynamic_routes_without_static_paths_is_empty_for_only_static_routes() {
+        let mut app = App::new();
+        app.base_path = "/home/user/Documents/tuono".into();
 
         let routes = [
             "/home/user/Documents/tuono/src/routes/page.rs",
             "/home/user/Documents/tuono/src/routes/posts/page.rs",
         ];
-
         routes
             .into_iter()
-            .for_each(|route| app3.collect_route(Ok(PathBuf::from(route))));
+            .for_each(|route| app.collect_route(Ok(PathBuf::from(route))));
 
-        assert!(!app3.has_dynamic_routes())
+        assert!(app.dynamic_routes_without_static_paths().is_empty());
     }
 }

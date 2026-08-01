@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::fs;
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 use ssr_rs::{Ssr, SsrError};
 
@@ -12,10 +12,27 @@ use crate::mode::{GLOBAL_MODE, Mode};
 /// cost. Dev additionally rebuilds the isolate when the bundle file changes so
 /// hot-reloads are still picked up.
 ///
+/// The bundle exposes two named exports (see `templates/server.ts`):
+/// `renderFn` buffers the whole page into a string, while `renderStream` flushes
+/// each HTML chunk through the `__ssr_write` global as React produces it.
+/// [`Js::render_to_string`] drives the former; [`Js::render_stream`] the latter.
+///
+/// Streaming is `ssr_rs`'s opt-in [`Ssr::streaming`] helper: it installs the
+/// `__ssr_write` writer global and drives the render, delivering each chunk to
+/// the sink tuono passes (see [`Js::render_stream`]). The library owns the sink
+/// plumbing; tuono just supplies the sink.
+///
 /// Each phase (`bundle read` / `v8 compile` / `ssr render`) is timed into the
 /// request trace under `DEBUG=1`, so a warm request shows only `ssr render`
 /// while the first request (or the one after a rebuild) also shows the compile.
 pub struct Js;
+
+/// Buffered-render export: resolves the whole page to a single string.
+const RENDER_FN: &str = "renderFn";
+/// Streaming-render export: writes chunks via the `__ssr_write` global.
+const RENDER_STREAM_FN: &str = "renderStream";
+/// The writer global the streaming bundle calls to emit each chunk.
+const STREAM_WRITE_FN: &str = "__ssr_write";
 
 #[cfg(target_os = "windows")]
 const PROD_BUNDLE_PATH: &str = ".\\out\\server\\prod-server.js";
@@ -41,6 +58,23 @@ impl Js {
             ProdJs::render_to_string(payload)
         }
     }
+
+    /// Streaming render: `on_chunk` is invoked for each HTML fragment as it is
+    /// produced. Returns once the render's promise resolves; a *shell* error
+    /// (rejection before any chunk) is an `Err` with `on_chunk` never called, so
+    /// the caller can still send an error response instead of a partial page.
+    pub fn render_stream(
+        payload: Option<&str>,
+        on_chunk: impl FnMut(String) + 'static,
+    ) -> Result<(), SsrError> {
+        let mode = GLOBAL_MODE.get().expect("Failed to get GLOBAL_MODE");
+
+        if *mode == Mode::Dev {
+            DevJs::render_stream(payload, on_chunk)
+        } else {
+            ProdJs::render_stream(payload, on_chunk)
+        }
+    }
 }
 
 /// A compiled bundle (V8 isolate) cached on the current thread, tagged with the
@@ -57,7 +91,10 @@ impl ProdJs {
         static SSR: RefCell<Option<Ssr<'static, 'static>>> = const { RefCell::new(None) };
     }
 
-    fn render_to_string(params: Option<&str>) -> Result<String, SsrError> {
+    /// Run `f` against this thread's cached isolate, compiling + caching it on
+    /// first use. The prod bundle is always present by server start, so a failed
+    /// read/compile panics (as before) rather than falling back.
+    fn with_ssr<R>(f: impl FnOnce(&mut Ssr<'static, 'static>) -> R) -> R {
         Self::SSR.with(|cell| {
             let mut cache = cell.borrow_mut();
 
@@ -73,27 +110,69 @@ impl ProdJs {
             }
 
             let ssr = cache.as_mut().expect("SSR was just populated");
-            crate::debug::time("ssr render", || ssr.render_to_string(params))
+            f(ssr)
+        })
+    }
+
+    fn render_to_string(params: Option<&str>) -> Result<String, SsrError> {
+        Self::with_ssr(|ssr| crate::debug::time("ssr render", || ssr.render(RENDER_FN, params)))
+    }
+
+    fn render_stream(
+        params: Option<&str>,
+        on_chunk: impl FnMut(String) + 'static,
+    ) -> Result<(), SsrError> {
+        Self::with_ssr(move |ssr| {
+            crate::debug::time("ssr render", || {
+                ssr.streaming(STREAM_WRITE_FN)?
+                    .render(RENDER_STREAM_FN, params, on_chunk)
+            })
         })
     }
 }
 
 struct DevJs;
 
+/// How long a thread trusts its cached isolate before re-`stat`ing the bundle to
+/// detect a hot-reload. A rebuild is picked up within this window; between checks
+/// we skip the per-request `stat` syscall. A dev vite rebuild takes far longer
+/// than this, so the added staleness is imperceptible.
+const BUNDLE_CHECK_DEBOUNCE: Duration = Duration::from_millis(250);
+
 impl DevJs {
     thread_local! {
         static SSR: RefCell<Option<CachedSsr>> = const { RefCell::new(None) };
+        static LAST_CHECK: Cell<Option<Instant>> = const { Cell::new(None) };
     }
 
-    fn render_to_string(params: Option<&str>) -> Result<String, SsrError> {
-        // Rebuild only when the bundle file changes (a hot-reload writes a new
-        // `dev-server.js`); otherwise reuse the cached isolate.
-        let modified = fs::metadata(DEV_BUNDLE_PATH)
-            .and_then(|meta| meta.modified())
-            .ok();
-
+    /// Run `f` against this thread's cached isolate, rebuilding it when the dev
+    /// bundle changes (debounced). `f` receives `None` when the bundle is missing
+    /// or mid-rebuild, so each caller can serve its own fallback; the closure is
+    /// invoked exactly once so a streaming sink can be captured without conflict.
+    fn with_ssr<R>(f: impl FnOnce(Option<&mut Ssr<'static, 'static>>) -> R) -> R {
         Self::SSR.with(|cell| {
             let mut cache = cell.borrow_mut();
+
+            // Debounce the mtime check: within the window, reuse the cached
+            // isolate without a `stat`. A fresh thread (no cache) always checks.
+            let now = Instant::now();
+            let due = match Self::LAST_CHECK.with(|c| c.get()) {
+                Some(last) => now.duration_since(last) >= BUNDLE_CHECK_DEBOUNCE,
+                None => true,
+            };
+
+            if cache.is_some() && !due {
+                let cached = cache.as_mut().expect("cache is Some");
+                return f(Some(&mut cached.ssr));
+            }
+
+            Self::LAST_CHECK.with(|c| c.set(Some(now)));
+
+            // Rebuild only when the bundle file changes (a hot-reload writes a
+            // new `dev-server.js`); otherwise reuse the cached isolate.
+            let modified = fs::metadata(DEV_BUNDLE_PATH)
+                .and_then(|meta| meta.modified())
+                .ok();
 
             let stale = match &*cache {
                 Some(cached) => cached.modified != modified,
@@ -103,18 +182,43 @@ impl DevJs {
             if stale {
                 match Self::compile(modified) {
                     Some(cached) => *cache = Some(cached),
-                    // Bundle missing or mid-rebuild: drop the cache and serve the
-                    // raw HTML template so the client still boots (and the next
-                    // request recompiles).
+                    // Bundle missing or mid-rebuild: drop the cache and let the
+                    // caller serve the raw HTML template so the client still
+                    // boots (the next request recompiles).
                     None => {
                         *cache = None;
-                        return Ok(Self::fallback(params));
+                        return f(None);
                     }
                 }
             }
 
             let cached = cache.as_mut().expect("SSR was just populated");
-            crate::debug::time("ssr render", || cached.ssr.render_to_string(params))
+            f(Some(&mut cached.ssr))
+        })
+    }
+
+    fn render_to_string(params: Option<&str>) -> Result<String, SsrError> {
+        Self::with_ssr(|ssr| match ssr {
+            Some(ssr) => crate::debug::time("ssr render", || ssr.render(RENDER_FN, params)),
+            None => Ok(Self::fallback(params)),
+        })
+    }
+
+    fn render_stream(
+        params: Option<&str>,
+        mut on_chunk: impl FnMut(String) + 'static,
+    ) -> Result<(), SsrError> {
+        Self::with_ssr(move |ssr| match ssr {
+            Some(ssr) => crate::debug::time("ssr render", || {
+                ssr.streaming(STREAM_WRITE_FN)?
+                    .render(RENDER_STREAM_FN, params, on_chunk)
+            }),
+            // Emit the fallback shell as a single chunk so the streaming path
+            // still boots the client while the bundle is (re)building.
+            None => {
+                on_chunk(Self::fallback(params));
+                Ok(())
+            }
         })
     }
 

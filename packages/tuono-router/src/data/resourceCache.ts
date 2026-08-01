@@ -4,6 +4,32 @@ import type { ServerErrorPayload, TuonoErrorWithSource } from '../types'
 const isServerSide = typeof window === 'undefined'
 
 /**
+ * Baked to `true` by `tuono build --static` (via the vite `define`); the
+ * `typeof` guard keeps this safe under vitest/SSR where the define isn't
+ * applied. In a static export there is no server to resolve the extensionless
+ * `/__tuono/data{path}` route, so data is pre-rendered to `.json` files, keyed
+ * by path only (no query variants).
+ */
+declare const __TUONO_STATIC__: boolean
+const IS_STATIC_EXPORT =
+  typeof __TUONO_STATIC__ !== 'undefined' && __TUONO_STATIC__
+
+/**
+ * The data endpoint URL for a location. In a static export it targets the
+ * pre-rendered `.json` file matching what `tuono build --static` writes (root is
+ * `/__tuono/data.json` to avoid a `data/.json` dotfile); otherwise the live
+ * server's extensionless route, including search params.
+ */
+function dataEndpointUrl({ pathname, searchStr }: LocationKeyParts): string {
+  if (IS_STATIC_EXPORT) {
+    return pathname === '/'
+      ? '/__tuono/data.json'
+      : `/__tuono/data${pathname}.json`
+  }
+  return `/__tuono/data${pathname}${searchStr}`
+}
+
+/**
  * Fulfilled value of a data resource. A redirect is a normal (non-error)
  * outcome so it must NOT reject — rejecting would trigger the error boundary.
  */
@@ -127,9 +153,7 @@ function annotate(promise: Promise<RouteDataResult>): DataResource {
 async function fetchRouteData(
   location: LocationKeyParts,
 ): Promise<RouteDataResult> {
-  const res = await fetch(
-    `/__tuono/data${location.pathname}${location.searchStr}`,
-  )
+  const res = await fetch(dataEndpointUrl(location))
   // Read the body before the `res.ok` check: a panicked handler responds with a
   // 500 that still carries the structured error under `info.serverError` (dev).
   const body = (await res.json().catch(() => null)) as TuonoApiResponse | null

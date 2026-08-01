@@ -122,19 +122,34 @@ pub enum RenderJob {
 
 /// Render a [`RenderJob`] on the SSR pool. `RenderJob` is `Send`, so the handler
 /// future stays `Send` across this await.
+///
+/// The page render streams: the shell is flushed as soon as it is ready and the
+/// remaining chunks follow as the isolate produces them, so a large page's TTFB
+/// no longer waits on the whole render. The HTTP status is fixed before the
+/// first byte — a shell error (no chunk emitted) yields a 500 instead of a
+/// partial 200.
 pub async fn finish_render(job: RenderJob) -> AxumResponse {
+    use crate::render_pool::RenderStream;
+
     match job {
         RenderJob::Ready(response) => response,
         RenderJob::Render {
             payload,
             http_code,
             cookies,
-        } => match crate::render_pool::render(payload).await {
-            Ok(html) => (http_code, cookies, Html(html)).into_response(),
-            Err(_) => (
+        } => match crate::render_pool::render_stream(payload).await {
+            RenderStream::Streaming(body) => (
                 http_code,
                 cookies,
-                Html("500 Internal server error".to_string()),
+                [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+                body,
+            )
+                .into_response(),
+            RenderStream::Empty => (http_code, cookies, Html(String::new())).into_response(),
+            RenderStream::Failed => (
+                http_code,
+                cookies,
+                Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
             )
                 .into_response(),
         },

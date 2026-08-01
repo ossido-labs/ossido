@@ -51,6 +51,22 @@ export interface TuonoConfig {
   }
   logging?: TuonoConfigLogging
   dev?: TuonoConfigDev
+  ssr?: TuonoConfigSsr
+}
+
+/** Server-side rendering options. */
+export interface TuonoConfigSsr {
+  /**
+   * Number of dedicated V8 render-pool threads. Each holds a warm isolate and
+   * renders one request at a time, off the async runtime (which stays free for
+   * I/O). Defaults to the machine's available parallelism (CPU cores), resolved
+   * at runtime.
+   *
+   * Lower it to cap memory on constrained hosts (e.g. `1`); raising it past the
+   * core count only adds contention for CPU-bound rendering. Overridable at
+   * runtime with the `TUONO_SSR_THREADS` environment variable.
+   */
+  renderThreads?: number
 }
 
 /** Development-only tweaks. */

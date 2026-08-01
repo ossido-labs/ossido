@@ -450,3 +450,63 @@ pub fn api_middleware() -> tower_http::cors::CorsLayer {
         ".layer(api_middleware::api_middleware())",
     );
 }
+
+const DYNAMIC_WITH_STATIC_PATHS: &str = "#[tuono_lib::handler]\nasync fn handler(_req: tuono_lib::Request) -> tuono_lib::Response { todo!() }\n#[tuono_lib::static_paths]\nasync fn static_paths(_paths: &mut tuono_lib::StaticPaths) {}\n";
+
+#[test]
+#[serial]
+fn it_wires_the_static_paths_endpoint_for_a_dynamic_route() {
+    let temp_tuono_project = TempTuonoProject::new();
+
+    temp_tuono_project.add_file_with_content(
+        "./src/routes/pokemons/[pokemon]/page.rs",
+        DYNAMIC_WITH_STATIC_PATHS,
+    );
+
+    let mut test_tuono_build = Command::cargo_bin("tuono").unwrap();
+    test_tuono_build
+        .arg("build")
+        .arg("--no-js-emit")
+        .assert()
+        .success();
+
+    let temp_main_rs_content = fs::read_to_string(temp_tuono_project.path().join(".tuono/main.rs"))
+        .expect("Failed to read '.tuono/main.rs' content.");
+
+    // The usual dynamic SSR route…
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/pokemons/{pokemon}", get(pokemons_dyn_pokemon_page::tuono_internal_route))"#,
+    );
+    // …plus the internal static-paths enumeration endpoint, keyed by module.
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/__tuono/static_paths/pokemons_dyn_pokemon_page", get(pokemons_dyn_pokemon_page::tuono_internal_static_paths))"#,
+    );
+}
+
+#[test]
+#[serial]
+fn it_omits_the_static_paths_endpoint_without_the_macro() {
+    let temp_tuono_project = TempTuonoProject::new();
+
+    temp_tuono_project
+        .add_file_with_content("./src/routes/pokemons/[pokemon]/page.rs", HANDLER_FILE);
+
+    let mut test_tuono_build = Command::cargo_bin("tuono").unwrap();
+    test_tuono_build
+        .arg("build")
+        .arg("--no-js-emit")
+        .assert()
+        .success();
+
+    let temp_main_rs_content = fs::read_to_string(temp_tuono_project.path().join(".tuono/main.rs"))
+        .expect("Failed to read '.tuono/main.rs' content.");
+
+    // The dynamic SSR route is present, but no enumeration endpoint is wired.
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/pokemons/{pokemon}", get(pokemons_dyn_pokemon_page::tuono_internal_route))"#,
+    );
+    assert!(!temp_main_rs_content.contains("tuono_internal_static_paths"));
+}

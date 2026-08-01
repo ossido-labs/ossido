@@ -64,11 +64,23 @@ impl Default for LoggingConfig {
     }
 }
 
+/// Server-side rendering config.
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct SsrConfig {
+    /// Number of dedicated V8 render-pool threads. `None` (unset) resolves to the
+    /// machine's available parallelism at runtime; the `TUONO_SSR_THREADS` env
+    /// var overrides this.
+    #[serde(rename = "renderThreads", default)]
+    pub render_threads: Option<usize>,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Config {
     pub server: ServerConfig,
     #[serde(default)]
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub ssr: SsrConfig,
 }
 
 impl Config {
@@ -91,5 +103,31 @@ mod tests {
         assert_eq!(config.server.host, "localhost".to_string());
         assert_eq!(config.server.origin, None);
         assert_eq!(config.server.port, 3000);
+        assert_eq!(config.ssr.render_threads, None);
+    }
+
+    #[test]
+    fn deserializes_ssr_render_threads() {
+        let config: Config = serde_json::from_str(
+            r#"{ "server": { "host": "localhost", "port": 3000, "origin": null }, "ssr": { "renderThreads": 3 } }"#,
+        )
+        .unwrap();
+        assert_eq!(config.ssr.render_threads, Some(3));
+    }
+
+    #[test]
+    fn ssr_defaults_when_absent_or_null() {
+        let base = r#"{ "server": { "host": "localhost", "port": 3000, "origin": null }"#;
+
+        // Missing `ssr` entirely.
+        let config: Config = serde_json::from_str(&format!("{base} }}")).unwrap();
+        assert_eq!(config.ssr.render_threads, None);
+
+        // Present but `renderThreads: null` (the shape the JS normalizer emits).
+        let config: Config = serde_json::from_str(&format!(
+            "{base}, \"ssr\": {{ \"renderThreads\": null }} }}"
+        ))
+        .unwrap();
+        assert_eq!(config.ssr.render_threads, None);
     }
 }

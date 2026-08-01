@@ -4,4 +4,10 @@ import { serverSideRendering } from 'tuono/ssr'
 
 import { routeTree } from './routeTree.gen'
 
-export const renderFn = serverSideRendering(routeTree)
+const renderer = serverSideRendering(routeTree)
+
+// Buffered render (error pages, static export, dev fallback) and streaming
+// render (progressive page responses) are exposed as separate named exports so
+// the Rust runtime can call each by name (`renderFn` / `renderStream`).
+export const renderFn = renderer.renderFn
+export const renderStream = renderer.renderStream

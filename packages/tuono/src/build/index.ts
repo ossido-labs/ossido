@@ -8,8 +8,7 @@ import inject from '@rollup/plugin-inject'
 import { TuonoReactPlugin } from 'tuono-react-vite-plugin'
 import { ErrorOverlayVitePlugin } from 'tuono-ui/vite-plugin'
 
-import type { TuonoConfig } from '../config'
-
+import type { InternalTuonoConfig } from './types'
 import { blockingAsync } from './utils'
 import { createJsonConfig, loadConfig } from './config'
 import { ENV_PREFIX } from './constants'
@@ -61,11 +60,11 @@ const VITE_SSR_PLUGINS: Array<Plugin> = [
 ]
 
 /**
- * From a given {@link TuonoConfig} return a `vite` "mergeable" {@link InlineConfig}
- * including all default tuono related options
+ * From a resolved {@link InternalTuonoConfig} return a `vite` "mergeable"
+ * {@link InlineConfig} including all default tuono related options
  */
 function createBaseViteConfigFromTuonoConfig(
-  tuonoConfig: TuonoConfig,
+  tuonoConfig: InternalTuonoConfig,
 ): InlineConfig {
   /**
    * @warning Keep in sync with {@link LazyLoadingPlugin} tests:
@@ -86,6 +85,14 @@ function createBaseViteConfigFromTuonoConfig(
     cacheDir: 'cache',
     envDir: '../',
     envPrefix: ENV_PREFIX,
+
+    define: {
+      // Baked into the client bundle for `tuono build --static` (the CLI sets
+      // `TUONO_STATIC` for the react build). The router reads it to fetch the
+      // pre-rendered `.json` data files instead of the extensionless
+      // `/__tuono/data{path}` route, which has no server in a static export.
+      __TUONO_STATIC__: JSON.stringify(process.env.TUONO_STATIC === 'true'),
+    },
 
     resolve: {
       alias: tuonoConfig.vite?.alias ?? {},

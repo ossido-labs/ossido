@@ -203,6 +203,7 @@ mod tests {
             path: "/api/health".to_string(),
             is_dynamic: false,
             is_layout: false,
+            has_static_paths: false,
             axum_info: None,
             api_data: Some(ApiData {
                 methods: Vec::new(),

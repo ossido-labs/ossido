@@ -91,5 +91,10 @@ export const normalizeConfig = (config: TuonoConfig): InternalTuonoConfig => {
     dev: {
       criticalCss: config.dev?.criticalCss ?? true,
     },
+    ssr: {
+      // `null` = auto: the Rust runtime uses the machine's available
+      // parallelism (resolving it here would bake in the build machine's cores).
+      renderThreads: config.ssr?.renderThreads ?? null,
+    },
   }
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::http::{HeaderMap, Uri};
 use serde::de::DeserializeOwned;
@@ -36,7 +37,10 @@ impl From<Uri> for Location {
 #[derive(Debug, Clone)]
 pub struct Request {
     pub uri: Uri,
-    pub headers: HeaderMap,
+    /// Wrapped in `Arc` so cloning a `Request` (once per page + once per
+    /// ascendant layout handler) shares the header map instead of deep-copying
+    /// it. Read access (`req.headers.get(..)`) is unchanged via `Deref`.
+    pub headers: Arc<HeaderMap>,
     pub params: HashMap<String, String>,
     body: Option<Vec<u8>>,
 }
@@ -50,7 +54,7 @@ impl Request {
     ) -> Request {
         Request {
             uri,
-            headers,
+            headers: Arc::new(headers),
             params,
             body,
         }
@@ -161,16 +165,17 @@ mod tests {
 
     #[test]
     fn it_correctly_parses_form_data() {
-        let mut request = Request::new(
-            Uri::from_static("http://localhost:3000"),
-            HeaderMap::new(),
-            HashMap::new(),
-            None,
-        );
-
-        request.headers.insert(
+        let mut headers = HeaderMap::new();
+        headers.insert(
             "content-type",
             "application/x-www-form-urlencoded".parse().unwrap(),
+        );
+
+        let mut request = Request::new(
+            Uri::from_static("http://localhost:3000"),
+            headers,
+            HashMap::new(),
+            None,
         );
 
         request.body = Some("name=John+Doe&email=john%40example.com".as_bytes().to_vec());
@@ -185,20 +190,18 @@ mod tests {
 
     #[test]
     fn it_rejects_wrong_form_content_type() {
-        let mut request = Request::new(
-            Uri::from_static("http://localhost:3000"),
-            HeaderMap::new(),
-            HashMap::new(),
-            None,
-        );
-
-        request
-            .headers
-            .insert("content-type", "application/json".parse().unwrap());
-
-        request.headers.insert(
+        let mut headers = HeaderMap::new();
+        headers.insert("content-type", "application/json".parse().unwrap());
+        headers.insert(
             "body",
             "name=John+Doe&email=john%40example.com".parse().unwrap(),
+        );
+
+        let request = Request::new(
+            Uri::from_static("http://localhost:3000"),
+            headers,
+            HashMap::new(),
+            None,
         );
 
         let form_data: Result<FormData, BodyParseError> = request.form_data();
@@ -208,16 +211,17 @@ mod tests {
 
     #[test]
     fn it_handles_missing_form_body() {
-        let mut request = Request::new(
-            Uri::from_static("http://localhost:3000"),
-            HeaderMap::new(),
-            HashMap::new(),
-            None,
-        );
-
-        request.headers.insert(
+        let mut headers = HeaderMap::new();
+        headers.insert(
             "content-type",
             "application/x-www-form-urlencoded".parse().unwrap(),
+        );
+
+        let request = Request::new(
+            Uri::from_static("http://localhost:3000"),
+            headers,
+            HashMap::new(),
+            None,
         );
 
         let form_data: Result<FormData, BodyParseError> = request.form_data();

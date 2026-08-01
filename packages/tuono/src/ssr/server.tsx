@@ -45,6 +45,7 @@ import { MessageChannelPolyfill } from './polyfills/MessageChannel'
 
 import type { ReadableStream } from 'node:stream/web'
 
+import type { JSX } from 'react'
 import { renderToReadableStream } from 'react-dom/server'
 import { createRouter } from 'tuono-router'
 import type { createRoute } from 'tuono-router'
@@ -52,17 +53,31 @@ import type { createRoute } from 'tuono-router'
 import { TuonoEntryPoint } from '../shared/TuonoEntryPoint'
 import type { ServerPayload } from '../types'
 
-import { streamToString } from './utils'
+import { streamToString, createUtf8Streamer } from './utils'
 
 type RouteTree = ReturnType<typeof createRoute>
 
-export function serverSideRendering(routeTree: RouteTree) {
-  return async function render(payload: string | undefined): Promise<string> {
+/**
+ * Chunk sink injected by the Rust `ssr_rs` runtime for streaming renders (see
+ * `Ssr::render_to_stream`). Each call hands one HTML fragment to Rust, which
+ * forwards it to the client immediately instead of buffering the whole page.
+ */
+declare const __ssr_write: ((chunk: string) => void) | undefined
+
+interface ServerSideRenderer {
+  /** Buffered render — resolves the whole page to a single HTML string. */
+  renderFn: (payload: string | undefined) => Promise<string>
+  /** Streaming render — flushes each HTML chunk via `__ssr_write`. */
+  renderStream: (payload: string | undefined) => Promise<void>
+}
+
+export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
+  // Build the React element for a request. Shared by the buffered and streaming
+  // entry points so they render exactly the same tree.
+  const element = (payload: string | undefined): JSX.Element => {
     const serverPayload = (payload ? JSON.parse(payload) : {}) as ServerPayload
-
-    const router = createRouter({ routeTree }) // Render the app
-
-    const stream = await renderToReadableStream(
+    const router = createRouter({ routeTree })
+    return (
       // `rawServerPayload` is the exact JSON Rust already produced; passing it
       // lets `TuonoScripts` embed it verbatim instead of re-stringifying the
       // parsed payload inside V8.
@@ -70,14 +85,47 @@ export function serverSideRendering(routeTree: RouteTree) {
         router={router}
         serverPayload={serverPayload}
         rawServerPayload={payload}
-      />,
+      />
     )
+  }
 
-    await stream.allReady
+  return {
+    /**
+     * Buffered render: resolve the whole page to a single string. Used for
+     * error pages, static export (SSG), `catch_all`, and the dev fallback —
+     * anywhere the caller needs the complete HTML up front.
+     */
+    async renderFn(payload: string | undefined): Promise<string> {
+      const stream = await renderToReadableStream(element(payload))
+      await stream.allReady
+      return await streamToString(
+        // ReadableStream should be implemented in node)
+        stream as unknown as ReadableStream<Uint8Array>,
+      )
+    },
 
-    return await streamToString(
-      // ReadableStream should be implemented in node)
-      stream as unknown as ReadableStream<Uint8Array>,
-    )
+    /**
+     * Streaming render: flush each HTML chunk to Rust via
+     * `__ssr_write` as React produces it, so the shell reaches the
+     * client without waiting for the full page. `renderToReadableStream`
+     * rejects on a *shell* error before any chunk is written, so Rust can still
+     * send a 500 instead of a partial 200 in that case.
+     */
+    async renderStream(payload: string | undefined): Promise<void> {
+      const write = __ssr_write
+      if (typeof write !== 'function') {
+        throw new Error('__ssr_write is not registered by the runtime')
+      }
+
+      const stream = await renderToReadableStream(element(payload))
+
+      const streamer = createUtf8Streamer()
+      for await (const chunk of stream as unknown as ReadableStream<Uint8Array>) {
+        const text = streamer.push(chunk)
+        if (text) write(text)
+      }
+      const tail = streamer.flush()
+      if (tail) write(tail)
+    },
   }
 }

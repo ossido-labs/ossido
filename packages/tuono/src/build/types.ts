@@ -20,11 +20,20 @@ export interface InternalTuonoConfigDev {
   criticalCss: boolean
 }
 
+/**
+ * Fully-resolved SSR config. `renderThreads` is `null` when unset — the Rust
+ * runtime then defaults it to the machine's available parallelism.
+ */
+export interface InternalTuonoConfigSsr {
+  renderThreads: number | null
+}
+
 export interface InternalTuonoConfig extends Omit<
   TuonoConfig,
-  'server' | 'logging' | 'dev'
+  'server' | 'logging' | 'dev' | 'ssr'
 > {
   server: TuonoConfigServer
   logging: InternalTuonoConfigLogging
   dev: InternalTuonoConfigDev
+  ssr: InternalTuonoConfigSsr
 }

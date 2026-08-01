@@ -301,6 +301,17 @@ impl SourceBuilder {
                     r#".route("/__tuono/data{axum_route}", get(__tuono_data_{module_import}))"#
                 ));
             }
+
+            // A dynamic route can expose its `#[static_paths]` enumerator on a
+            // fixed internal endpoint keyed by the (safe, unique) module name, so
+            // `tuono build --static` can fetch the pages to generate. Keyed by
+            // module rather than the pattern because the pattern holds `{param}`
+            // placeholders, which an enumeration endpoint must not.
+            if route.has_static_paths {
+                route_declarations.push_str(&format!(
+                    r#".route("/__tuono/static_paths/{module_import}", get({module_import}::tuono_internal_static_paths))"#
+                ));
+            }
         }
 
         route_declarations.push_str(")\n");

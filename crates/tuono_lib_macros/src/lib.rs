@@ -10,6 +10,7 @@ mod api;
 mod handler;
 mod middleware;
 mod props;
+mod static_paths;
 mod utils;
 
 #[proc_macro_attribute]
@@ -33,6 +34,14 @@ pub fn api(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn middleware(args: TokenStream, item: TokenStream) -> TokenStream {
     middleware::middleware_core(args.into(), item.into()).into()
+}
+
+/// Mark the function in a dynamic route's `page.rs` that enumerates the pages to
+/// statically generate for that route (Tuono's `getStaticPaths`). See
+/// [`tuono_lib::StaticPaths`](../tuono_lib/struct.StaticPaths.html).
+#[proc_macro_attribute]
+pub fn static_paths(args: TokenStream, item: TokenStream) -> TokenStream {
+    static_paths::static_paths_core(args.into(), item.into()).into()
 }
 
 /// Automatically generate typescript's types

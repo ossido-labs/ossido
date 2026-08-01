@@ -21,6 +21,7 @@ describe('createJsonConfig', () => {
         browser: { enabled: true, level: 'info' as const },
       },
       dev: { criticalCss: true },
+      ssr: { renderThreads: null },
     }
 
     await createJsonConfig(sampleConfig)
@@ -41,6 +42,7 @@ describe('createJsonConfig', () => {
         browser: { enabled: true, level: 'info' as const },
       },
       dev: { criticalCss: true },
+      ssr: { renderThreads: null },
     }
 
     await createJsonConfig({ ...sampleConfig, vite: { plugins: [react()] } })
@@ -61,6 +63,7 @@ describe('createJsonConfig', () => {
         browser: { enabled: true, level: 'info' as const },
       },
       dev: { criticalCss: true },
+      ssr: { renderThreads: null },
     }
 
     await createJsonConfig(sampleConfig)

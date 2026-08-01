@@ -20,10 +20,17 @@ pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
         std::process::exit(0);
     }
 
-    if ssg && app.has_dynamic_routes() {
-        // TODO: allow dynamic routes static generation
-        println!("Cannot statically build dynamic routes");
-        std::process::exit(1);
+    if ssg {
+        // Dynamic routes are statically generated from their `#[static_paths]`
+        // enumerator; abort only for those that declare none.
+        let missing = app.dynamic_routes_without_static_paths();
+        if !missing.is_empty() {
+            println!(
+                "Cannot statically generate these dynamic routes — add a #[static_paths] function to each page.rs:\n  {}",
+                missing.join("\n  ")
+            );
+            std::process::exit(1);
+        }
     }
 
     app.build_tuono_config()
@@ -33,7 +40,7 @@ pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
 
     app.check_server_availability(Mode::Prod);
 
-    app.build_react_prod();
+    app.build_react_prod(ssg);
 
     // Remove the spinner
     app_build_spinner.stop_with_message("\u{2705}Build completed".into());

@@ -30,9 +30,9 @@ pub struct Payload<'a> {
     layout_data: Option<&'a HashMap<String, Box<RawValue>>>,
     mode: Mode,
     #[serde(rename(serialize = "jsBundles"))]
-    js_bundles: Option<Vec<String>>,
+    js_bundles: Option<&'a Vec<String>>,
     #[serde(rename(serialize = "cssBundles"))]
-    css_bundles: Option<Vec<String>>,
+    css_bundles: Option<&'a Vec<String>>,
     #[serde(rename(serialize = "devServerConfig"))]
     dev_server_config: Option<&'a ServerConfig>,
     /// Present only when a handler panicked (dev mode). The client seeds the
@@ -99,8 +99,8 @@ impl<'a> Payload<'a> {
     fn add_bundle_sources(&mut self) {
         let manifest = MANIFEST.get().expect("Manifest not loaded");
         let bundles = manifest.get_bundle_from_pathname(self.location.pathname());
-        self.js_bundles = Some(bundles.js_files);
-        self.css_bundles = Some(bundles.css_files);
+        self.js_bundles = Some(&bundles.js_files);
+        self.css_bundles = Some(&bundles.css_files);
     }
 }
 
@@ -196,14 +196,14 @@ mod tests {
         let _ = payload.client_payload();
         assert_eq!(
             payload.js_bundles,
-            Some(vec![
+            Some(&vec![
                 "assets/index-D-yFyCZo.js".to_string(),
                 "assets/client-main-B9g1NVV7.js".to_string()
             ])
         );
         assert_eq!(
             payload.css_bundles,
-            Some(vec![
+            Some(&vec![
                 "assets/index-CynfArjF.css".to_string(),
                 "assets/client-main-BS7N-NIa.css".to_string()
             ])

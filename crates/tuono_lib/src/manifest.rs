@@ -44,6 +44,11 @@ pub struct RouteBundle {
     pub js_files: Vec<String>,
 }
 
+/// Fallback returned by [`Manifest::get_bundle_from_pathname`] when no bundle
+/// matches (in practice unreachable — `client-main` always exists). Static so
+/// the lookup can hand back a borrow instead of cloning a bundle per request.
+static EMPTY_BUNDLE: Lazy<RouteBundle> = Lazy::new(RouteBundle::default);
+
 #[derive(Debug)]
 pub struct Manifest {
     /// The mapping between the route and the bundle
@@ -176,10 +181,10 @@ impl Manifest {
     /// this file (packages/tuono/src/router/components/Matches.ts).
     ///
     /// Optimizations should occour on both.
-    pub fn get_bundle_from_pathname(&self, pathname: &str) -> RouteBundle {
+    pub fn get_bundle_from_pathname(&self, pathname: &str) -> &RouteBundle {
         // Exact match
         if let Some(bundle) = self.bundles.get(pathname) {
-            return bundle.clone();
+            return bundle;
         }
 
         let dynamic_routes = self
@@ -212,7 +217,7 @@ impl Manifest {
                         let route_data = self.bundles.get(&format!("/{manifest_key}"));
 
                         if let Some(data) = route_data {
-                            return data.clone();
+                            return data;
                         }
                         break '_dynamic_routes_loop;
                     }
@@ -233,7 +238,7 @@ impl Manifest {
 
                     let route_data = self.bundles.get(&format!("/{manifest_key}"));
                     if let Some(data) = route_data {
-                        return data.clone();
+                        return data;
                     }
                     break;
                 }
@@ -242,11 +247,11 @@ impl Manifest {
 
         // No dynamic routes, return the client main bundle
         if let Some(bundle) = self.bundles.get("client-main") {
-            return bundle.clone();
+            return bundle;
         }
 
         // This should never happen because client-main always exists
-        RouteBundle::default()
+        &EMPTY_BUNDLE
     }
 }
 

@@ -1,17 +1,31 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use fs_extra::dir::create_all;
 use http::Method;
 use regex::Regex;
-use reqwest::Url;
 use reqwest::blocking::Client;
+use serde::Deserialize;
 use syn::{Attribute, Ident, Item, Meta};
 use tracing::trace;
 
 use crate::macro_attr::is_tuono_attr;
+
+/// One dynamic slot's value in a `#[static_paths]` entry, as returned by the
+/// enumeration endpoint: a single segment (`[param]`) or an ordered list
+/// (`[...catchall]`). Mirrors `tuono_lib::SegmentValue`'s untagged JSON.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+enum SegmentValue {
+    One(String),
+    Many(Vec<String>),
+}
+
+/// The params for one page to generate: slot name → value.
+type ParamSet = HashMap<String, SegmentValue>;
 
 fn has_dynamic_path(route: &str) -> bool {
     let regex = Regex::new(r"\[(.*?)\]").expect("Failed to create the regex");
@@ -185,6 +199,38 @@ pub(crate) fn is_layout_path(path: &str) -> bool {
     path == "/layout" || path.ends_with("/layout")
 }
 
+/// Whether a route file's contents declare a `#[static_paths]` (or
+/// `#[tuono_lib::static_paths]`) enumerator, parsing the AST so comments and
+/// string literals can't produce a false positive. A file that does not parse
+/// yields `false`; the subsequent compile surfaces the syntax error.
+fn file_declares_static_paths(content: &str) -> bool {
+    let Ok(file) = syn::parse_file(content) else {
+        return false;
+    };
+
+    file.items.iter().any(|item| match item {
+        Item::Fn(func) => func
+            .attrs
+            .iter()
+            .any(|attr| is_tuono_attr(attr.path(), "static_paths")),
+        _ => false,
+    })
+}
+
+/// Whether the `page.rs` at `path` declares a `#[static_paths]` enumerator.
+/// Resolves the file relative to the current project (`src/routes{path}.rs`);
+/// a missing/unreadable file simply yields `false`.
+fn route_declares_static_paths(path: &str) -> bool {
+    let Ok(base_path) = std::env::current_dir() else {
+        return false;
+    };
+    let file_path = base_path.join(format!("src/routes{path}.rs"));
+    let Ok(content) = std::fs::read_to_string(&file_path) else {
+        return false;
+    };
+    file_declares_static_paths(&content)
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Route {
     pub path: String,
@@ -193,17 +239,24 @@ pub struct Route {
     /// own — its props are composed into the SSR + data map of every page it
     /// wraps.
     pub is_layout: bool,
+    /// Whether this (dynamic) route's `page.rs` declares a `#[static_paths]`
+    /// enumerator, so `tuono build --static` can generate its concrete pages
+    /// instead of aborting. Only meaningful for dynamic routes.
+    pub has_static_paths: bool,
     pub axum_info: Option<AxumInfo>,
     pub api_data: Option<ApiData>,
 }
 
 impl Route {
     pub fn new(cleaned_path: String) -> Self {
+        let is_dynamic = has_dynamic_path(&cleaned_path);
         Route {
             is_layout: is_layout_path(&cleaned_path),
+            // Only dynamic routes need (and are checked for) an enumerator.
+            has_static_paths: is_dynamic && route_declares_static_paths(&cleaned_path),
             path: cleaned_path.clone(),
             axum_info: None,
-            is_dynamic: has_dynamic_path(&cleaned_path),
+            is_dynamic,
             api_data: ApiData::new(&cleaned_path),
         }
     }
@@ -230,121 +283,216 @@ impl Route {
     }
 
     pub fn save_ssg_file(&self, reqwest: &Client) -> Result<(), String> {
-        // Layouts have no standalone page to statically render.
+        // Layouts have no standalone page; APIs return JSON, not HTML.
         if self.is_api() || self.is_layout {
             return Ok(());
         }
 
-        let path = &self.url_path();
+        // A static route renders a single page at its own URL.
+        if !self.is_dynamic {
+            return self.save_page(reqwest, &self.url_path());
+        }
 
-        let url = format!("http://localhost:3000{path}");
+        // A dynamic route enumerates its pages via `#[static_paths]` (guaranteed
+        // present — `tuono build --static` aborts earlier otherwise). Each param
+        // set is substituted into the route pattern to form one concrete URL.
+        let pattern = self.url_path();
+        for params in self.fetch_static_paths(reqwest)? {
+            let concrete = concrete_path(&pattern, &params)?;
+            self.save_page(reqwest, &concrete)?;
+        }
+        Ok(())
+    }
 
-        trace!("Requesting the page: {}", url);
-        let mut response = match reqwest.get(format!("http://localhost:3000{path}")).send() {
-            Ok(response) => response,
-            Err(_) => return Err(format!("Failed to get the response: {url}")),
-        };
+    /// Fetch the enumerated param sets from this dynamic route's
+    /// `#[static_paths]` endpoint (`/__tuono/static_paths/<module>`).
+    fn fetch_static_paths(&self, reqwest: &Client) -> Result<Vec<ParamSet>, String> {
+        let module = &self
+            .axum_info
+            .as_ref()
+            .ok_or_else(|| format!("Route {} is missing module info", self.path))?
+            .module_import;
 
-        let file_path = self.output_file_path();
+        let url = format!("http://localhost:3000/__tuono/static_paths/{module}");
+        trace!("Requesting static paths: {url}");
 
-        let parent_dir = match file_path.parent() {
-            Some(parent_dir) => parent_dir,
-            None => {
-                return Err(format!("Failed to get the parent directory {file_path:?}"));
-            }
-        };
+        let response = reqwest
+            .get(&url)
+            .send()
+            .map_err(|_| format!("Failed to fetch static paths: {url}"))?;
 
-        if !parent_dir.is_dir()
-            && let Err(err) = create_all(parent_dir, false)
-        {
+        if !response.status().is_success() {
             return Err(format!(
-                "Failed to create the parent directory {parent_dir:?}\nError: {err}"
+                "The static_paths endpoint returned {} for {}",
+                response.status(),
+                self.url_path()
             ));
         }
 
-        trace!("Saving the HTML file: {:?}", file_path);
+        response.json::<Vec<ParamSet>>().map_err(|err| {
+            format!(
+                "Failed to parse static paths for {}: {err}",
+                self.url_path()
+            )
+        })
+    }
 
-        let mut file = match File::create(&file_path) {
-            Ok(file) => file,
-            Err(_) => return Err(format!("Failed to create the file: {file_path:?}")),
-        };
+    /// Render one concrete page (`path`) and, when the route has a server
+    /// handler, its data endpoint — saving both under `out/static`.
+    fn save_page(&self, reqwest: &Client, path: &str) -> Result<(), String> {
+        let url = format!("http://localhost:3000{path}");
 
-        if io::copy(&mut response, &mut file).is_err() {
-            return Err(format!("Failed to write the file: {file_path:?}"));
-        }
+        trace!("Requesting the page: {url}");
+        let mut response = reqwest
+            .get(&url)
+            .send()
+            .map_err(|_| format!("Failed to get the response: {url}"))?;
 
-        // Saving also the server response
+        let file_path = self.output_file_path(path);
+        trace!("Saving the HTML file: {file_path:?}");
+        write_response_to_file(&mut response, &file_path)?;
+
+        // Saving also the server response (the route's data endpoint).
         if self.axum_info.is_some() {
             trace!("The route is an axum route, saving the JSON file");
 
-            let data_file_path = PathBuf::from(&format!("out/static/__tuono/data{path}.json"));
+            // Request from the live server using the raw path so it matches the
+            // codegen'd `/__tuono/data{axum_route}` route — including the root's
+            // trailing slash (`/__tuono/data/`).
+            let data_url = format!("http://localhost:3000/__tuono/data{path}");
+            trace!("Requesting the JSON file: {data_url}");
+            let mut response = reqwest
+                .get(&data_url)
+                .send()
+                .map_err(|_| format!("Failed to get the response: {data_url}"))?;
 
-            let data_parent_dir = match data_file_path.parent() {
-                Some(parent_dir) => parent_dir,
-                None => {
-                    return Err(format!(
-                        "Failed to get the parent directory {data_file_path:?}"
-                    ));
-                }
-            };
-
-            if !data_parent_dir.is_dir()
-                && let Err(err) = create_all(data_parent_dir, false)
-            {
-                return Err(format!(
-                    "Failed to create the parent directory {data_parent_dir:?}\n Error: {err}"
-                ));
-            }
-
-            let base = Url::parse("http://localhost:3000/__tuono/data").unwrap();
-
-            let path = if path == "/" { "" } else { path };
-
-            let pathname = &format!("/__tuono/data{path}");
-
-            let url = base
-                .join(pathname)
-                .expect("Failed to build the reqwest URL");
-
-            trace!("Requesting the JSON file: {}", url);
-
-            let mut response = match reqwest.get(url.clone()).send() {
-                Ok(response) => {
-                    trace!("Successfully got the response for: {url}");
-                    response
-                }
-                Err(_) => return Err(format!("Failed to get the response: {url}")),
-            };
-
-            let mut data_file = match File::create(&data_file_path) {
-                Ok(file) => file,
-                Err(_) => {
-                    return Err(format!(
-                        "Failed to create the JSON file: {data_file_path:?}"
-                    ));
-                }
-            };
-
-            if io::copy(&mut response, &mut data_file).is_err() {
-                return Err("Failed to write the JSON file".to_string());
-            }
+            write_response_to_file(&mut response, &static_data_file_path(path))?;
         }
 
         Ok(())
     }
 
-    fn output_file_path(&self) -> PathBuf {
-        let cleaned_path = self.url_path();
-
+    fn output_file_path(&self, url_path: &str) -> PathBuf {
         if NO_HTML_EXTENSIONS
             .iter()
             .any(|extension| self.path.ends_with(extension))
         {
-            return PathBuf::from(format!("out/static{cleaned_path}"));
+            return PathBuf::from(format!("out/static{url_path}"));
         }
 
-        PathBuf::from(format!("out/static{cleaned_path}/index.html"))
+        PathBuf::from(format!("out/static{url_path}/index.html"))
     }
+}
+
+/// Substitute a `#[static_paths]` param set into a dynamic route pattern to form
+/// one concrete URL, validating that every `[…]` slot is filled with the right
+/// kind of value and that no extra params are supplied. `[name]` consumes a
+/// single segment; `[...name]` consumes an ordered list of segments.
+fn concrete_path(pattern: &str, params: &ParamSet) -> Result<String, String> {
+    let mut out = String::new();
+    let mut consumed = 0usize;
+
+    for segment in pattern.split('/').filter(|segment| !segment.is_empty()) {
+        if let Some(name) = segment
+            .strip_prefix("[...")
+            .and_then(|rest| rest.strip_suffix(']'))
+        {
+            match params.get(name) {
+                Some(SegmentValue::Many(segments)) => {
+                    for part in segments {
+                        out.push('/');
+                        out.push_str(part);
+                    }
+                }
+                Some(SegmentValue::One(_)) => {
+                    return Err(format!(
+                        "static_paths for '{pattern}': catch-all '[...{name}]' needs a list of segments, got a single value"
+                    ));
+                }
+                None => {
+                    return Err(format!(
+                        "static_paths for '{pattern}': missing catch-all param '{name}'"
+                    ));
+                }
+            }
+            consumed += 1;
+        } else if let Some(name) = segment
+            .strip_prefix('[')
+            .and_then(|rest| rest.strip_suffix(']'))
+        {
+            match params.get(name) {
+                Some(SegmentValue::One(value)) => {
+                    out.push('/');
+                    out.push_str(value);
+                }
+                Some(SegmentValue::Many(_)) => {
+                    return Err(format!(
+                        "static_paths for '{pattern}': param '[{name}]' needs a single segment, got a list"
+                    ));
+                }
+                None => {
+                    return Err(format!(
+                        "static_paths for '{pattern}': missing param '{name}'"
+                    ));
+                }
+            }
+            consumed += 1;
+        } else {
+            out.push('/');
+            out.push_str(segment);
+        }
+    }
+
+    if consumed != params.len() {
+        return Err(format!(
+            "static_paths for '{pattern}': entry has {} param(s) but the route has {consumed} dynamic slot(s)",
+            params.len()
+        ));
+    }
+
+    if out.is_empty() {
+        out.push('/');
+    }
+    Ok(out)
+}
+
+/// Output file for a page's data JSON, matching the URL the router fetches in a
+/// static export (`resourceCache`'s static-mode URL): `out/static/__tuono/data{path}.json`,
+/// with the root written as `data.json` (not `data/.json`) to avoid a dotfile /
+/// dir-vs-file clash.
+fn static_data_file_path(path: &str) -> PathBuf {
+    if path == "/" {
+        PathBuf::from("out/static/__tuono/data.json")
+    } else {
+        PathBuf::from(format!("out/static/__tuono/data{path}.json"))
+    }
+}
+
+/// Create `file_path`'s parent directory (if needed) and stream `response` into
+/// it. Shared by the page-HTML and data-JSON writes.
+fn write_response_to_file(
+    response: &mut reqwest::blocking::Response,
+    file_path: &Path,
+) -> Result<(), String> {
+    let Some(parent_dir) = file_path.parent() else {
+        return Err(format!("Failed to get the parent directory {file_path:?}"));
+    };
+
+    if !parent_dir.is_dir()
+        && let Err(err) = create_all(parent_dir, false)
+    {
+        return Err(format!(
+            "Failed to create the parent directory {parent_dir:?}\nError: {err}"
+        ));
+    }
+
+    let mut file =
+        File::create(file_path).map_err(|_| format!("Failed to create the file: {file_path:?}"))?;
+
+    io::copy(response, &mut file)
+        .map_err(|_| format!("Failed to write the file: {file_path:?}"))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -382,6 +530,32 @@ mod tests {
     #[test]
     fn parse_api_methods_returns_empty_for_unparseable_input() {
         assert!(parse_api_methods("#[api(GET)] this is not valid rust {{{").is_empty());
+    }
+
+    #[test]
+    fn detects_static_paths_in_both_imported_and_qualified_forms() {
+        assert!(file_declares_static_paths(
+            "#[static_paths]\nasync fn static_paths(paths: &mut StaticPaths) {}"
+        ));
+        assert!(file_declares_static_paths(
+            "#[tuono_lib::static_paths]\nasync fn sp(paths: &mut StaticPaths) {}"
+        ));
+    }
+
+    #[test]
+    fn does_not_detect_static_paths_when_absent_or_unparseable() {
+        // A handler-only file has no enumerator.
+        assert!(!file_declares_static_paths(
+            "#[handler]\nasync fn get_server_side_props(req: Request) -> Response { todo!() }"
+        ));
+        // A `static_paths(...)` call in a body must not be picked up.
+        assert!(!file_declares_static_paths(
+            "async fn f() { let _ = static_paths(); }"
+        ));
+        // Unparseable input yields false rather than panicking.
+        assert!(!file_declares_static_paths(
+            "#[static_paths] not valid rust {{{"
+        ));
     }
 
     #[test]
@@ -443,7 +617,89 @@ mod tests {
         for (path, html) in routes {
             let route = Route::new(path.to_string());
 
-            assert_eq!(route.output_file_path(), PathBuf::from(html))
+            assert_eq!(
+                route.output_file_path(&route.url_path()),
+                PathBuf::from(html)
+            )
         }
+    }
+
+    fn param_set(entries: &[(&str, SegmentValue)]) -> ParamSet {
+        entries
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn concrete_path_substitutes_single_and_catchall_slots() {
+        // Single dynamic param.
+        assert_eq!(
+            concrete_path(
+                "/pokemons/[pokemon]",
+                &param_set(&[("pokemon", SegmentValue::One("pikachu".into()))]),
+            ),
+            Ok("/pokemons/pikachu".to_string())
+        );
+
+        // Catch-all expands to multiple segments.
+        assert_eq!(
+            concrete_path(
+                "/docs/[...slug]",
+                &param_set(&[(
+                    "slug",
+                    SegmentValue::Many(vec!["getting-started".into(), "install".into()]),
+                )]),
+            ),
+            Ok("/docs/getting-started/install".to_string())
+        );
+
+        // A param and a catch-all in one route.
+        assert_eq!(
+            concrete_path(
+                "/[param]/[...catchall]",
+                &param_set(&[
+                    ("param", SegmentValue::One("hello".into())),
+                    ("catchall", SegmentValue::Many(vec!["a".into(), "b".into()])),
+                ]),
+            ),
+            Ok("/hello/a/b".to_string())
+        );
+    }
+
+    #[test]
+    fn concrete_path_validates_missing_wrong_kind_and_extra_params() {
+        // Missing param.
+        assert!(concrete_path("/pokemons/[pokemon]", &param_set(&[])).is_err());
+
+        // Single value given for a catch-all slot.
+        assert!(
+            concrete_path(
+                "/docs/[...slug]",
+                &param_set(&[("slug", SegmentValue::One("a".into()))]),
+            )
+            .is_err()
+        );
+
+        // List given for a single-segment slot.
+        assert!(
+            concrete_path(
+                "/pokemons/[pokemon]",
+                &param_set(&[("pokemon", SegmentValue::Many(vec!["a".into(), "b".into()]))]),
+            )
+            .is_err()
+        );
+
+        // Extra param that no slot consumes.
+        assert!(
+            concrete_path(
+                "/pokemons/[pokemon]",
+                &param_set(&[
+                    ("pokemon", SegmentValue::One("pikachu".into())),
+                    ("extra", SegmentValue::One("x".into())),
+                ]),
+            )
+            .is_err()
+        );
     }
 }

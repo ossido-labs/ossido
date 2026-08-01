@@ -32,6 +32,7 @@ describe('normalizeConfig', () => {
         browser: { enabled: true, level: 'info' },
       },
       dev: { criticalCss: true },
+      ssr: { renderThreads: null },
     })
   })
 
@@ -55,6 +56,7 @@ describe('normalizeConfig', () => {
         browser: { enabled: true, level: 'info' },
       },
       dev: { criticalCss: true },
+      ssr: { renderThreads: null },
     })
   })
 
@@ -191,6 +193,26 @@ describe('normalizeConfig', () => {
       expect(normalizeConfig(config)).toStrictEqual(
         expect.objectContaining({
           dev: { criticalCss: false },
+        }),
+      )
+    })
+  })
+
+  describe('ssr', () => {
+    it('should default renderThreads to null (auto)', () => {
+      expect(normalizeConfig({})).toStrictEqual(
+        expect.objectContaining({
+          ssr: { renderThreads: null },
+        }),
+      )
+    })
+
+    it('should honour renderThreads set by the user', () => {
+      const config: TuonoConfig = { ssr: { renderThreads: 4 } }
+
+      expect(normalizeConfig(config)).toStrictEqual(
+        expect.objectContaining({
+          ssr: { renderThreads: 4 },
         }),
       )
     })

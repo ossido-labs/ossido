@@ -64,8 +64,14 @@ export function RouterProvider({
       <Matches mode={mode} />
       {/* Dev-only: the floating overlay host that surfaces every kind of dev
           error (render/SSR panics, uncaught errors, rejections, Vite build
-          errors). Renders null until something is reported. */}
-      {mode === 'Dev' && <DevErrorOverlayHost />}
+          errors). Renders null until something is reported.
+
+          `import.meta.env.DEV` is a build-time constant (true only in the dev
+          bundle), so the prod build eliminates this branch and tree-shakes the
+          entire overlay — including its heavy Shiki syntax-highlighter — out of
+          the prod client and SSR bundles. The runtime `mode` check is kept for
+          the dev bundle. */}
+      {import.meta.env.DEV && mode === 'Dev' && <DevErrorOverlayHost />}
     </RouterContextProvider>
   )
 }

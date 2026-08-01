@@ -18,6 +18,7 @@ mod server;
 mod server_error;
 mod services;
 mod ssr;
+mod static_paths;
 mod vite_reverse_proxy;
 mod vite_websocket_proxy;
 
@@ -35,7 +36,8 @@ pub use response::{
 pub use server::{Server, tuono_internal_init_v8_platform};
 pub use server_error::{ErrorSource, ServerError, catch_handler};
 pub use ssr_rs::Ssr;
+pub use static_paths::{SegmentValue, StaticParams, StaticPaths};
 pub use tokio;
 // `Props` is re-exported both as the struct (from `response`) and as this derive
 // macro — the same name in two namespaces, like `serde::Serialize`.
-pub use tuono_lib_macros::{Props, Type, api, handler, middleware};
+pub use tuono_lib_macros::{Props, Type, api, handler, middleware, static_paths};

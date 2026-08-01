@@ -61,8 +61,8 @@ impl MockTuonoServer {
         let original_dir = env::current_dir().expect("Failed to read current_dir");
         let temp_dir = tempdir().expect("Failed to create temp_dir");
 
-        let react_prod_build = fs::read_to_string("./tests/assets/fake_react_build.js")
-            .expect("Failed to read fake_react_build.js");
+        let ssr_bundle = fs::read_to_string("./tests/assets/fake_ssr_bundle.js")
+            .expect("Failed to read fake_ssr_bundle.js");
 
         env::set_current_dir(temp_dir.path()).expect("Failed to change current dir into temp_dir");
 
@@ -71,7 +71,7 @@ impl MockTuonoServer {
             r#"{"server": {"host": "127.0.0.1", "port": 0}}"#,
         );
 
-        add_file_with_content("./out/server/prod-server.js", react_prod_build.as_str());
+        add_file_with_content("./out/server/prod-server.js", ssr_bundle.as_str());
 
         add_file_with_content(
             "./out/client/.vite/manifest.json",

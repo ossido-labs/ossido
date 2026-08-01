@@ -41,7 +41,9 @@ test('surfaces a render error as a floating overlay and recovers on retry', asyn
 
   const overlay = page.locator('.tuono-err-window')
   await expect(overlay).toBeVisible()
-  await expect(page.locator('.tuono-err-pager-kind')).toHaveText('Runtime error')
+  await expect(page.locator('.tuono-err-pager-kind')).toHaveText(
+    'Runtime error',
+  )
   await expect(page.locator('.tuono-err-message')).toContainText(
     'a component threw during render',
   )
