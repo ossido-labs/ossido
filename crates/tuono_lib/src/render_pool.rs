@@ -24,7 +24,7 @@ use std::sync::OnceLock;
 
 use axum::body::Body;
 use crossbeam_channel::{Sender, unbounded};
-use futures_util::stream;
+use futures_util::stream::{self, StreamExt};
 use ssr_rs::SsrError;
 use tokio::sync::{mpsc, oneshot};
 
@@ -187,18 +187,26 @@ pub async fn render_stream(payload: String) -> RenderStream {
     // Yield the buffered first chunk, then drain the channel until the terminal
     // result. A mid-stream error ends the body (the client keeps the partial
     // page) — the status is already committed.
-    let body = Body::from_stream(stream::unfold(
-        (Some(first), chunk_rx),
-        |(first, mut chunk_rx)| async move {
-            if let Some(first) = first {
-                return Some((Ok::<String, Infallible>(first), (None, chunk_rx)));
-            }
-            match chunk_rx.recv().await {
-                Some(StreamMsg::Chunk(chunk)) => Some((Ok(chunk), (None, chunk_rx))),
-                Some(StreamMsg::Done(_)) | None => None,
-            }
-        },
-    ));
+    //
+    // `.fuse()` is required: `unfold` panics if polled after it returns `None`,
+    // and some body consumers (e.g. `tower_http`'s `CompressionLayer`) poll once
+    // more after completion to flush. Fusing makes the stream return `None`
+    // indefinitely instead.
+    let body = Body::from_stream(
+        stream::unfold(
+            (Some(first), chunk_rx),
+            |(first, mut chunk_rx)| async move {
+                if let Some(first) = first {
+                    return Some((Ok::<String, Infallible>(first), (None, chunk_rx)));
+                }
+                match chunk_rx.recv().await {
+                    Some(StreamMsg::Chunk(chunk)) => Some((Ok(chunk), (None, chunk_rx))),
+                    Some(StreamMsg::Done(_)) | None => None,
+                }
+            },
+        )
+        .fuse(),
+    );
 
     RenderStream::Streaming(body)
 }

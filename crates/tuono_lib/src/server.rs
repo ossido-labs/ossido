@@ -1,5 +1,6 @@
 use axum::routing::{Router, get, post};
 use ssr_rs::Ssr;
+use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use tuono_internal::config::Config;
 use tuono_internal::log::{self, Level};
@@ -146,7 +147,12 @@ impl Server {
                 .fallback_service(
                     ServeDir::new(PROD_PUBLIC_DIR)
                         .fallback(get(catch_all).layer(LoggerLayer::new())),
-                );
+                )
+                // Outermost: compress dynamic SSR HTML and static assets on the
+                // way out (negotiated via `Accept-Encoding`). Responses that are
+                // already encoded — the static-route cache serves pre-brotli'd
+                // `Content-Encoding: br` bytes — are passed through untouched.
+                .layer(CompressionLayer::new());
 
             axum::serve(self.listener, router)
                 .await
