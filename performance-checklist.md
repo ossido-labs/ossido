@@ -181,16 +181,78 @@ Before optimising, attribute where request time actually goes:
   the request path to the idle startup window; without pre-warm one such slow
   request is paid per pool thread).
   _Remaining:_ a V8 startup snapshot (compile once → snapshot → cheap per-isolate
-  restore, also sharing compiled state to cut memory) — depends on an `ssr_rs`
-  capability, deferred.
-  _Impact: medium (cold start / memory) · Effort: medium · Risk: medium._
+  restore) — depends on an `ssr_rs` capability. **DEPRIORITISED after measuring.**
 
-- [ ] **8. SSG for static routes / HTML micro-cache.**
-      In prod, static (`○`) routes still render through V8 on every request
-      (`server.rs` falls through to `catch_all`). Pre-render data-less routes to HTML
-      at build time and serve them as files (skip V8 entirely), or add a short-TTL
-      HTML cache keyed by path+payload for hot pages.
-      _Impact: high for static-heavy apps · Effort: high · Risk: medium._
+  **Measured (2026-08-01, `examples/isolate_memory.rs`)** — process RSS vs live
+  isolate count, one real thread per isolate, 618 KB react+router bundle:
+
+  | isolates | RSS | Δ | marginal / new isolate |
+  | -------- | ------ | ------- | ---------------------- |
+  | 0        | 9 MB   | —       | —                      |
+  | 1        | 24 MB  | 15 MB   | 15 MB (one-time setup) |
+  | 4        | 45 MB  | 36 MB   | ~6.7 MB                |
+  | 16       | 116 MB | 107 MB  | **~5.6 MB**            |
+
+  Memory scales linearly at **~6 MB/isolate**, so the default (= core count) pool
+  holds ~100 MB of isolates on a 16-core box. **But a startup snapshot would not
+  reclaim it:** V8 snapshots share startup *CPU*, not resident *heap* — each
+  isolate deserialises its own copy of the bytecode + initialised objects into its
+  private heap. The only cross-isolate heap sharing V8 does (read-only builtins)
+  is already happening (the marginal falls 15 → 5.6 MB as N grows). So a snapshot
+  buys only the ~104 ms compile, which **pre-warm already moved off the request
+  path** — net user-facing win ≈ 0. The existing lever for memory-constrained
+  hosts is lowering `ssr.renderThreads` (already supported).
+  _Verdict: not worth the `SnapshotCreator` effort. Impact: low (startup only) ·
+  Effort: medium · Risk: medium._
+
+- [x] **8. HTML cache for static routes.** DONE (2026-08-01) — shipped the
+      in-memory cache rather than build-time pre-render: static (`○`) routes have
+      no server handler, so they all fall through to `catch_all`, whose render
+      depends only on the request URI (payload = `{ location, mode, js/cssBundles }`,
+      no headers/data). That makes the output deterministic per URI and safe to
+      cache forever. `catch_all` (`catch_all.rs`) now keeps a prod-only,
+      URI-keyed, bounded (`OnceLock<RwLock<HashMap<String, Bytes>>>`, cap 4096)
+      cache: first hit renders on the pool + caches; every later hit serves the
+      cached `Bytes` (cheap `Arc` clone) with no V8. Prod-only (a dev hot-reload
+      would stale it); capped so a 404 flood (unmatched URLs also hit `catch_all`)
+      can't grow memory without bound.
+
+  **Measured (prod fixture, 16-core, before → after):**
+
+  | `/heavy` (177 KB `○` route) | before (V8/req) | after (cached) |
+  | --------------------------- | --------------- | -------------- |
+  | throughput (c=16)           | ~1.0k req/s     | **~13.8k req/s** (~13×) |
+  | p99 under load              | 81 ms           | **2.4 ms**     |
+  | first request               | 17 ms           | 17 ms, then 0 ms |
+
+  The cached heavy route is now **bandwidth-bound** (177 KB × 13.8k ≈ 2.4 GB/s),
+  not V8-bound. Light `○` routes were already at the no-V8 ceiling, so the cache
+  is a no-op win there (correctly). Verified: e2e 8/8, `tuono_lib` tests pass with
+  the cache active (mock server runs `Mode::Prod`).
+
+  _Follow-ups (optional):_ (a) eager pre-warm — render all `○` routes at startup
+  so even the first request skips V8; (b) build-time pre-render to `out/static`
+  files for CDN/edge serving (the `--static` machinery already does the render).
+  Neither is needed for the throughput win, which the runtime cache fully captures.
+  _Impact: high for heavy static routes · Effort: low (shipped) · Risk: low._
+
+  **Measured (2026-08-01, prod fixture, 16-core box, `scratchpad/load.mjs`)** —
+  headroom is entirely a function of a route's render cost (page weight):
+
+  | route (static `○`)        | resp size | c=1 (render) | throughput ceiling | p99 @ load |
+  | ------------------------- | --------- | ------------ | ------------------ | ---------- |
+  | `/second-route` (trivial) | 515 B     | 0.2 ms       | ~30k req/s (c=50)  | 4.8 ms     |
+  | `/heavy` (1500 rows)      | 177 KB    | 4.7 ms       | **~1.0k req/s** (c=16, saturated) | 81 ms |
+  | `/__tuono/data` (no V8)   | ~5 KB     | 0.3 ms       | ~29k req/s (c=50)  | 4.9 ms     |
+
+  Takeaway: a **trivial** static route already runs at the no-V8 ceiling (~30k
+  req/s) — V8 render (~0.2 ms) is noise, so #8 buys **nothing** there. A **heavy**
+  static route saturates the 16-isolate pool at **~1k req/s** — ~27× below the
+  no-V8 ceiling — with p99 ballooning to 81 ms under load. So #8's win is real but
+  **concentrated in moderate/heavy static pages** (render > ~0.5 ms, i.e. more than
+  a few KB of output); it does nothing for light pages. Worth building for
+  content/docs-style apps; low value for light-page apps.
+  _Revised: Impact high **only for heavy static routes** · Effort high · Risk medium._
 
   Note: this item is about the **dynamic prod server** serving static routes
   without V8. The separate **static export** (`tuono build --static`) is a
