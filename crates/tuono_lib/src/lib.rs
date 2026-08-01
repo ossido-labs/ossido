@@ -11,6 +11,7 @@ mod logger;
 mod manifest;
 mod mode;
 mod payload;
+mod render_pool;
 mod request;
 mod response;
 mod server;
@@ -28,8 +29,8 @@ pub use mode::Mode;
 pub use payload::Payload;
 pub use request::Request;
 pub use response::{
-    HandlerData, Props, Response, chain_json, error_json, render_chain, render_error_to_string,
-    resolve_handler,
+    HandlerData, Props, RenderJob, Response, chain_json, error_json, error_render_job,
+    finish_render, render_chain, render_error_to_string, resolve_handler,
 };
 pub use server::{Server, tuono_internal_init_v8_platform};
 pub use server_error::{ErrorSource, ServerError, catch_handler};

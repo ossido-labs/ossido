@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use erased_serde::Serialize;
 use serde::Serialize as SerdeSerialize;
+use serde_json::value::RawValue;
 use tuono_internal::config::ServerConfig;
 
 use crate::config::GLOBAL_CONFIG;
@@ -24,7 +27,7 @@ pub struct Payload<'a> {
         rename(serialize = "layoutData"),
         skip_serializing_if = "Option::is_none"
     )]
-    layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
+    layout_data: Option<&'a HashMap<String, Box<RawValue>>>,
     mode: Mode,
     #[serde(rename(serialize = "jsBundles"))]
     js_bundles: Option<Vec<String>>,
@@ -71,7 +74,7 @@ impl<'a> Payload<'a> {
     pub fn new_with_layout(
         req: &'a Request,
         data: &'a dyn Serialize,
-        layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
+        layout_data: Option<&'a HashMap<String, Box<RawValue>>>,
     ) -> Payload<'a> {
         let mut payload = Payload::new(req, data);
         payload.layout_data = layout_data;

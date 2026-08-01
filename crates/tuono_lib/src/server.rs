@@ -118,6 +118,10 @@ impl Server {
     pub async fn start(self) {
         self.display_start_message();
 
+        // Spawn the SSR render pool up front so its threads (and warm isolates)
+        // are ready before the first request, rather than lazily on first render.
+        crate::render_pool::init();
+
         if self.mode == Mode::Dev {
             let router = self
                 .router

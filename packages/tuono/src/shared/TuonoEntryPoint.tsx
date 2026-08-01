@@ -10,15 +10,21 @@ import { RouterContextProviderWrapper } from './RouterContextProviderWrapper'
 interface TuonoEntryPointProps {
   router: RouterInstanceType
   serverPayload?: ServerPayload
+  /** The raw payload JSON (server render only) — see {@link TuonoContext}. */
+  rawServerPayload?: string
 }
 
 export function TuonoEntryPoint({
   router,
   serverPayload,
+  rawServerPayload,
 }: TuonoEntryPointProps): JSX.Element {
   return (
     <StrictMode>
-      <TuonoContextProvider serverPayload={serverPayload}>
+      <TuonoContextProvider
+        serverPayload={serverPayload}
+        rawServerPayload={rawServerPayload}
+      >
         <RouterContextProviderWrapper router={router} />
       </TuonoContextProvider>
     </StrictMode>

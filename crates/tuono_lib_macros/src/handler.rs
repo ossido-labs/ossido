@@ -113,10 +113,14 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
            // (dev) or as a detail-free 500 (prod) rather than dropping the request.
            // `Response::from` lets the handler return either a `Response` or any
            // type that derives `tuono_lib::Props`.
-           match tuono_lib::catch_handler(#fn_name(req.clone(), #argument_names)).await {
-               Ok(response) => tuono_lib::Response::from(response).render_to_string(req).into_response(),
-               Err(server_error) => tuono_lib::render_error_to_string(req, server_error),
-           }
+           // Turn the handler result into a `Send` render job *synchronously*
+           // (the `Response` and the `Result` scrutinee both hold non-`Send`
+           // props, so no await may span this match), then await the render.
+           let render_job = match tuono_lib::catch_handler(#fn_name(req.clone(), #argument_names)).await {
+               Ok(response) => tuono_lib::Response::from(response).into_render_job(req),
+               Err(server_error) => tuono_lib::error_render_job(req, server_error),
+           };
+           tuono_lib::finish_render(render_job).await.into_response()
         }
 
         pub async fn tuono_internal_api(

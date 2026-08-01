@@ -445,7 +445,7 @@ impl SourceBuilder {
                         {join_futures}
                     );
                     let layouts = vec![{layout_entries}];
-                    tuono_lib::render_chain(req, page, layouts)
+                    tuono_lib::render_chain(req, page, layouts).await
                 }}
 
                 async fn __tuono_data_{page_module}(

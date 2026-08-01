@@ -1,12 +1,14 @@
+use std::collections::HashMap;
+
 use axum::Json;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response as AxumResponse};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use erased_serde::Serialize;
+use serde_json::value::RawValue;
 
 use crate::mode::{GLOBAL_MODE, Mode};
 use crate::server_error::ServerError;
-use crate::ssr::Js;
 use crate::{Payload, Request};
 
 const INTERNAL_SERVER_ERROR_HTML: &str = "500 Internal server error";
@@ -29,33 +31,43 @@ struct JsonErrorInfo {
 /// Render the SSR error page for a panicked handler. In development the page
 /// boots the client with the error payload so the overlay renders; in
 /// production it returns a detail-free `500` (no source/stack leaked).
-pub fn render_error_to_string(req: Request, error: ServerError) -> AxumResponse {
+/// Build a `Send` [`RenderJob`] for a panicked handler's error page,
+/// synchronously (serializing the error payload). Used by the handler macro so
+/// the non-`Send` work happens before any await.
+pub fn error_render_job(req: Request, error: ServerError) -> RenderJob {
     // Surface the error in the server console (pretty template / json).
     error.log();
 
     let mode = *GLOBAL_MODE.get().expect("Failed to get GLOBAL_MODE");
 
     if mode == Mode::Prod {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
-        )
-            .into_response();
+        return RenderJob::Ready(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
+            )
+                .into_response(),
+        );
     }
 
-    let mut payload = Payload::new_with_error(&req, error);
-    match payload
-        .client_payload()
-        .ok()
-        .and_then(|payload| Js::render_to_string(Some(&payload)).ok())
-    {
-        Some(html) => (StatusCode::INTERNAL_SERVER_ERROR, Html(html)).into_response(),
-        None => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
-        )
-            .into_response(),
+    match Payload::new_with_error(&req, error).client_payload() {
+        Ok(payload) => RenderJob::Render {
+            payload,
+            http_code: StatusCode::INTERNAL_SERVER_ERROR,
+            cookies: CookieJar::new(),
+        },
+        Err(_) => RenderJob::Ready(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
+            )
+                .into_response(),
+        ),
     }
+}
+
+pub async fn render_error_to_string(req: Request, error: ServerError) -> AxumResponse {
+    finish_render(error_render_job(req, error)).await
 }
 
 /// JSON error response for a panicked handler on the data endpoint. In
@@ -96,6 +108,39 @@ pub enum Response {
     Custom((StatusCode, HeaderMap, String)),
 }
 
+/// A fully `Send` render job produced by [`Response::into_render_job`]. Either an
+/// already-finished response (redirect / custom / serialization error) or a
+/// serialized payload ready to be rendered on the pool.
+pub enum RenderJob {
+    Ready(AxumResponse),
+    Render {
+        payload: String,
+        http_code: StatusCode,
+        cookies: CookieJar,
+    },
+}
+
+/// Render a [`RenderJob`] on the SSR pool. `RenderJob` is `Send`, so the handler
+/// future stays `Send` across this await.
+pub async fn finish_render(job: RenderJob) -> AxumResponse {
+    match job {
+        RenderJob::Ready(response) => response,
+        RenderJob::Render {
+            payload,
+            http_code,
+            cookies,
+        } => match crate::render_pool::render(payload).await {
+            Ok(html) => (http_code, cookies, Html(html)).into_response(),
+            Err(_) => (
+                http_code,
+                cookies,
+                Html("500 Internal server error".to_string()),
+            )
+                .into_response(),
+        },
+    }
+}
+
 #[derive(serde::Serialize)]
 struct JsonResponseInfo {
     redirect_destination: Option<String>,
@@ -116,7 +161,7 @@ struct JsonResponse<'a> {
         rename(serialize = "layoutData"),
         skip_serializing_if = "Option::is_none"
     )]
-    layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
+    layout_data: Option<&'a HashMap<String, Box<RawValue>>>,
     info: JsonResponseInfo,
 }
 
@@ -131,7 +176,7 @@ impl<'a> JsonResponse<'a> {
 
     fn new_with_layout(
         props: &'a dyn Serialize,
-        layout_data: Option<&'a serde_json::Map<String, serde_json::Value>>,
+        layout_data: Option<&'a HashMap<String, Box<RawValue>>>,
     ) -> Self {
         JsonResponse {
             data: Some(props),
@@ -177,27 +222,34 @@ impl Props {
 }
 
 impl Response {
-    pub fn render_to_string(&self, req: Request) -> impl IntoResponse + use<> {
+    /// Consume the response into a `Send` [`RenderJob`], serializing the props to
+    /// the payload string **synchronously**. This deliberately does *not* await:
+    /// `Response` holds a non-`Send` `dyn Serialize`, so an `async fn` taking
+    /// `self` would capture it and be `!Send`. The caller runs this synchronously,
+    /// then awaits [`finish_render`] on the resulting (fully `Send`) job.
+    pub fn into_render_job(self, req: Request) -> RenderJob {
         match self {
             Self::Props(Props {
                 data,
                 http_code,
                 cookies,
-            }) => {
-                let payload = Payload::new(&req, data.as_ref()).client_payload().unwrap();
-
-                match Js::render_to_string(Some(&payload)) {
-                    Ok(html) => (*http_code, cookies.clone(), Html(html)),
-                    Err(_) => (
-                        *http_code,
-                        cookies.clone(),
+            }) => match Payload::new(&req, data.as_ref()).client_payload() {
+                Ok(payload) => RenderJob::Render {
+                    payload,
+                    http_code,
+                    cookies,
+                },
+                Err(_) => RenderJob::Ready(
+                    (
+                        http_code,
+                        cookies,
                         Html("500 Internal server error".to_string()),
-                    ),
-                }
-                .into_response()
-            }
-            Self::Redirect(to) => Redirect::permanent(to).into_response(),
-            Self::Custom(response) => response.clone().into_response(),
+                    )
+                        .into_response(),
+                ),
+            },
+            Self::Redirect(to) => RenderJob::Ready(Redirect::permanent(&to).into_response()),
+            Self::Custom(response) => RenderJob::Ready(response.into_response()),
         }
     }
 
@@ -231,7 +283,10 @@ impl Response {
 /// a `serde_json::Value`.
 pub enum HandlerData {
     Props {
-        data: serde_json::Value,
+        /// The handler's props, serialized once to raw JSON. Kept as `RawValue`
+        /// (not a `serde_json::Value` tree) so the final payload splices it
+        /// verbatim instead of building then re-serializing a tree.
+        data: Box<RawValue>,
         http_code: StatusCode,
         cookies: CookieJar,
     },
@@ -254,23 +309,30 @@ pub fn resolve_handler(result: Result<Response, ServerError>) -> HandlerData {
             http_code,
             cookies,
         })) => HandlerData::Props {
-            data: serde_json::to_value(data.as_ref()).unwrap_or(serde_json::Value::Null),
+            // Serialize once to raw JSON (still `Send`). Falls back to `null` if
+            // the props fail to serialize.
+            data: serde_json::value::to_raw_value(data.as_ref()).unwrap_or_else(|_| raw_null()),
             http_code,
             cookies,
         },
     }
 }
 
+/// A `Box<RawValue>` holding the JSON literal `null`, for serialization fallbacks.
+fn raw_null() -> Box<RawValue> {
+    RawValue::from_string("null".to_string()).expect("`null` is valid JSON")
+}
+
 /// Collect the layouts' data into a map keyed by `dataKey`, short-circuiting on
 /// the first redirect/error.
 enum LayoutResolution {
-    Map(serde_json::Map<String, serde_json::Value>),
+    Map(HashMap<String, Box<RawValue>>),
     Redirect(String),
     Error(ServerError),
 }
 
 fn resolve_layouts(layouts: Vec<(String, HandlerData)>) -> LayoutResolution {
-    let mut map = serde_json::Map::new();
+    let mut map: HashMap<String, Box<RawValue>> = HashMap::new();
     for (key, data) in layouts {
         match data {
             HandlerData::Error(error) => return LayoutResolution::Error(error),
@@ -291,13 +353,13 @@ fn resolve_layouts(layouts: Vec<(String, HandlerData)>) -> LayoutResolution {
 /// Render the SSR HTML for a page together with the server data of every
 /// `layout.rs` that wraps it. `layouts` is keyed by each layout's `dataKey`. A
 /// redirect or panic from any handler in the chain short-circuits.
-pub fn render_chain(
+pub async fn render_chain(
     req: Request,
     page: HandlerData,
     layouts: Vec<(String, HandlerData)>,
 ) -> AxumResponse {
     let layout_map = match resolve_layouts(layouts) {
-        LayoutResolution::Error(error) => return render_error_to_string(req, error),
+        LayoutResolution::Error(error) => return render_error_to_string(req, error).await,
         LayoutResolution::Redirect(destination) => {
             return Redirect::permanent(&destination).into_response();
         }
@@ -305,7 +367,7 @@ pub fn render_chain(
     };
 
     match page {
-        HandlerData::Error(error) => render_error_to_string(req, error),
+        HandlerData::Error(error) => render_error_to_string(req, error).await,
         HandlerData::Redirect(destination) => Redirect::permanent(&destination).into_response(),
         HandlerData::Custom(response) => response.into_response(),
         HandlerData::Props {
@@ -313,18 +375,23 @@ pub fn render_chain(
             http_code,
             cookies,
         } => {
-            let layout_data = if layout_map.is_empty() {
-                None
-            } else {
-                Some(&layout_map)
+            // Serialize the payload (dropping the borrowed `Payload`) before
+            // awaiting the render, so nothing borrowed is held across the await.
+            let payload_json = {
+                let layout_data = if layout_map.is_empty() {
+                    None
+                } else {
+                    Some(&layout_map)
+                };
+                Payload::new_with_layout(&req, &data, layout_data).client_payload()
             };
-            let mut payload = Payload::new_with_layout(&req, &data, layout_data);
 
-            match payload
-                .client_payload()
-                .ok()
-                .and_then(|payload| Js::render_to_string(Some(&payload)).ok())
-            {
+            let html = match payload_json {
+                Ok(payload) => crate::render_pool::render(payload).await.ok(),
+                Err(_) => None,
+            };
+
+            match html {
                 Some(html) => (http_code, cookies, Html(html)).into_response(),
                 None => (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -413,10 +480,15 @@ mod tests {
     /// cookies, mirroring what `resolve_handler` produces for the common case.
     fn props(data: serde_json::Value) -> HandlerData {
         HandlerData::Props {
-            data,
+            data: serde_json::value::to_raw_value(&data).unwrap(),
             http_code: StatusCode::OK,
             cookies: CookieJar::new(),
         }
+    }
+
+    /// Parse a `RawValue` back into a `Value` for structural assertions.
+    fn raw_to_value(raw: &RawValue) -> serde_json::Value {
+        serde_json::from_str(raw.get()).unwrap()
     }
 
     /// A minimal `ServerError` (no captured location/backtrace) for exercising
@@ -455,7 +527,7 @@ mod tests {
                 http_code,
                 cookies,
             } => {
-                assert_eq!(data, serde_json::json!({ "hello": "world" }));
+                assert_eq!(raw_to_value(&data), serde_json::json!({ "hello": "world" }));
                 assert_eq!(http_code, StatusCode::CREATED);
                 assert_eq!(cookies.get("session").unwrap().value(), "abc");
             }
@@ -506,10 +578,13 @@ mod tests {
             LayoutResolution::Map(map) => {
                 // Both props layouts are keyed; the `Custom` layout contributes
                 // nothing to the data map.
-                assert_eq!(map.get("/layout"), Some(&serde_json::json!({ "a": 1 })));
                 assert_eq!(
-                    map.get("/dash/settings/layout"),
-                    Some(&serde_json::json!({ "b": 2 }))
+                    raw_to_value(map.get("/layout").unwrap()),
+                    serde_json::json!({ "a": 1 })
+                );
+                assert_eq!(
+                    raw_to_value(map.get("/dash/settings/layout").unwrap()),
+                    serde_json::json!({ "b": 2 })
                 );
                 assert!(!map.contains_key("/dash/layout"));
                 assert_eq!(map.len(), 2);

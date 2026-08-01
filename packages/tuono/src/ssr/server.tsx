@@ -63,7 +63,14 @@ export function serverSideRendering(routeTree: RouteTree) {
     const router = createRouter({ routeTree }) // Render the app
 
     const stream = await renderToReadableStream(
-      <TuonoEntryPoint router={router} serverPayload={serverPayload} />,
+      // `rawServerPayload` is the exact JSON Rust already produced; passing it
+      // lets `TuonoScripts` embed it verbatim instead of re-stringifying the
+      // parsed payload inside V8.
+      <TuonoEntryPoint
+        router={router}
+        serverPayload={serverPayload}
+        rawServerPayload={payload}
+      />,
     )
 
     await stream.allReady
