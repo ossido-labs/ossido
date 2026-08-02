@@ -1,4 +1,3 @@
-// src/routes/pokemons/[pokemon].rs
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use tuono_lib::{handler, Props, Request, Response};
