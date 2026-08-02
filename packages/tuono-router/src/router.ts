@@ -86,12 +86,9 @@ export class Router {
   }
 
   #updateBasePath = (basePath?: string): void => {
-    if (!this.basePath || (basePath && basePath !== basePath)) {
-      if (basePath === undefined || basePath === '' || basePath === '/') {
-        this.basePath = '/'
-      } else {
-        this.basePath = `/${trimPath(basePath)}`
-      }
-    }
+    // No option passed → keep the current base path.
+    if (basePath === undefined) return
+
+    this.basePath = basePath === '' || basePath === '/' ? '/' : `/${trimPath(basePath)}`
   }
 }

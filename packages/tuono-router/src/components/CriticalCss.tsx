@@ -5,6 +5,17 @@ import type { Mode } from '../types'
 const VITE_PROXY_PATH = '/vite-server'
 const CRITICAL_CSS_PATH = VITE_PROXY_PATH + '/tuono_internal__critical_css'
 
+/**
+ * Baked in by the vite `define` in tuono's build config, mirroring the
+ * `dev.criticalCss` option. When the user disables critical CSS the vite
+ * endpoint is disabled too, so the links must not render (they would be dead,
+ * render-blocking requests). The `typeof` guard keeps this safe under
+ * vitest/tsdown where the define is not applied.
+ */
+declare const __TUONO_CRITICAL_CSS__: boolean
+const CRITICAL_CSS_ENABLED =
+  typeof __TUONO_CRITICAL_CSS__ === 'undefined' || __TUONO_CRITICAL_CSS__
+
 interface CriticalCssProps {
   routeFilePath?: string
   mode?: Mode
@@ -19,7 +30,7 @@ export function CriticalCss({
   routeFilePath,
   mode,
 }: CriticalCssProps): JSX.Element | null {
-  if (!routeFilePath || mode !== 'Dev') {
+  if (!CRITICAL_CSS_ENABLED || !routeFilePath || mode !== 'Dev') {
     return null
   }
 

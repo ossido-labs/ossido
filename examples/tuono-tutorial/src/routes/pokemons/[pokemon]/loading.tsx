@@ -1,4 +1,4 @@
-import PokemonSkeleton from '../../../components/PokemonSkeleton.tsx'
+import PokemonSkeleton from '@/components/PokemonSkeleton'
 
 export default function PokemonViewLoading() {
   return <PokemonSkeleton />

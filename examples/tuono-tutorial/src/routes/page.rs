@@ -1,31 +1,28 @@
-// src/routes/page.rs
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tuono_lib::{handler, Props, Request, Response};
+use tuono_lib::{handler, Props, Request, Type};
 
 const ALL_POKEMON: &str = "https://pokeapi.co/api/v2/pokemon?limit=151";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Props, Type, Serialize, Deserialize)]
 struct Pokemons {
     results: Vec<Pokemon>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Type, Serialize, Deserialize)]
 struct Pokemon {
     name: String,
     url: String,
 }
 
 #[handler]
-async fn get_all_pokemons(_req: Request, fetch: Client) -> Response {
-    match fetch.get(ALL_POKEMON).send().await {
-        Ok(res) => {
-            let data = res.json::<Pokemons>().await.unwrap();
-            Response::Props(Props::new(data))
-        }
-        Err(_err) => Response::Props(Props::new_with_status(
-            "{}", // Return empty JSON
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )),
-    }
+async fn get_all_pokemon(_req: Request, fetch: Client) -> Pokemons {
+    fetch
+        .get(ALL_POKEMON)
+        .send()
+        .await
+        .expect("failed to fetch the pokemon list")
+        .json()
+        .await
+        .expect("failed to parse the pokemon list")
 }

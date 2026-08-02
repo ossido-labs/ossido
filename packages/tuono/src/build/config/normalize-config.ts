@@ -82,7 +82,7 @@ export const normalizeConfig = (config: TuonoConfig): InternalTuonoConfig => {
     },
     logging: {
       format: config.logging?.format ?? 'pretty',
-      routeTree: config.logging?.routeTree ?? true,
+      routeTree: config.logging?.routeTree ?? false,
       browser: {
         enabled: config.logging?.browser?.enabled ?? true,
         level: config.logging?.browser?.level ?? 'info',

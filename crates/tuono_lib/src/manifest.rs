@@ -53,6 +53,11 @@ static EMPTY_BUNDLE: Lazy<RouteBundle> = Lazy::new(RouteBundle::default);
 pub struct Manifest {
     /// The mapping between the route and the bundle
     bundles: HashMap<String, RouteBundle>,
+    /// Dynamic route keys with their pre-split (non-empty) path segments,
+    /// computed once at load so the per-request matcher doesn't re-filter the
+    /// bundle map or re-split route paths. Sorted by key so matching is
+    /// deterministic (a `HashMap` iteration order is not).
+    dynamic_routes: Vec<(String, Vec<String>)>,
 }
 
 fn clean_route_path(path: String) -> String {
@@ -169,7 +174,24 @@ impl From<ViteManifest> for Manifest {
             }
         }
 
-        Manifest { bundles }
+        let mut dynamic_routes: Vec<(String, Vec<String>)> = bundles
+            .keys()
+            .filter(|path| has_dynamic_path(path))
+            .map(|path| {
+                let segments = path
+                    .split('/')
+                    .filter(|segment| !segment.is_empty())
+                    .map(str::to_string)
+                    .collect();
+                (path.clone(), segments)
+            })
+            .collect();
+        dynamic_routes.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+        Manifest {
+            bundles,
+            dynamic_routes,
+        }
     }
 }
 
@@ -187,30 +209,19 @@ impl Manifest {
             return bundle;
         }
 
-        let dynamic_routes = self
-            .bundles
-            .keys()
-            .filter(|path| has_dynamic_path(path))
-            .collect::<Vec<&String>>();
-
-        if !dynamic_routes.is_empty() {
+        if !self.dynamic_routes.is_empty() {
             let path_segments = pathname
                 .split('/')
                 .filter(|path| !path.is_empty())
                 .collect::<Vec<&str>>();
 
-            '_dynamic_routes_loop: for dyn_route in dynamic_routes.iter() {
-                let dyn_route_segments = dyn_route
-                    .split('/')
-                    .filter(|path| !path.is_empty())
-                    .collect::<Vec<&str>>();
-
+            '_dynamic_routes_loop: for (_, dyn_route_segments) in &self.dynamic_routes {
                 let mut route_segments_collector: Vec<&str> = Vec::new();
 
                 for i in 0..dyn_route_segments.len() {
                     // Catch all dynamic route
                     if dyn_route_segments[i].starts_with("[...") {
-                        route_segments_collector.push(dyn_route_segments[i]);
+                        route_segments_collector.push(dyn_route_segments[i].as_str());
 
                         let manifest_key = route_segments_collector.join("/");
 
@@ -225,9 +236,9 @@ impl Manifest {
                         break;
                     }
                     if dyn_route_segments[i] == path_segments[i]
-                        || has_dynamic_path(dyn_route_segments[i])
+                        || has_dynamic_path(&dyn_route_segments[i])
                     {
-                        route_segments_collector.push(dyn_route_segments[i])
+                        route_segments_collector.push(dyn_route_segments[i].as_str())
                     } else {
                         break;
                     }

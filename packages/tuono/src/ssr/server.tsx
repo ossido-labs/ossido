@@ -47,7 +47,7 @@ import type { ReadableStream } from 'node:stream/web'
 
 import type { JSX } from 'react'
 import { renderToReadableStream } from 'react-dom/server'
-import { createRouter } from 'tuono-router'
+import { createRouter, preloadRouteChain } from 'tuono-router'
 import type { createRoute } from 'tuono-router'
 
 import { TuonoEntryPoint } from '../shared/TuonoEntryPoint'
@@ -74,9 +74,17 @@ interface ServerSideRenderer {
 export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
   // Build the React element for a request. Shared by the buffered and streaming
   // entry points so they render exactly the same tree.
-  const element = (payload: string | undefined): JSX.Element => {
+  //
+  // Async because the matched route's code (page + wrapping layouts) is
+  // preloaded first: routes are `React.lazy`-wrapped, and rendering one that
+  // hasn't loaded suspends its boundary, which pushes the page content into an
+  // out-of-order late chunk (empty shell paints first — a visible flash on
+  // every cold load). In the bundled SSR output the dynamic imports are
+  // inlined, so this resolves in a microtask.
+  const element = async (payload: string | undefined): Promise<JSX.Element> => {
     const serverPayload = (payload ? JSON.parse(payload) : {}) as ServerPayload
     const router = createRouter({ routeTree })
+    await preloadRouteChain(router, serverPayload.location?.pathname)
     return (
       // `rawServerPayload` is the exact JSON Rust already produced; passing it
       // lets `TuonoScripts` embed it verbatim instead of re-stringifying the
@@ -96,7 +104,7 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
      * anywhere the caller needs the complete HTML up front.
      */
     async renderFn(payload: string | undefined): Promise<string> {
-      const stream = await renderToReadableStream(element(payload))
+      const stream = await renderToReadableStream(await element(payload))
       await stream.allReady
       return await streamToString(
         // ReadableStream should be implemented in node)
@@ -117,7 +125,7 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
         throw new Error('__ssr_write is not registered by the runtime')
       }
 
-      const stream = await renderToReadableStream(element(payload))
+      const stream = await renderToReadableStream(await element(payload))
 
       const streamer = createUtf8Streamer()
       for await (const chunk of stream as unknown as ReadableStream<Uint8Array>) {

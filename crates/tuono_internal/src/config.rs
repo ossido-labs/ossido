@@ -39,29 +39,16 @@ impl Default for BrowserLogConfig {
     }
 }
 
-fn default_true() -> bool {
-    true
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct LoggingConfig {
     #[serde(default)]
     pub format: LogFormat,
-    /// Print the route tree on `tuono dev` start-up.
-    #[serde(rename = "routeTree", default = "default_true")]
+    /// Print the route tree on `tuono dev` start-up. Off by default; opt in with
+    /// `logging.routeTree: true` in `tuono.config.ts`.
+    #[serde(rename = "routeTree", default)]
     pub route_tree: bool,
     #[serde(default)]
     pub browser: BrowserLogConfig,
-}
-
-impl Default for LoggingConfig {
-    fn default() -> Self {
-        LoggingConfig {
-            format: LogFormat::default(),
-            route_tree: true,
-            browser: BrowserLogConfig::default(),
-        }
-    }
 }
 
 /// Server-side rendering config.

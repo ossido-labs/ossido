@@ -107,7 +107,9 @@ impl SourceBuilder {
         })
     }
 
-    // Build the source code needed for both build and dev
+    // Build the source code needed for both build and dev. Typescript types are
+    // NOT generated here — callers run `generate_typescript_file` as a separate
+    // step so the CLI can report it as its own checklist item.
     pub fn base_build(&mut self) -> io::Result<()> {
         let mode = self.mode.clone();
 
@@ -119,9 +121,6 @@ impl SourceBuilder {
         // `../src`) type-check in editors — it inherits the project's compiler
         // options and scopes to the generated entry files.
         self.create_file(dev_folder.join("tsconfig.json"), TSCONFIG_DATA)?;
-
-        self.types_jar
-            .generate_typescript_file(&self.base_path, &self.route_props_typescript())?;
 
         if mode == Mode::Dev {
             self.app.build_tuono_config()?;

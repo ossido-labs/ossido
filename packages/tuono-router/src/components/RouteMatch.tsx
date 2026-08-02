@@ -41,6 +41,13 @@ export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
 
   return (
     <TraverseRootComponents routes={routes} mode={mode}>
+      {/* The leaf route's critical CSS must stay OUTSIDE the <Suspense> below:
+          React 19 ties a boundary's reveal to any `precedence` stylesheet
+          rendered inside it, which would push the streamed initial content into
+          an out-of-order late chunk (empty shell paints first — a flash on
+          every cold load). Rendered here it still hoists into the shell's
+          <head> as render-blocking, but the boundary streams inline. */}
+      <CriticalCss routeFilePath={route.filePath} mode={mode} />
       {/* The <Suspense> is not keyed by the resource key, so navigation
           re-renders (rather than remounts) the subtree. With the destination's
           data + code prefetched by `updateLocation`, that lets the new page
@@ -56,7 +63,6 @@ export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
             route={route}
             resourceKey={resourceKey}
             location={location}
-            mode={mode}
           />
         </TuonoErrorBoundary>
       </Suspense>

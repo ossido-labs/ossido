@@ -1,5 +1,5 @@
 import { hydrateRoot } from 'react-dom/client'
-import { createRouter } from 'tuono-router'
+import { createRouter, preloadRouteChain } from 'tuono-router'
 import type { createRoute } from 'tuono-router'
 import { warmDevErrorSource } from 'tuono-ui'
 
@@ -22,5 +22,14 @@ export function hydrate(routeTree: RouteTree): void {
   // Create a new router instance
   const router = createRouter({ routeTree })
 
-  hydrateRoot(document, <TuonoEntryPoint router={router} />)
+  // Load the matched route's code (page + wrapping layouts) BEFORE hydrating:
+  // the server preloads the same chain and renders the page content inline, so
+  // the first client render must also resolve it synchronously — hydrating
+  // while the `React.lazy` chunk is still loading would mismatch that HTML.
+  const initialPathname =
+    window[SERVER_PAYLOAD_VARIABLE_NAME]?.location?.pathname ??
+    window.location.pathname
+  void preloadRouteChain(router, initialPathname).finally(() => {
+    hydrateRoot(document, <TuonoEntryPoint router={router} />)
+  })
 }

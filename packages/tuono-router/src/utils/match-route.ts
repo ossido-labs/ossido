@@ -2,6 +2,40 @@ import type { Route } from '../route'
 
 const DYNAMIC_PATH_REGEX = /\[(.*?)\]/
 
+interface DynamicRouteEntry {
+  route: string
+  segments: Array<string>
+}
+
+/**
+ * The dynamic routes of a route table, pre-filtered and pre-split, computed
+ * once per `routesById` object instead of on every match. Keyed weakly so the
+ * per-request SSR routers are garbage-collected with their cache entry. Sorted
+ * by route id so matching order is deterministic and mirrors the server-side
+ * matcher (crates/tuono_lib/src/manifest.rs).
+ *
+ * The route table is only rebuilt when the router receives a new route tree
+ * (never after startup in practice), so keying by object identity is safe.
+ */
+const dynamicRoutesCache = new WeakMap<
+  Record<string, Route>,
+  Array<DynamicRouteEntry>
+>()
+
+function getDynamicRoutes(
+  routesById: Record<string, Route>,
+): Array<DynamicRouteEntry> {
+  let cached = dynamicRoutesCache.get(routesById)
+  if (!cached) {
+    cached = Object.keys(routesById)
+      .filter((route) => DYNAMIC_PATH_REGEX.test(route))
+      .sort()
+      .map((route) => ({ route, segments: route.split('/').filter(Boolean) }))
+    dynamicRoutesCache.set(routesById, cached)
+  }
+  return cached
+}
+
 /**
  * In order to correctly handle pathnames that might finish with a slash
  * we first sanitize them by removing the final slash.
@@ -33,9 +67,7 @@ export function matchRoute(
 
   if (routesById[pathname]) return routesById[pathname]
 
-  const dynamicRoutes = Object.keys(routesById).filter((route) =>
-    DYNAMIC_PATH_REGEX.test(route),
-  )
+  const dynamicRoutes = getDynamicRoutes(routesById)
 
   if (!dynamicRoutes.length) return
 
@@ -43,10 +75,7 @@ export function matchRoute(
 
   let match = undefined
 
-  // TODO: Check algo efficiency
-  for (const dynamicRoute of dynamicRoutes) {
-    const dynamicRouteSegments = dynamicRoute.split('/').filter(Boolean)
-
+  for (const { segments: dynamicRouteSegments } of dynamicRoutes) {
     const routeSegmentsCollector: Array<string> = []
 
     for (let i = 0; i < dynamicRouteSegments.length; i++) {

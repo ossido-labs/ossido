@@ -11,7 +11,7 @@ use crate::mode::{GLOBAL_MODE, Mode};
 use crate::server_error::ServerError;
 use crate::{Payload, Request};
 
-const INTERNAL_SERVER_ERROR_HTML: &str = "500 Internal server error";
+pub(crate) const INTERNAL_SERVER_ERROR_HTML: &str = "500 Internal server error";
 
 /// JSON body returned by the data endpoint (`/__tuono/data/...`) when a handler
 /// panics. Mirrors the normal `{ data, info }` shape so the client parses it the
@@ -230,6 +230,12 @@ impl Props {
         }
     }
 
+    /// Like [`new_with_status`](Self::new_with_status) but with empty props
+    /// (`"{}"`) — for error responses that carry a status code but no data.
+    pub fn empty_with_status(http_code: StatusCode) -> Self {
+        Self::new_with_status("{}", http_code)
+    }
+
     pub fn add_cookie(&mut self, cookie: Cookie) {
         let jar = self.cookies.clone().add(cookie.into_owned());
         self.cookies = jar
@@ -258,7 +264,7 @@ impl Response {
                     (
                         http_code,
                         cookies,
-                        Html("500 Internal server error".to_string()),
+                        Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
                     )
                         .into_response(),
                 ),

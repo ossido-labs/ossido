@@ -261,7 +261,10 @@ impl App {
         }
     }
 
-    pub fn build_react_prod(&self, static_export: bool) {
+    /// Build the react client + server bundles. Returns the build script's
+    /// stdout (the bundle-size summary — vite itself logs at `error` level) so
+    /// the caller can print it once its spinner has stopped.
+    pub fn build_react_prod(&self, static_export: bool) -> String {
         if !Path::new(BUILD_JS_SCRIPT).exists() {
             error!("Failed to find the build script. Please run `npm install`");
             std::process::exit(1);
@@ -284,6 +287,8 @@ impl App {
             error!("Error: {}", String::from_utf8_lossy(&output.stderr));
             std::process::exit(1);
         }
+
+        String::from_utf8_lossy(&output.stdout).into_owned()
     }
 
     pub fn run_rust_server(&self) -> Child {

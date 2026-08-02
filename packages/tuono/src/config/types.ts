@@ -25,8 +25,9 @@ export interface TuonoConfigLogging {
    */
   format?: TuonoLogFormat
   /**
-   * Print the route tree on `tuono dev` start-up. Default `true`.
-   * (`tuono build` always prints it, regardless of this option.)
+   * Print the route tree on `tuono dev` start-up. Default `false` — set to
+   * `true` to opt in. (`tuono build` always prints it, regardless of this
+   * option.)
    */
   routeTree?: boolean
   /** Forwarding of browser `console.*` to the dev server console (dev only). */

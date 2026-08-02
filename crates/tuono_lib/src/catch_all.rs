@@ -105,8 +105,11 @@ pub async fn catch_all(Path(params): Path<HashMap<String, String>>, request: Req
 
     let req = crate::Request::new(pathname.to_owned(), headers.to_owned(), params, None);
 
-    // TODO: remove unwrap
-    let payload = Payload::new(&req, &"").client_payload().unwrap();
+    // Serializing the static payload (no route data) can only fail on a broken
+    // manifest lookup; degrade to a 500 rather than panicking the worker.
+    let Ok(payload) = Payload::new(&req, &"").client_payload() else {
+        return internal_server_error();
+    };
 
     // Render on the dedicated pool so the async worker isn't blocked.
     match crate::render_pool::render(payload).await {
@@ -134,10 +137,14 @@ pub async fn catch_all(Path(params): Path<HashMap<String, String>>, request: Req
                 html_response(raw)
             }
         }
-        _ => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Html("500 internal server error".to_string()),
-        )
-            .into_response(),
+        _ => internal_server_error(),
     }
+}
+
+fn internal_server_error() -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Html(crate::response::INTERNAL_SERVER_ERROR_HTML.to_string()),
+    )
+        .into_response()
 }

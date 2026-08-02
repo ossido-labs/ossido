@@ -28,7 +28,7 @@ describe('normalizeConfig', () => {
       },
       logging: {
         format: 'pretty',
-        routeTree: true,
+        routeTree: false,
         browser: { enabled: true, level: 'info' },
       },
       dev: { criticalCss: true },
@@ -52,7 +52,7 @@ describe('normalizeConfig', () => {
       },
       logging: {
         format: 'pretty',
-        routeTree: true,
+        routeTree: false,
         browser: { enabled: true, level: 'info' },
       },
       dev: { criticalCss: true },

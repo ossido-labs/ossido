@@ -6,6 +6,9 @@ const config: TuonoConfig = {
       '@': 'src',
     },
   },
+  ssr: {
+    renderThreads: 1,
+  }
 }
 
 export default config

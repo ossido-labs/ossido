@@ -47,6 +47,44 @@ enum StreamMsg {
 
 static POOL: OnceLock<Sender<Job>> = OnceLock::new();
 
+/// Log a failed render so a 500 is never silent: the terminal shows *why*
+/// (`SsrError::JsException` carries the stringified JS error/rejection). The
+/// response itself stays a plain 500 — the error may contain source detail
+/// that must not leak to clients in prod.
+fn log_render_error(error: Option<&SsrError>) {
+    if let Some(error) = error {
+        tuono_internal::log::backend(
+            tuono_internal::log::Level::Error,
+            format!("SSR render failed: {error}"),
+        );
+    }
+}
+
+/// Run a render guarded against panics. Without this, one panicking render
+/// (e.g. an isolate compiled from a torn mid-rebuild bundle read) kills the
+/// pool thread; once every thread has died, all further requests fail
+/// instantly with a bare 500 and no output — permanently, until restart. The
+/// panic is logged, the thread's isolate is dropped (unwinding out of V8 can
+/// leave it broken; the next render recompiles), and the request gets an
+/// `Err` like any other failed render.
+fn guarded<T>(
+    render: impl FnOnce() -> Result<T, SsrError> + std::panic::UnwindSafe,
+) -> Result<T, SsrError> {
+    std::panic::catch_unwind(render).unwrap_or_else(|panic| {
+        let msg = panic
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| panic.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "unknown panic".to_string());
+        tuono_internal::log::backend(
+            tuono_internal::log::Level::Error,
+            format!("SSR render panicked: {msg}"),
+        );
+        Js::invalidate_isolate();
+        Err(SsrError::FailedJsExecution("SSR render panicked"))
+    })
+}
+
 const SSR_THREADS_ENV: &str = "TUONO_SSR_THREADS";
 
 fn pool_size() -> usize {
@@ -88,16 +126,32 @@ fn sender() -> &'static Sender<Job> {
                     // than dying silently. In dev this is a no-op (the isolate
                     // compiles lazily once the bundle exists); in prod the bundle
                     // is present by the time the server starts.
-                    let _ = std::panic::catch_unwind(|| {
+                    if let Err(panic) = std::panic::catch_unwind(|| {
                         let _ = Js::render_to_string(None);
-                    });
+                    }) {
+                        // Surface the panic instead of swallowing it: in prod a
+                        // failed warm-up usually means a broken server bundle,
+                        // and silence would just defer the error to the first
+                        // real request.
+                        let msg = panic
+                            .downcast_ref::<&str>()
+                            .map(|s| s.to_string())
+                            .or_else(|| panic.downcast_ref::<String>().cloned())
+                            .unwrap_or_else(|| "unknown panic".to_string());
+                        tuono_internal::log::backend(
+                            tuono_internal::log::Level::Warn,
+                            format!("SSR warm-up render panicked: {msg}"),
+                        );
+                    }
 
                     // Each thread reuses its warm thread-local isolate for every
                     // job (recompiling only on a dev hot-reload, handled in `Js`).
                     while let Ok(job) = rx.recv() {
                         match job {
                             Job::Buffered(payload, reply) => {
-                                let _ = reply.send(Js::render_to_string(Some(&payload)));
+                                let result = guarded(|| Js::render_to_string(Some(&payload)));
+                                log_render_error(result.as_ref().err());
+                                let _ = reply.send(result);
                             }
                             Job::Stream(payload, chunks) => {
                                 // Forward each chunk as it is produced, then the
@@ -108,9 +162,12 @@ fn sender() -> &'static Sender<Job> {
                                 // sink is `'static`); the original stays for the
                                 // terminal `Done`.
                                 let tx = chunks.clone();
-                                let result = Js::render_stream(Some(&payload), move |chunk| {
-                                    let _ = tx.send(StreamMsg::Chunk(chunk));
+                                let result = guarded(|| {
+                                    Js::render_stream(Some(&payload), move |chunk| {
+                                        let _ = tx.send(StreamMsg::Chunk(chunk));
+                                    })
                                 });
+                                log_render_error(result.as_ref().err());
                                 let _ = chunks.send(StreamMsg::Done(result));
                             }
                         }

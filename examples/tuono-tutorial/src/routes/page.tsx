@@ -1,13 +1,8 @@
-import type { JSX } from 'react'
+import { Wordmark } from '@/components/Wordmark'
+import PokemonLink from '@/components/PokemonLink'
+import type { TuonoPage } from 'tuono/types'
 
-import { Wordmark } from '../components/Wordmark.tsx'
-import PokemonLink from '../components/PokemonLink'
-
-interface IndexProps {
-  results: Array<{ name: string; url: string }>
-}
-
-export default function IndexPage({ results }: IndexProps): JSX.Element {
+const IndexPage: TuonoPage<'/'> = ({ results }) => {
   return (
     <>
       <title>Tuono tutorial</title>
@@ -16,8 +11,6 @@ export default function IndexPage({ results }: IndexProps): JSX.Element {
       <div className="hero">
         <h1 className="title">
           <span>TU</span>
-          {/* The logo stands in for the "O" visually; keep a hidden "O" so the
-              heading still reads "TUONO" to screen readers, and hide the SVG. */}
           <span className="visually-hidden">O</span>
           <Wordmark aria-hidden />
           <span>NO</span>
@@ -50,3 +43,5 @@ export default function IndexPage({ results }: IndexProps): JSX.Element {
     </>
   )
 }
+
+export default IndexPage;

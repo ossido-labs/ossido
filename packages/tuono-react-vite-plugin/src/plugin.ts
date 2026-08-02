@@ -30,7 +30,7 @@ export function TuonoReactPlugin(options?: TuonoReactPluginOptions): Plugin {
     try {
       await routeGenerator()
     } catch (err) {
-      console.error(err)
+      console.error('[tuono] route tree generation failed:', err)
     } finally {
       lock = false
     }

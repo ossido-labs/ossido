@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use colored::Colorize;
 use fs_extra::dir::{CopyOptions, copy};
 use spinners::{Spinner, Spinners};
 use tracing::{error, trace};
@@ -36,20 +37,35 @@ pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
     app.build_tuono_config()
         .unwrap_or_else(|_| exit_gracefully_with_error("Failed to build tuono.config.ts"));
 
+    let build_started = Instant::now();
     let mut app_build_spinner = Spinner::new(Spinners::Dots, "Building app...".into());
 
     app.check_server_availability(Mode::Prod);
 
-    app.build_react_prod(ssg);
+    let build_output = app.build_react_prod(ssg);
 
-    // Remove the spinner
-    app_build_spinner.stop_with_message("\u{2705}Build completed".into());
+    // Persist a checklist-style line matching `tuono dev`'s "✔ Ready in Xms".
+    app_build_spinner.stop_and_persist(
+        &"✔".green().bold().to_string(),
+        format!("Built in {}ms", build_started.elapsed().as_millis())
+            .green()
+            .bold()
+            .to_string(),
+    );
+
+    // The build script's stdout carries the bundle-size summary (vite itself
+    // logs at `error` level) — print it under the tick, above the route tree.
+    let build_output = build_output.trim_end();
+    if !build_output.is_empty() {
+        println!("{build_output}");
+    }
 
     // `tuono build` always prints the route tree (the dev-only `logging.routeTree`
     // option does not apply here).
     crate::route_tree::print_route_tree(&app);
 
     if ssg {
+        let ssg_started = Instant::now();
         let mut app_build_static_spinner =
             Spinner::new(Spinners::Dots, "Static site generation".into());
 
@@ -92,25 +108,36 @@ pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
             .build()
             .unwrap_or_else(|_| exit_and_shut_server("Failed to build reqwest client"));
 
-        // Wait for server
-        let mut is_server_ready = false;
+        // Wait for the server, bounded: a server that never comes up (port in
+        // use, panic on boot) should fail the build with a clear error instead
+        // of hanging forever. Poll fast at first (the server usually boots in
+        // well under a second), backing off to 1s.
+        const SERVER_READY_TIMEOUT: Duration = Duration::from_secs(60);
         let config = app.config.as_ref().unwrap();
+        let server_url = match &config.server.origin {
+            Some(origin) => origin.clone(),
+            None => format!("http://{}:{}", config.server.host, config.server.port),
+        };
 
-        while !is_server_ready {
+        let wait_started = std::time::Instant::now();
+        let mut poll_interval = Duration::from_millis(100);
+        loop {
             trace!("Checking server availability");
 
-            let server_url = match &config.server.origin {
-                Some(origin) => origin.clone(),
-                None => format!("http://{}:{}", config.server.host, config.server.port),
-            };
-
             if reqwest_client.get(&server_url).send().is_ok() {
-                is_server_ready = true;
-            } else {
-                trace!("Server not ready yet. Sleeping for 1 second");
+                break;
             }
 
-            sleep(Duration::from_secs(1));
+            if wait_started.elapsed() >= SERVER_READY_TIMEOUT {
+                exit_and_shut_server(&format!(
+                    "Server did not become ready at {server_url} within {}s — cannot statically generate",
+                    SERVER_READY_TIMEOUT.as_secs()
+                ));
+            }
+
+            trace!("Server not ready yet. Sleeping for {poll_interval:?}");
+            sleep(poll_interval);
+            poll_interval = (poll_interval * 2).min(Duration::from_secs(1));
         }
 
         trace!("Server is ready, starting static site generation");
@@ -124,7 +151,15 @@ pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
         // Close server
         let _ = rust_server.kill();
 
-        app_build_static_spinner
-            .stop_with_message("\u{2705}Static site generation completed".into());
+        app_build_static_spinner.stop_and_persist(
+            &"✔".green().bold().to_string(),
+            format!(
+                "Static generation in {}ms",
+                ssg_started.elapsed().as_millis()
+            )
+            .green()
+            .bold()
+            .to_string(),
+        );
     }
 }

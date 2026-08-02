@@ -10,7 +10,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
+    "allowImportingTsExtensions": false,
     "types": ["tuono/build-client"],
 
     // Interop Constraints
@@ -26,7 +26,11 @@
     "noEmit": true,
 
     // Completeness
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src", "tuono.config.ts", "./.tuono/types.ts"]
 }

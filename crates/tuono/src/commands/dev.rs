@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-use console::Term;
+use colored::Colorize;
 use miette::{IntoDiagnostic, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -46,9 +46,12 @@ fn ssr_reload_needed(path: &Path) -> bool {
     clippy::await_holding_lock,
     reason = "At this point there is no other thread waiting for the lock"
 )]
-async unsafe fn start_all_processes(process_manager: Arc<Mutex<ProcessManager>>) {
+async unsafe fn start_all_processes(
+    process_manager: Arc<Mutex<ProcessManager>>,
+    report: impl FnMut(&str),
+) {
     if let Ok(mut pm) = process_manager.lock() {
-        pm.start_dev_processes().await
+        pm.start_dev_processes(report).await
     }
 }
 
@@ -66,12 +69,19 @@ fn detect_existing_env_files() -> Vec<String> {
 #[tokio::main]
 pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
     let source_builder = RwLock::new(source_builder);
-    let term = Term::stdout();
-    let mut sp = Spinner::new(Spinners::Dots, "Starting dev server...".into());
 
     let process_manager = Arc::new(Mutex::new(ProcessManager::new()));
 
     let env_files = detect_existing_env_files();
+
+    // Render the startup as a checklist under the "Running dev server..." header
+    // that `new::` / `cli` printed: each phase spins while active, then persists a
+    // green tick when it finishes (the `spinners` crate can't update text in
+    // place, so we `stop_and_persist` each item and spin the next below it). This
+    // replaces one silent, often minutes-long spinner.
+    let tick = "✔".green().to_string();
+    let mut current: Option<Spinner> = None;
+    let mut current_label = String::new();
 
     // Time the build/bundle work so the intro can report how long it took.
     let build_started = Instant::now();
@@ -79,13 +89,21 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
         // It is safe to call this function because here
         // only one thread is running and the lock is not
         // needed by any other thread.
-        start_all_processes(process_manager.clone()).await;
+        start_all_processes(process_manager.clone(), |label: &str| {
+            if let Some(mut sp) = current.take() {
+                sp.stop_and_persist(&tick, current_label.clone());
+            }
+            current_label = label.to_string();
+            current = Some(Spinner::new(Spinners::Dots, label.to_string()));
+        })
+        .await;
     }
     let ready_in = build_started.elapsed();
 
-    // Remove the spinner
-    sp.stop();
-    _ = term.clear_line();
+    // Tick the final phase.
+    if let Some(mut sp) = current.take() {
+        sp.stop_and_persist(&tick, current_label.clone());
+    }
 
     // Server address log for production
     // is done on the server process.

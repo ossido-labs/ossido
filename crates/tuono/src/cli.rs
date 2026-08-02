@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand};
+use colored::Colorize;
+use spinners::{Spinner, Spinners};
 use tracing::{Level, span};
 
 use crate::commands::{build, dev, new};
@@ -49,9 +51,24 @@ pub fn app() -> std::io::Result<()> {
 
             let _guard = span.enter();
 
+            // Validate the project (this emits the "not a tuono project" error
+            // and bails) *before* printing any startup UI, so a non-project
+            // directory fails cleanly with just the error.
             let mut source_builder = SourceBuilder::new(Mode::Dev)?;
 
+            // A persistent header, then a checklist: scaffolding (codegen +
+            // config build) and type generation are the first items;
+            // `dev::watch` ticks the rest (compile / bundle / start) below it.
+            let tick = "✔".green().to_string();
+            println!("Running dev server...\n");
+
+            let mut scaffold_sp = Spinner::new(Spinners::Dots, "Scaffolding project".into());
             source_builder.base_build()?;
+            scaffold_sp.stop_and_persist(&tick, "Scaffolding project".into());
+
+            let mut types_sp = Spinner::new(Spinners::Dots, "Generating types".into());
+            source_builder.generate_typescript_file()?;
+            types_sp.stop_and_persist(&tick, "Generating types".into());
 
             source_builder.app.check_server_availability(Mode::Dev);
 
@@ -64,6 +81,7 @@ pub fn app() -> std::io::Result<()> {
 
             let mut source_builder = SourceBuilder::new(Mode::Prod)?;
             source_builder.base_build()?;
+            source_builder.generate_typescript_file()?;
             build::build(source_builder.app, ssg, no_js_emit);
         }
         Actions::New {

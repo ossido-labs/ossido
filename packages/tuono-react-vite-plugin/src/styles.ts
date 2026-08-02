@@ -126,7 +126,9 @@ export const getStylesForModule = async (
         styles[dep.url] = css
       } catch {
         // this can happen with dynamically imported modules
-        console.warn(`Could not load ${dep.file}`)
+        console.warn(
+          `[tuono] critical css: could not load ${dep.file} (resolved from ${dep.url})`,
+        )
       }
     }
   }
@@ -191,6 +193,15 @@ const findNodeDependencies = async (
   node: ModuleNode,
   deps: Set<ModuleNode>,
 ): Promise<void> => {
+  // On a cold server start only modules the browser has already requested have
+  // been transformed. Anything deeper (e.g. a component imported by the route)
+  // sits in the graph as a bare placeholder with no import information, so the
+  // walk would dead-end before reaching its CSS. Prime it the same way the
+  // top-level route is primed. This also runs the plugin `transform` hook for
+  // CSS modules, populating `cssModulesManifest` before it is read below.
+  if (!node.ssrTransformResult && !node.transformResult) {
+    await vite.transformRequest(node.url).catch(() => undefined)
+  }
   // since `ssrTransformResult.deps` contains URLs instead of `ModuleNode`s, this process is asynchronous.
   // instead of using `await`, we resolve all branches in parallel.
   const branches: Array<Promise<void>> = []

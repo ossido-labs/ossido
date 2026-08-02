@@ -6,6 +6,10 @@
 /// The debug/error messages should be printed using the `tracing` crate
 macro_rules! tuono_println {
     ($($arg:tt)*) => {{
-        println!("  {}", format!($($arg)*));
+        println!(
+            "{} {}",
+            $crate::colored::Colorize::yellow("[TUONO]"),
+            format!($($arg)*)
+        );
     }};
 }

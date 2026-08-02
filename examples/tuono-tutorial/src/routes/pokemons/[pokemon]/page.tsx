@@ -1,6 +1,6 @@
 import type { JSX } from 'react'
 
-import PokemonView from '../../../components/PokemonView'
+import PokemonView from '@/components/PokemonView'
 
 interface Pokemon {
   id: number

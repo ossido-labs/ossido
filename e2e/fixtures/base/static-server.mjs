@@ -20,7 +20,14 @@ const CONTENT_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.txt': 'text/plain; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
 }
 

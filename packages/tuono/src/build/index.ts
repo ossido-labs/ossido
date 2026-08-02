@@ -1,11 +1,13 @@
 import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 
 import type { InlineConfig, Plugin } from 'vite'
 import { build, createServer, mergeConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import inject from '@rollup/plugin-inject'
-import { TuonoReactPlugin } from 'tuono-react-vite-plugin'
+import { TuonoReactPlugin, routeGenerator } from 'tuono-react-vite-plugin'
 import { ErrorOverlayVitePlugin } from 'tuono-ui/vite-plugin'
 
 import type { InternalTuonoConfig } from './types'
@@ -92,6 +94,13 @@ function createBaseViteConfigFromTuonoConfig(
       // pre-rendered `.json` data files instead of the extensionless
       // `/__tuono/data{path}` route, which has no server in a static export.
       __TUONO_STATIC__: JSON.stringify(process.env.TUONO_STATIC === 'true'),
+      // Baked into both bundles so `<CriticalCss>` skips rendering its dev
+      // stylesheet links when `dev.criticalCss: false` — the vite endpoint is
+      // disabled in that case, so the links would otherwise be dead requests
+      // that block rendering.
+      __TUONO_CRITICAL_CSS__: JSON.stringify(
+        tuonoConfig.dev?.criticalCss ?? true,
+      ),
     },
 
     resolve: {
@@ -185,51 +194,115 @@ const developmentCSRWatch = (): void => {
   })
 }
 
+const KB = 1024
+
+const formatKb = (bytes: number): string => `${(bytes / KB).toFixed(1)} kB`
+
+/**
+ * Print a compact per-asset size summary (raw + gzip) for the prod build, so
+ * size regressions are visible on every `tuono build` without extra tooling.
+ * Reads the emitted files directly — works regardless of vite's log level.
+ */
+const printBundleSummary = (): void => {
+  interface AssetRow {
+    label: string
+    size: number
+    gzip: number
+  }
+
+  const collectDir = (dir: string, prefix: string): Array<AssetRow> => {
+    try {
+      return readdirSync(dir, { recursive: true, encoding: 'utf-8' })
+        .filter((file) => /\.(js|css)$/.test(file))
+        .map((file) => {
+          const content = readFileSync(join(dir, file))
+          return {
+            label: `${prefix}/${file}`,
+            size: content.length,
+            gzip: gzipSync(content).length,
+          }
+        })
+    } catch {
+      return []
+    }
+  }
+
+  const assets = [
+    ...collectDir(resolve('out/client'), 'client'),
+    ...collectDir(resolve('out/server'), 'server'),
+  ].sort((a, b) => b.size - a.size)
+
+  if (!assets.length) return
+
+  const labelWidth = Math.max(...assets.map((asset) => asset.label.length))
+  console.log('')
+  for (const asset of assets) {
+    console.log(
+      `  ${asset.label.padEnd(labelWidth)}  ${formatKb(asset.size).padStart(10)} │ gzip: ${formatKb(asset.gzip).padStart(9)}`,
+    )
+  }
+  const total = assets.reduce((sum, asset) => sum + asset.size, 0)
+  const totalGzip = assets.reduce((sum, asset) => sum + asset.gzip, 0)
+  console.log(
+    `  ${'total'.padEnd(labelWidth)}  ${formatKb(total).padStart(10)} │ gzip: ${formatKb(totalGzip).padStart(9)}`,
+  )
+  console.log('')
+}
+
 const buildProd = (): void => {
   blockingAsync(async () => {
     const config = await loadConfig()
 
-    await build(
-      mergeConfig<InlineConfig, InlineConfig>(
-        createBaseViteConfigFromTuonoConfig(config),
-        {
-          build: {
-            manifest: true,
-            emptyOutDir: true,
-            outDir: '../out/client',
-            rollupOptions: {
-              input: CLIENT_MAIN_ENTRY,
-            },
-          },
-        },
-      ),
-    )
+    // Generate the route tree once up front. Both builds' plugin instances
+    // re-run the generator on `configResolved`, but it skips the write when
+    // the content is unchanged — pre-generating removes the concurrent-write
+    // hazard so the two builds (independent outputs) can run in parallel.
+    await routeGenerator()
 
-    await build(
-      mergeConfig<InlineConfig, InlineConfig>(
-        createBaseViteConfigFromTuonoConfig(config),
-        {
-          plugins: VITE_SSR_PLUGINS,
-          build: {
-            ssr: true,
-            minify: true,
-            outDir: '../out/server',
-            emptyOutDir: true,
-            rollupOptions: {
-              input: SERVER_MAIN_ENTRY,
-              output: {
-                entryFileNames: 'prod-server.js',
-                format: 'iife',
+    await Promise.all([
+      build(
+        mergeConfig<InlineConfig, InlineConfig>(
+          createBaseViteConfigFromTuonoConfig(config),
+          {
+            build: {
+              manifest: true,
+              emptyOutDir: true,
+              outDir: '../out/client',
+              rollupOptions: {
+                input: CLIENT_MAIN_ENTRY,
               },
             },
           },
-          ssr: {
-            target: 'webworker',
-            noExternal: true,
-          },
-        },
+        ),
       ),
-    )
+      build(
+        mergeConfig<InlineConfig, InlineConfig>(
+          createBaseViteConfigFromTuonoConfig(config),
+          {
+            plugins: VITE_SSR_PLUGINS,
+            build: {
+              ssr: true,
+              minify: true,
+              outDir: '../out/server',
+              emptyOutDir: true,
+              rollupOptions: {
+                input: SERVER_MAIN_ENTRY,
+                output: {
+                  entryFileNames: 'prod-server.js',
+                  format: 'iife',
+                },
+              },
+            },
+            ssr: {
+              target: 'webworker',
+              noExternal: true,
+            },
+          },
+        ),
+      ),
+    ])
+
+    printBundleSummary()
   })
 }
 

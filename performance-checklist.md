@@ -264,6 +264,40 @@ Before optimising, attribute where request time actually goes:
   page + its data JSON. `--static` now aborts only for a dynamic route that
   declares no enumerator (was: any dynamic route at all).
 
+- [x] **9. Response compression.** DONE (2026-08-01) — the framework served
+      everything uncompressed (no `CompressionLayer`, `tower-http` had only `fs`).
+      #8 had just made cached static routes bandwidth-bound, so response size was
+      the ceiling. Two-part fix:
+      - **Compress-once in the static-route cache** (`catch_all.rs`): each entry
+        stores raw + brotli (quality 9) computed **once** on insert; a `br`-capable
+        client is served the pre-compressed bytes with `Content-Encoding: br` and
+        **zero per-request compression**. (A blanket `CompressionLayer` alone would
+        re-brotli the 177 KB page on every hit — CPU-bound, a regression.)
+      - **`CompressionLayer` (br + gzip)** as the outermost prod layer for
+        everything else — streaming SSR HTML and static assets — negotiated via
+        `Accept-Encoding`. It skips the cache's already-`Content-Encoding`-tagged
+        responses, so no double-compression.
+
+  **Gotcha fixed:** the streaming body used `futures::stream::unfold`, which
+  **panics if polled after `None`**; `CompressionLayer` polls once more to flush,
+  crashing every compressed streaming response (`ECONNRESET`). Fixed by `.fuse()`
+  on the stream (`render_pool.rs`) — also a general robustness fix.
+
+  **Measured (prod fixture, `Accept-Encoding: br`):**
+
+  | response                    | raw     | brotli  | on-wire |
+  | --------------------------- | ------- | ------- | ------- |
+  | `/heavy` (cached static)    | 177 KB  | **2.9 KB** | pre-compressed in cache |
+  | `/` (streaming SSR)         | 1.7 KB  | 0.9 KB  | `CompressionLayer` |
+  | client JS asset             | 218 KB  | 70 KB (32%) | `CompressionLayer` |
+
+  Heavy static route throughput: **13.8k → ~60k req/s** (p99 2.4 ms → **0.6 ms**) —
+  no longer bandwidth-bound. Full journey vs the original V8-per-request: **~1k →
+  60k req/s (~60×)**. Verified: e2e 8/8, `tuono_lib` tests pass.
+  _Follow-up (optional):_ precompressed static assets at build (`.br`/`.gz` +
+  `ServeDir::precompressed_br`) to drop the per-request asset compression CPU.
+  _Impact: high (every response; completes #8) · Effort: low · Risk: low._
+
 ---
 
 ## Focus: props serialization across the Rust ⇄ V8 ⇄ client boundary

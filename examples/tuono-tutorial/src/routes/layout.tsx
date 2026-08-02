@@ -2,7 +2,7 @@ import type { JSX } from 'react'
 import { TuonoScripts } from 'tuono'
 import type { TuonoLayoutProps } from 'tuono'
 
-import '../styles/global.css'
+import '@/styles/global.css'
 
 export default function RootLayout({
   children,

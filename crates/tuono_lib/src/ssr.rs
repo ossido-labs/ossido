@@ -75,6 +75,20 @@ impl Js {
             ProdJs::render_stream(payload, on_chunk)
         }
     }
+
+    /// Drop the current thread's cached isolate so the next render recompiles
+    /// from the bundle on disk. Called by the render pool after a render
+    /// *panics*: unwinding out of V8 can leave the isolate in a broken state,
+    /// and reusing it would fail every subsequent request on this thread.
+    pub fn invalidate_isolate() {
+        let mode = GLOBAL_MODE.get().expect("Failed to get GLOBAL_MODE");
+
+        if *mode == Mode::Dev {
+            DevJs::invalidate();
+        } else {
+            ProdJs::invalidate();
+        }
+    }
 }
 
 /// A compiled bundle (V8 isolate) cached on the current thread, tagged with the
@@ -129,6 +143,12 @@ impl ProdJs {
             })
         })
     }
+
+    /// Drop this thread's cached isolate; the next render recompiles the prod
+    /// bundle. See [`Js::invalidate_isolate`].
+    fn invalidate() {
+        Self::SSR.with(|cell| *cell.borrow_mut() = None);
+    }
 }
 
 struct DevJs;
@@ -180,15 +200,20 @@ impl DevJs {
             };
 
             if stale {
+                // Drop the old isolate BEFORE compiling the new one: rusty_v8
+                // requires `OwnedIsolate`s to be dropped in reverse creation
+                // order, so replacing the cache in one step (new isolate created
+                // while the old is still alive) panics on the old one's drop —
+                // which, unguarded, killed this pool thread on every hot-reload
+                // recompile.
+                *cache = None;
+
                 match Self::compile(modified) {
                     Some(cached) => *cache = Some(cached),
-                    // Bundle missing or mid-rebuild: drop the cache and let the
-                    // caller serve the raw HTML template so the client still
-                    // boots (the next request recompiles).
-                    None => {
-                        *cache = None;
-                        return f(None);
-                    }
+                    // Bundle missing or mid-rebuild: leave the cache empty and
+                    // let the caller serve the raw HTML template so the client
+                    // still boots (the next request recompiles).
+                    None => return f(None),
                 }
             }
 
@@ -198,17 +223,21 @@ impl DevJs {
     }
 
     fn render_to_string(params: Option<&str>) -> Result<String, SsrError> {
-        Self::with_ssr(|ssr| match ssr {
+        let result = Self::with_ssr(|ssr| match ssr {
             Some(ssr) => crate::debug::time("ssr render", || ssr.render(RENDER_FN, params)),
             None => Ok(Self::fallback(params)),
-        })
+        });
+        if result.is_err() {
+            Self::invalidate();
+        }
+        result
     }
 
     fn render_stream(
         params: Option<&str>,
         mut on_chunk: impl FnMut(String) + 'static,
     ) -> Result<(), SsrError> {
-        Self::with_ssr(move |ssr| match ssr {
+        let result = Self::with_ssr(move |ssr| match ssr {
             Some(ssr) => crate::debug::time("ssr render", || {
                 ssr.streaming(STREAM_WRITE_FN)?
                     .render(RENDER_STREAM_FN, params, on_chunk)
@@ -219,13 +248,41 @@ impl DevJs {
                 on_chunk(Self::fallback(params));
                 Ok(())
             }
-        })
+        });
+        if result.is_err() {
+            Self::invalidate();
+        }
+        result
+    }
+
+    /// Drop this thread's cached isolate so the next request recompiles from
+    /// the bundle on disk. Called after any failed render: a failure can mean
+    /// the isolate is poisoned (compiled from a torn mid-rebuild read, or V8
+    /// left in a broken state), and keeping it would fail every subsequent
+    /// request on this thread until the next edit changed the bundle's mtime.
+    /// Also clears the debounce so the recompile isn't deferred.
+    fn invalidate() {
+        Self::SSR.with(|cell| *cell.borrow_mut() = None);
+        Self::LAST_CHECK.with(|c| c.set(None));
     }
 
     /// Read + compile the dev bundle, or `None` if it can't be read/compiled.
     fn compile(modified: Option<SystemTime>) -> Option<CachedSsr> {
         let source =
             crate::debug::time("bundle read", || fs::read_to_string(DEV_BUNDLE_PATH).ok())?;
+
+        // The bundle write is not atomic: a hot-reload can overwrite the file
+        // mid-read, yielding truncated JS that may still compile yet render
+        // broken — and, with the pre-write mtime cached, it would keep failing
+        // until the next edit. If the mtime moved during the read, discard it;
+        // the caller serves the fallback and the next request retries.
+        let modified_after_read = fs::metadata(DEV_BUNDLE_PATH)
+            .and_then(|meta| meta.modified())
+            .ok();
+        if modified_after_read != modified {
+            return None;
+        }
+
         let ssr = crate::debug::time("v8 compile", || Ssr::from(source, "").ok())?;
         Some(CachedSsr { modified, ssr })
     }

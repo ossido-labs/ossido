@@ -83,17 +83,27 @@ impl ProcessManager {
         }
     }
 
-    // Start all the processes needed for the dev server
-    pub async fn start_dev_processes(&mut self) {
+    // Start all the processes needed for the dev server. `report` is called with
+    // the label of each phase as it begins, so the caller can render a checklist
+    // (tick the previous item, start the next) instead of one silent, often
+    // multi-minute, spinner.
+    pub async fn start_dev_processes(&mut self, mut report: impl FnMut(&str)) {
         trace!("Starting dev processes");
         self.start_process(ProcessId::WatchReactSrc);
         self.start_process(ProcessId::BuildRustSrc);
         self.start_process(ProcessId::BuildReactSSRSrc);
 
+        // The Rust build is the long pole on a fresh project: it compiles the
+        // whole dependency tree (tuono_lib + ssr_rs + V8), which is why the first
+        // `tuono dev` can sit here for minutes.
+        report("Compiling the Tuono server");
         self.wait_for_process(ProcessId::BuildRustSrc).await;
+
+        report("Building the frontend bundle");
         self.wait_for_process(ProcessId::BuildReactSSRSrc).await;
 
         // This needs to start after having built the rust and react sources
+        report("Starting the dev server");
         self.start_process(ProcessId::RunRustDevServer);
     }
 
@@ -142,6 +152,7 @@ impl ProcessManager {
                 .green()
                 .bold()
         );
+        println!();
     }
 
     pub fn restart_process(&mut self, id: ProcessId) {

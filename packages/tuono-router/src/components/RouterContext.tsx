@@ -137,9 +137,6 @@ export function RouterContextProvider({
   serverInitialLocation,
   children,
 }: RouterContextProviderProps): ReactNode {
-  // Allow the router to update options on the router instance
-  router.update({ ...router.options } as Parameters<typeof router.update>[0])
-
   const [location, setLocation] = useState<ParsedLocation>(() =>
     getInitialLocation(serverInitialLocation),
   )
