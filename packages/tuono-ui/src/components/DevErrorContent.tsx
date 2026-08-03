@@ -192,7 +192,7 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
                 {'html' in sourceLine ? (
                   <span
                     className="tuono-err-code-text"
-                    // Highlighted markup produced by starry-night (trusted).
+                    // Highlighted markup produced by Shiki (trusted).
                     dangerouslySetInnerHTML={{ __html: sourceLine.html }}
                   />
                 ) : (
@@ -222,7 +222,9 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
               }
             >
               <div className="tuono-err-frame-head">
-                <span className="tuono-err-fn">{frame.fn ?? '<anonymous>'}</span>
+                <span className="tuono-err-fn">
+                  {frame.fn ?? '<anonymous>'}
+                </span>
                 {isAppSourceFrame(frame) && (
                   <span className="tuono-err-frame-badge">app</span>
                 )}

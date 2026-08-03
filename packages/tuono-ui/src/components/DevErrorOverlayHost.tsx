@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom'
 import { BaseStyles } from './BaseStyles'
 import { DevErrorContent } from './DevErrorContent'
 import { DevBuildErrorContent } from './DevBuildErrorContent'
-import { SYNTAX_THEME_CSS } from './devErrorTheme'
 import { DEV_ERROR_STYLES } from './devErrorStyles'
 import type {
   DevErrorEntry,
@@ -77,7 +76,6 @@ function Styles(): JSX.Element {
     <>
       <BaseStyles />
       <style>{DEV_ERROR_STYLES}</style>
-      <style>{SYNTAX_THEME_CSS}</style>
     </>
   )
 }
@@ -238,7 +236,10 @@ function DevIndicator({
       )}
       <div className={`tuono-err-indicator tuono-err-indicator--${position}`}>
         {menuOpen && (
-          <div className={`tuono-err-menu tuono-err-menu--${position}`} role="menu">
+          <div
+            className={`tuono-err-menu tuono-err-menu--${position}`}
+            role="menu"
+          >
             <button
               type="button"
               role="menuitem"

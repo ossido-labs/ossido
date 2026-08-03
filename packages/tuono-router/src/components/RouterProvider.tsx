@@ -67,10 +67,12 @@ export function RouterProvider({
           errors). Renders null until something is reported.
 
           `import.meta.env.DEV` is a build-time constant (true only in the dev
-          bundle), so the prod build eliminates this branch and tree-shakes the
-          entire overlay — including its heavy Shiki syntax-highlighter — out of
-          the prod client and SSR bundles. The runtime `mode` check is kept for
-          the dev bundle. */}
+          bundle), so the prod build eliminates this branch — the overlay host is
+          never rendered in prod. The heavy Shiki syntax-highlighter it uses is
+          reached lazily (via the dev error reporter), so the prod build
+          code-splits it into chunks that a real prod visitor never fetches (the
+          runtime `mode` check gates them). The `mode` check is also what keeps
+          the overlay working in the dev bundle. */}
       {import.meta.env.DEV && mode === 'Dev' && <DevErrorOverlayHost />}
     </RouterContextProvider>
   )

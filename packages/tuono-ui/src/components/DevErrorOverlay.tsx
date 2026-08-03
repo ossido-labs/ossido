@@ -4,7 +4,6 @@ import type { TuonoErrorProps } from '../types'
 
 import { BaseStyles } from './BaseStyles'
 import { DevErrorContent } from './DevErrorContent'
-import { SYNTAX_THEME_CSS } from './devErrorTheme'
 import { DEV_ERROR_STYLES } from './devErrorStyles'
 
 /**
@@ -25,7 +24,6 @@ export function DevErrorOverlay({
     <div className="tuono-err-backdrop" role="alertdialog" aria-modal="true">
       <BaseStyles />
       <style>{DEV_ERROR_STYLES}</style>
-      <style>{SYNTAX_THEME_CSS}</style>
       <div className="tuono-err-window">
         <div className="tuono-err-body">
           <DevErrorContent error={error} />

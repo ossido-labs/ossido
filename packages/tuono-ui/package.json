@@ -55,8 +55,10 @@
   },
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",
-    "@wooorm/starry-night": "^3.10.0",
-    "hast-util-to-html": "^9.0.5"
+    "@shikijs/langs": "^4.4.1",
+    "@shikijs/themes": "^4.4.1",
+    "hast-util-to-html": "^9.0.5",
+    "shiki": "^4.4.1"
   },
   "devDependencies": {
     "@storybook/react-vite": "10.5.5",

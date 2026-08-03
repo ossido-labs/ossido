@@ -1,5 +1,5 @@
 import type { TraceMap } from '@jridgewell/trace-mapping'
-import type { createStarryNight } from '@wooorm/starry-night'
+import type { HighlighterCore } from 'shiki/core'
 
 // Minimal hast shapes (avoids a direct dependency on `@types/hast`).
 interface HastText {
@@ -18,9 +18,9 @@ type ToHtml = (tree: { type: 'root'; children: Array<HastNode> }) => string
 /**
  * Dev-only pipeline for the error overlay. Resolves a browser stack trace to
  * original source locations (via each module's sourcemap), then extracts and
- * syntax-highlights (starry-night) the source excerpt around the throwing
- * expression. Everything here is dynamically imported so it never ships in the
- * production client bundle.
+ * syntax-highlights (Shiki) the source excerpt around the throwing expression.
+ * Everything here is dynamically imported so it never ships in the production
+ * client bundle.
  */
 
 interface RawFrame {
@@ -40,7 +40,7 @@ export interface ResolvedFrame {
 
 export interface HighlightedLine {
   number: number
-  /** Pre-highlighted HTML for the line (from starry-night). */
+  /** Pre-highlighted HTML for the line (from Shiki, inline-styled). */
   html: string
   isErrorLine: boolean
 }
@@ -59,7 +59,7 @@ export interface SourceExcerpt {
   lines: Array<HighlightedLine>
 }
 
-/** The excerpt in plain text, before starry-night has highlighted it. */
+/** The excerpt in plain text, before Shiki has highlighted it. */
 export interface PlainExcerpt {
   file: string
   line: number
@@ -75,9 +75,24 @@ export interface RawExcerptSource {
   column: number
 }
 
-type StarryNight = Awaited<ReturnType<typeof createStarryNight>>
-
 const SOURCE_CONTEXT = 5
+
+/** Map a source file extension to the Shiki grammar (language) to load. */
+function langForFile(
+  file: string,
+): 'tsx' | 'typescript' | 'javascript' | 'rust' {
+  switch (extensionOf(file)) {
+    case '.tsx':
+    case '.jsx':
+      return 'tsx'
+    case '.ts':
+      return 'typescript'
+    case '.rs':
+      return 'rust'
+    default:
+      return 'javascript'
+  }
+}
 
 // V8 / Chrome: `fn (url:line:col)` or `url:line:col` (after the `at ` prefix).
 const V8_LINE = /^(?:(.*?)\s+)?\(?([^()]+):(\d+):(\d+)\)?$/
@@ -270,29 +285,29 @@ async function loadSourceMap(
   return map
 }
 
-/** Split a hast tree into per-line lists of nodes (handles multi-line tokens). */
-function splitLines(nodes: Array<HastNode>): Array<Array<HastNode>> {
-  const lines: Array<Array<HastNode>> = [[]]
-  const pushCurrent = (node: HastNode): void => {
-    lines[lines.length - 1]?.push(node)
-  }
-
-  for (const node of nodes) {
-    if (node.type === 'text') {
-      const segments = node.value.split('\n')
-      segments.forEach((segment, index) => {
-        if (index > 0) lines.push([])
-        if (segment !== '') pushCurrent({ type: 'text', value: segment })
-      })
-    } else {
-      const childLines = splitLines(node.children)
-      childLines.forEach((children, index) => {
-        if (index > 0) lines.push([])
-        if (children.length) pushCurrent({ ...node, children })
-      })
-    }
-  }
-  return lines
+/**
+ * Pull the per-line `<span class="line">` elements out of Shiki's `codeToHast`
+ * output (`root > pre > code > span.line*`). Shiki already delimits lines, so no
+ * manual line-splitting is needed.
+ */
+function extractLineNodes(tree: {
+  children: Array<HastNode>
+}): Array<Array<HastNode>> {
+  const pre = tree.children.find(
+    (node): node is HastElement =>
+      node.type === 'element' && node.tagName === 'pre',
+  )
+  const code = pre?.children.find(
+    (node): node is HastElement =>
+      node.type === 'element' && node.tagName === 'code',
+  )
+  // Shiki tags each line as `<span class="line">` (a raw `class` string, not the
+  // hast-normalized `className` array), separated by `\n` text nodes.
+  const lineNodes = (code?.children ?? []).filter(
+    (node): node is HastElement =>
+      node.type === 'element' && node.properties?.['class'] === 'line',
+  )
+  return lineNodes.map((line) => line.children)
 }
 
 /**
@@ -317,16 +332,18 @@ export function extractExcerpt(src: RawExcerptSource): PlainExcerpt {
 }
 
 function buildExcerpt(
-  starryNight: StarryNight,
+  highlighter: HighlighterCore,
   toHtml: ToHtml,
   source: string,
   file: string,
   errorLine: number,
   errorColumn: number,
 ): SourceExcerpt {
-  const scope = starryNight.flagToScope(extensionOf(file)) ?? 'source.js'
-  const tree = starryNight.highlight(source, scope)
-  const lines = splitLines(tree.children as unknown as Array<HastNode>)
+  const tree = highlighter.codeToHast(source, {
+    lang: langForFile(file),
+    theme: 'github-dark',
+  }) as unknown as { children: Array<HastNode> }
+  const lines = extractLineNodes(tree)
 
   const start = Math.max(1, errorLine - SOURCE_CONTEXT)
   const end = Math.min(lines.length, errorLine + SOURCE_CONTEXT)
@@ -343,52 +360,67 @@ function buildExcerpt(
   return { file, line: errorLine, column: errorColumn, lines: highlighted }
 }
 
-let starryNightPromise: Promise<StarryNight> | null = null
+let highlighterPromise: Promise<HighlighterCore> | null = null
 
-async function getStarryNight(): Promise<StarryNight> {
-  if (!starryNightPromise) {
-    starryNightPromise = (async (): Promise<StarryNight> => {
-      const { createStarryNight } = await import('@wooorm/starry-night')
-      const grammars = await Promise.all([
-        import('@wooorm/starry-night/source.tsx'),
-        import('@wooorm/starry-night/source.ts'),
-        import('@wooorm/starry-night/source.js'),
-        import('@wooorm/starry-night/source.rust'),
+/**
+ * Build a fine-grained Shiki highlighter: the tree-shakeable core, the pure-JS
+ * regex engine (no oniguruma WASM), and only the four grammars the overlay needs
+ * plus one theme. This keeps the dev-only chunk small and avoids a WASM fetch on
+ * the dev critical path.
+ */
+async function getHighlighter(): Promise<HighlighterCore> {
+  if (!highlighterPromise) {
+    highlighterPromise = (async (): Promise<HighlighterCore> => {
+      const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] =
+        await Promise.all([
+          import('shiki/core'),
+          import('shiki/engine/javascript'),
+        ])
+      const [tsx, ts, js, rust, theme] = await Promise.all([
+        import('@shikijs/langs/tsx'),
+        import('@shikijs/langs/typescript'),
+        import('@shikijs/langs/javascript'),
+        import('@shikijs/langs/rust'),
+        import('@shikijs/themes/github-dark'),
       ])
-      return createStarryNight(grammars.map((grammar) => grammar.default))
+      return createHighlighterCore({
+        themes: [theme.default],
+        langs: [tsx.default, ts.default, js.default, rust.default],
+        engine: createJavaScriptRegexEngine(),
+      })
     })()
   }
-  return starryNightPromise
+  return highlighterPromise
 }
 
 /**
- * Eagerly kick off the heavy, dev-only imports (starry-night + its grammars,
+ * Eagerly kick off the heavy, dev-only imports (Shiki core + engine + grammars,
  * trace-mapping, hast-util-to-html) so the first error's source excerpt renders
  * without waiting on library loading. Safe to call repeatedly — the imports are
  * cached. Call it when the overlay host mounts.
  */
 export function warmDevErrorSource(): void {
-  void getStarryNight()
+  void getHighlighter()
   void import('@jridgewell/trace-mapping')
   void import('hast-util-to-html')
 }
 
 /**
- * Syntax-highlight a source excerpt (starry-night picks the grammar from the
- * file extension, e.g. `.tsx` or `.rs`). Returns `null` if the dev-only
- * libraries fail to load — the caller keeps showing the plain excerpt.
+ * Syntax-highlight a source excerpt (Shiki picks the grammar from the file
+ * extension, e.g. `.tsx` or `.rs`). Returns `null` if the dev-only libraries
+ * fail to load — the caller keeps showing the plain excerpt.
  */
 export async function highlightExcerpt(
   src: RawExcerptSource,
 ): Promise<SourceExcerpt | null> {
   try {
-    const [starryNight, htmlModule] = await Promise.all([
-      getStarryNight(),
+    const [highlighter, htmlModule] = await Promise.all([
+      getHighlighter(),
       import('hast-util-to-html'),
     ])
     const toHtml = htmlModule.toHtml as unknown as ToHtml
     return buildExcerpt(
-      starryNight,
+      highlighter,
       toHtml,
       src.content,
       src.file,
@@ -413,9 +445,8 @@ export async function resolveDevErrorFrames(
   const rawFrames = parseStack(stack)
 
   try {
-    const { TraceMap, originalPositionFor, sourceContentFor } = await import(
-      '@jridgewell/trace-mapping'
-    )
+    const { TraceMap, originalPositionFor, sourceContentFor } =
+      await import('@jridgewell/trace-mapping')
 
     const mapCache = new Map<string, TraceMap | null>()
     const frames: Array<ResolvedFrame> = []

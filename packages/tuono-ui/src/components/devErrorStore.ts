@@ -84,7 +84,10 @@ const CORNER_STORAGE_KEY = 'tuono:dev-overlay-corner'
 function loadCorner(): DevOverlayCorner {
   try {
     const stored = globalThis.localStorage?.getItem(CORNER_STORAGE_KEY)
-    if (stored && (DEV_OVERLAY_CORNERS as ReadonlyArray<string>).includes(stored))
+    if (
+      stored &&
+      (DEV_OVERLAY_CORNERS as ReadonlyArray<string>).includes(stored)
+    )
       return stored as DevOverlayCorner
   } catch {
     // localStorage can be unavailable (SSR, privacy mode) — use the default.

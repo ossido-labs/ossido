@@ -109,9 +109,7 @@ describe('devErrorStore', () => {
     store.addBuildError(buildError)
     store.addBuildError({ ...buildError, message: 'Unexpected token' })
 
-    const builds = store
-      .getSnapshot()
-      .entries.filter((e) => e.kind === 'build')
+    const builds = store.getSnapshot().entries.filter((e) => e.kind === 'build')
     expect(builds).toHaveLength(1)
     expect(builds[0]?.build?.message).toBe('Unexpected token')
   })
