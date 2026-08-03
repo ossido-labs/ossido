@@ -6,6 +6,7 @@ use colored::Colorize;
 use fs_extra::dir::{CopyOptions, copy};
 use spinners::{Spinner, Spinners};
 use tracing::{error, trace};
+use tuono_internal::config::OutputMode;
 
 use crate::app::App;
 use crate::mode::Mode;
@@ -15,11 +16,28 @@ fn exit_gracefully_with_error(msg: &str) -> ! {
     std::process::exit(1);
 }
 
-pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
+/// Statically generate the site instead of building the SSR server.
+///
+/// `ssg_override` is the CLI intent: `Some(true)` for `--static`, `Some(false)`
+/// for `--server`, `None` to defer to the config's `output`.
+pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
     if no_js_emit {
         println!("Rust build successfully finished");
         std::process::exit(0);
     }
+
+    app.build_tuono_config()
+        .unwrap_or_else(|_| exit_gracefully_with_error("Failed to build tuono.config.ts"));
+
+    // The flag wins; otherwise the config's `output` decides. The config is only
+    // available after `build_tuono_config`, so this is resolved here rather than
+    // in the CLI layer.
+    let ssg = ssg_override.unwrap_or_else(|| {
+        app.config
+            .as_ref()
+            .map(|config| config.output == OutputMode::Static)
+            .unwrap_or(false)
+    });
 
     if ssg {
         // Dynamic routes are statically generated from their `#[static_paths]`
@@ -33,9 +51,6 @@ pub fn build(mut app: App, ssg: bool, no_js_emit: bool) {
             std::process::exit(1);
         }
     }
-
-    app.build_tuono_config()
-        .unwrap_or_else(|_| exit_gracefully_with_error("Failed to build tuono.config.ts"));
 
     let build_started = Instant::now();
     let mut app_build_spinner = Spinner::new(Spinners::Dots, "Building app...".into());

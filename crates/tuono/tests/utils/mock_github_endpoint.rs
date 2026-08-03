@@ -50,6 +50,18 @@ impl GitHubServerMock {
                 {
                     "path": "examples/tuono-app/package.json",
                     "type": "blob"
+                },
+                {
+                    "path": "examples/tuono-app/tuono.config.ts",
+                    "type": "blob"
+                },
+                {
+                    "path": "examples/tuono-app/src/styles",
+                    "type": "tree"
+                },
+                {
+                    "path": "examples/tuono-app/src/styles/global.css",
+                    "type": "blob"
                 }
             ]
             }"#,
@@ -92,6 +104,24 @@ impl GitHubServerMock {
             .respond_with(file_response_template(
                 r#"{"name": "tuono-app", "dependencies": { "tuono": "workspace:*" }}"#,
             ))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "tuono-labs/tuono/v{tuono_version}/examples/tuono-app/tuono.config.ts"
+            )))
+            .respond_with(file_response_template(
+                "import type { TuonoConfig } from 'tuono/config'\n\nconst config: TuonoConfig = {}\n\nexport default config\n",
+            ))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "tuono-labs/tuono/v{tuono_version}/examples/tuono-app/src/styles/global.css"
+            )))
+            .respond_with(file_response_template("body {\n  margin: 0;\n}\n"))
             .mount(&server)
             .await;
 

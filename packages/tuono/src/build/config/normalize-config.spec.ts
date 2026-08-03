@@ -33,6 +33,7 @@ describe('normalizeConfig', () => {
       },
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
+      output: 'server',
     })
   })
 
@@ -57,6 +58,7 @@ describe('normalizeConfig', () => {
       },
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
+      output: 'server',
     })
   })
 
@@ -214,6 +216,22 @@ describe('normalizeConfig', () => {
         expect.objectContaining({
           ssr: { renderThreads: 4 },
         }),
+      )
+    })
+  })
+
+  describe('output', () => {
+    it('should default output to server', () => {
+      expect(normalizeConfig({})).toStrictEqual(
+        expect.objectContaining({ output: 'server' }),
+      )
+    })
+
+    it('should honour output set to static', () => {
+      const config: TuonoConfig = { output: 'static' }
+
+      expect(normalizeConfig(config)).toStrictEqual(
+        expect.objectContaining({ output: 'static' }),
       )
     })
   })

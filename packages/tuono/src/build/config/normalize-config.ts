@@ -96,5 +96,6 @@ export const normalizeConfig = (config: TuonoConfig): InternalTuonoConfig => {
       // parallelism (resolving it here would bake in the build machine's cores).
       renderThreads: config.ssr?.renderThreads ?? null,
     },
+    output: config.output ?? 'server',
   }
 }

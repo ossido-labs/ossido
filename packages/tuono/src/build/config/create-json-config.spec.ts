@@ -22,6 +22,7 @@ describe('createJsonConfig', () => {
       },
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
+      output: 'server' as const,
     }
 
     await createJsonConfig(sampleConfig)
@@ -43,6 +44,7 @@ describe('createJsonConfig', () => {
       },
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
+      output: 'server' as const,
     }
 
     await createJsonConfig({ ...sampleConfig, vite: { plugins: [react()] } })
@@ -64,6 +66,7 @@ describe('createJsonConfig', () => {
       },
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
+      output: 'server' as const,
     }
 
     await createJsonConfig(sampleConfig)

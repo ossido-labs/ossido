@@ -3,6 +3,7 @@ export type {
   TuonoConfigServer,
   TuonoConfigLogging,
   TuonoConfigSsr,
+  TuonoConfigOutput,
   TuonoLogFormat,
   TuonoLogLevel,
 } from './types'

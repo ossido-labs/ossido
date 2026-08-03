@@ -8,12 +8,14 @@ export default function RootLayout({
   children,
 }: TuonoLayoutProps): JSX.Element {
   return (
-    <html>
+    <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>
-        <main>{children}</main>
+        <main className="flex min-h-screen flex-col items-center justify-center gap-11 px-6 pt-30 pb-24">
+          {children}
+        </main>
         <TuonoScripts />
       </body>
     </html>

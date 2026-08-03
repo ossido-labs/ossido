@@ -1,6 +1,7 @@
 import type {
   TuonoConfig,
   TuonoConfigServer,
+  TuonoConfigOutput,
   TuonoLogFormat,
   TuonoLogLevel,
 } from '../config'
@@ -30,10 +31,11 @@ export interface InternalTuonoConfigSsr {
 
 export interface InternalTuonoConfig extends Omit<
   TuonoConfig,
-  'server' | 'logging' | 'dev' | 'ssr'
+  'server' | 'logging' | 'dev' | 'ssr' | 'output'
 > {
   server: TuonoConfigServer
   logging: InternalTuonoConfigLogging
   dev: InternalTuonoConfigDev
   ssr: InternalTuonoConfigSsr
+  output: TuonoConfigOutput
 }

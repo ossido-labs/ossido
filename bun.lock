@@ -35,6 +35,22 @@
         "typescript": "^5.6.3",
       },
     },
+    "examples/ssg-example": {
+      "name": "ssg-example",
+      "version": "0.0.1",
+      "dependencies": {
+        "@tailwindcss/vite": "^4.3.3",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "tailwindcss": "^4.3.3",
+        "tuono": "0.20.0",
+      },
+      "devDependencies": {
+        "@types/react": "^19.0.2",
+        "@types/react-dom": "^19.0.2",
+        "typescript": "^5.6.3",
+      },
+    },
     "examples/tuono-app": {
       "name": "tuono-app",
       "version": "0.0.1",
@@ -132,7 +148,7 @@
     },
     "packages/tuono-react-vite-plugin": {
       "name": "tuono-react-vite-plugin",
-      "version": "0.19.7",
+      "version": "0.20.0",
       "dependencies": {
         "oxfmt": "0.61.0",
         "vite": "^8.1.5",
@@ -1187,6 +1203,8 @@
     "source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
 
     "space-separated-tokens": ["space-separated-tokens@2.0.2", "", {}, "sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q=="],
+
+    "ssg-example": ["ssg-example@workspace:examples/ssg-example"],
 
     "stackback": ["stackback@0.0.2", "", {}, "sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw=="],
 

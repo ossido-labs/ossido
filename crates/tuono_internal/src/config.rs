@@ -51,6 +51,16 @@ pub struct LoggingConfig {
     pub browser: BrowserLogConfig,
 }
 
+/// Build output mode, mirroring the TS `output` config option. Defaults to
+/// [`OutputMode::Server`]; `static` statically generates the site.
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputMode {
+    #[default]
+    Server,
+    Static,
+}
+
 /// Server-side rendering config.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct SsrConfig {
@@ -68,6 +78,8 @@ pub struct Config {
     pub logging: LoggingConfig,
     #[serde(default)]
     pub ssr: SsrConfig,
+    #[serde(default)]
+    pub output: OutputMode,
 }
 
 impl Config {
@@ -91,6 +103,26 @@ mod tests {
         assert_eq!(config.server.origin, None);
         assert_eq!(config.server.port, 3000);
         assert_eq!(config.ssr.render_threads, None);
+        assert_eq!(config.output, OutputMode::Server);
+    }
+
+    #[test]
+    fn deserializes_output_mode_and_defaults_to_server() {
+        let base = r#"{ "server": { "host": "localhost", "port": 3000, "origin": null }"#;
+
+        // Absent → defaults to server.
+        let config: Config = serde_json::from_str(&format!("{base} }}")).unwrap();
+        assert_eq!(config.output, OutputMode::Server);
+
+        // Explicit static.
+        let config: Config =
+            serde_json::from_str(&format!("{base}, \"output\": \"static\" }}")).unwrap();
+        assert_eq!(config.output, OutputMode::Static);
+
+        // Explicit server.
+        let config: Config =
+            serde_json::from_str(&format!("{base}, \"output\": \"server\" }}")).unwrap();
+        assert_eq!(config.output, OutputMode::Server);
     }
 
     #[test]

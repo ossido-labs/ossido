@@ -1,26 +1,84 @@
 import type { JSX } from 'react'
+import type { TuonoPage } from 'tuono/types'
 
-export default function IndexPage(): JSX.Element {
+import { Wordmark } from '../components/Wordmark.tsx'
+
+interface NavLink {
+  href: string
+  label: string
+  desc: string
+}
+
+const LINKS: ReadonlyArray<NavLink> = [
+  {
+    href: 'https://github.com/tuono-labs/tuono',
+    label: 'GitHub',
+    desc: 'Star the repo',
+  },
+  {
+    href: 'https://crates.io/crates/tuono',
+    label: 'Crates',
+    desc: 'The Rust crate',
+  },
+  {
+    href: 'https://www.npmjs.com/package/tuono',
+    label: 'npm',
+    desc: 'The npm package',
+  },
+]
+
+function NavCard({ href, label, desc }: NavLink): JSX.Element {
   return (
-    <div className="min-h-screen flex items-center justify-normal sm:justify-center p-4">
-      <div className="bg-white rounded-lg p-8 border-0 sm:border border-neutral-200 max-w-[unset] sm:max-w-md w-full">
-        <h1 className="text-4xl font-bold mb-4 text-center">
-          Welcome to Tuono
-        </h1>
-        <p className="text-gray-600 text-center mb-6">
-          This is a simple example of how to use Tailwind CSS utility classes in
-          Tuono.
-        </p>
-        <div className="flex flex-wrap gap-3 justify-center">
-          <a
-            href="https://tuono.dev"
-            target="_blank"
-            className="text-blue-600 underline hover:text-black flex items-center gap-1"
-          >
-            Tuono Documentation
-          </a>
-        </div>
-      </div>
-    </div>
+    <a
+      className="group flex flex-col gap-1.5 rounded-[14px] border border-white/10 bg-white/[0.02] px-[22px] py-5 no-underline transition duration-200 hover:-translate-y-0.5 hover:border-tuono-cyan/55 hover:bg-tuono-cyan/6"
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+    >
+      <span className="flex items-center justify-between text-lg font-semibold text-white">
+        {label}
+        <span
+          className="opacity-50 transition duration-200 group-hover:translate-x-1 group-hover:opacity-100"
+          aria-hidden
+        >
+          →
+        </span>
+      </span>
+      <span className="text-sm font-light text-tuono-text-dim">{desc}</span>
+    </a>
   )
 }
+
+const IndexPage: TuonoPage<'/'> = ({ subtitle }) => {
+  return (
+    <>
+      <img
+        src="/lightning.webp"
+        alt=""
+        className="fixed inset-0 -z-10 h-full w-full object-cover object-center opacity-20 mix-blend-screen"
+      />
+
+      <div className="flex flex-col items-center gap-3.5 text-center">
+        <h1 className="flex select-none items-center justify-center text-[clamp(95px,13vw,150px)] font-extrabold leading-none tracking-[0.02em] text-white">
+          <span>TU</span>
+          {/* The logo stands in for the "O" visually; keep a hidden "O" so the
+              heading still reads "TUONO" to screen readers, and hide the SVG. */}
+          <span className="sr-only">O</span>
+          <Wordmark aria-hidden />
+          <span>NO</span>
+        </h1>
+        <p className="max-w-[32ch] text-[clamp(16px,2.3vw,23px)] font-light text-tuono-text-dim">
+          {subtitle}
+        </p>
+      </div>
+
+      <nav className="grid w-full max-w-[780px] grid-cols-1 gap-4 sm:grid-cols-3">
+        {LINKS.map((link) => (
+          <NavCard key={link.href} {...link} />
+        ))}
+      </nav>
+    </>
+  )
+}
+
+export default IndexPage

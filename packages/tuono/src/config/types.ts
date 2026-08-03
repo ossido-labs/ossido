@@ -53,7 +53,19 @@ export interface TuonoConfig {
   logging?: TuonoConfigLogging
   dev?: TuonoConfigDev
   ssr?: TuonoConfigSsr
+  /**
+   * Default build output mode. Default `'server'`.
+   * - `'server'`: build the SSR server (`tuono build`).
+   * - `'static'`: statically generate the site (equivalent to `tuono build
+   *   --static`).
+   *
+   * The `--static` / `--server` CLI flags override this per invocation.
+   */
+  output?: TuonoConfigOutput
 }
+
+/** Build output mode. */
+export type TuonoConfigOutput = 'static' | 'server'
 
 /** Server-side rendering options. */
 export interface TuonoConfigSsr {
