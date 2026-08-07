@@ -1,14 +1,9 @@
 import type { OssidoConfig } from 'ossido/config'
-import mdx from '@mdx-js/rollup'
+import { ossidoMdx } from 'ossido-mdx/vite'
 
 const config: OssidoConfig = {
   vite: {
-    optimizeDeps: {
-      exclude: ['@mdx-js/react'],
-    },
-    plugins: [
-      { enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react' }) },
-    ],
+    plugins: [ossidoMdx()],
   },
 }
 

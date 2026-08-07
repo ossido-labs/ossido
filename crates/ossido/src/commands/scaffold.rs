@@ -7,6 +7,7 @@
 //! contribution — and the whole `ossido.config.ts` is *generated* from the
 //! selected set rather than string-patched, which keeps composition unambiguous.
 
+use clap::crate_version;
 use serde_json::Value;
 pub use ossido_internal::config::OutputMode;
 
@@ -55,11 +56,14 @@ pub const TAILWIND: Feature = Feature {
 pub const MDX: Feature = Feature {
     key: "mdx",
     label: "MDX",
-    dependencies: &[("@mdx-js/react", "^3.1.0")],
-    dev_dependencies: &[("@mdx-js/rollup", "^3.1.0")],
-    config_import: Some("import mdx from '@mdx-js/rollup'"),
-    config_plugin: Some("{ enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react' }) }"),
-    optimize_deps_exclude: &["@mdx-js/react"],
+    // `ossido-mdx` bundles `@mdx-js/rollup` and wires the `src/mdx-components.tsx`
+    // convention; pinned to this CLI's version so it matches the other ossido
+    // packages the scaffold installs.
+    dependencies: &[("ossido-mdx", crate_version!())],
+    dev_dependencies: &[],
+    config_import: Some("import { ossidoMdx } from 'ossido-mdx/vite'"),
+    config_plugin: Some("ossidoMdx()"),
+    optimize_deps_exclude: &[],
 };
 
 /// Every feature the wizard can offer, in display order.
@@ -215,14 +219,10 @@ mod tests {
     }
 
     #[test]
-    fn mdx_adds_optimize_deps_exclude_and_pre_plugin() {
+    fn mdx_adds_the_ossido_mdx_plugin() {
         let config = generate_ossido_config(&[&MDX], OutputMode::Server, None);
-        assert!(config.contains("import mdx from '@mdx-js/rollup'"));
-        assert!(config.contains("exclude: ['@mdx-js/react'],"));
-        assert!(
-            config
-                .contains("{ enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react' }) },")
-        );
+        assert!(config.contains("import { ossidoMdx } from 'ossido-mdx/vite'"));
+        assert!(config.contains("plugins: [\n      ossidoMdx(),\n    ],"));
     }
 
     #[test]
@@ -230,11 +230,11 @@ mod tests {
         let config = generate_ossido_config(&[&TAILWIND, &MDX], OutputMode::Static, None);
         assert!(config.contains("output: 'static',"));
         assert!(config.contains("import tailwindcss from '@tailwindcss/vite'"));
-        assert!(config.contains("import mdx from '@mdx-js/rollup'"));
+        assert!(config.contains("import { ossidoMdx } from 'ossido-mdx/vite'"));
         assert!(config.contains("tailwindcss(),"));
-        assert!(config.contains("...mdx("));
-        // Both native/awkward deps are excluded, in feature order.
-        assert!(config.contains("exclude: ['@tailwindcss/oxide', '@mdx-js/react'],"));
+        assert!(config.contains("ossidoMdx(),"));
+        // Tailwind's native oxide addon is still excluded (mdx no longer needs one).
+        assert!(config.contains("exclude: ['@tailwindcss/oxide'],"));
     }
 
     #[test]
@@ -274,9 +274,8 @@ mod tests {
         // New runtime deps landed in `dependencies`.
         assert!(merged.contains("\"@tailwindcss/vite\": \"^4.3.3\""));
         assert!(merged.contains("\"tailwindcss\": \"^4.3.3\""));
-        assert!(merged.contains("\"@mdx-js/react\": \"^3.1.0\""));
-        // New build-time dep landed in `devDependencies`.
-        assert!(merged.contains("\"@mdx-js/rollup\": \"^3.1.0\""));
+        // MDX contributes `ossido-mdx`, pinned to this CLI's version.
+        assert!(merged.contains(&format!("\"ossido-mdx\": \"{}\"", crate_version!())));
         // Existing deps untouched.
         assert!(merged.contains("\"react\": \"^19.0.0\""));
     }

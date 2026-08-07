@@ -151,11 +151,9 @@ const developmentSSRBundle = (): void => {
                 entryFileNames: 'dev-server.js',
                 // ESM (not IIFE) so the SSR entry can use top-level `await`; the
                 // Rust runtime compiles it as a V8 module (`Ssr::from_module`).
-                // `inlineDynamicImports` keeps it a single file — the runtime
-                // reads exactly one `dev-server.js` — since ESM output would
-                // otherwise code-split the route `import()`s into chunks.
+                // The build stays a single `dev-server.js` — the only file the
+                // runtime reads — because the SSR build disables code splitting.
                 format: 'es',
-                inlineDynamicImports: true,
               },
             },
           },
@@ -297,12 +295,10 @@ const buildProd = (): void => {
                   entryFileNames: 'prod-server.js',
                   // ESM (not IIFE) so the SSR entry can use top-level `await`;
                   // the Rust runtime compiles it as a V8 module
-                  // (`Ssr::from_module`). `inlineDynamicImports` keeps it a
-                  // single file — the runtime reads exactly one
-                  // `prod-server.js` — since ESM output would otherwise
-                  // code-split the route `import()`s into chunks.
+                  // (`Ssr::from_module`). The build stays a single
+                  // `prod-server.js` — the only file the runtime reads —
+                  // because the SSR build disables code splitting.
                   format: 'es',
-                  inlineDynamicImports: true,
                 },
               },
             },

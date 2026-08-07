@@ -1,0 +1,62 @@
+{
+  "name": "ossido-mdx",
+  "version": "0.20.0",
+  "description": "MDX support for ossido with a Next.js-style src/mdx-components.tsx convention for global MDX components. Ossido is the react/rust fullstack framework",
+  "homepage": "https://ossido.dev",
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "lint": "oxlint",
+    "format": "oxfmt --check .",
+    "format:fix": "oxfmt .",
+    "typecheck": "tsc --noEmit",
+    "test:watch": "vitest",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChildishForces/ossido.git",
+    "directory": "packages/ossido-mdx"
+  },
+  "keywords": [],
+  "author": "Valerio Ageno",
+  "license": "MIT",
+  "type": "module",
+  "types": "dist/esm/index.d.ts",
+  "main": "dist/esm/index.js",
+  "module": "dist/esm/index.js",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "default": "./dist/esm/index.js"
+    },
+    "./vite": {
+      "types": "./dist/esm/vite.d.ts",
+      "default": "./dist/esm/vite.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@mdx-js/rollup": "^3.1.0",
+    "@types/mdx": "^2.0.13"
+  },
+  "peerDependencies": {
+    "vite": "^8.1.5"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "tsdown": "0.22.14",
+    "vite": "^8.2.0",
+    "vite-config": "workspace:*",
+    "vitest": "4.1.10"
+  }
+}

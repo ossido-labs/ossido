@@ -1,5 +1,4 @@
 import type { JSX } from 'react'
-import { MDXProvider } from '@mdx-js/react'
 import { OssidoScripts } from 'ossido'
 import type { OssidoLayoutProps } from 'ossido'
 
@@ -11,9 +10,7 @@ export default function RootLayout({
   return (
     <html>
       <body>
-        <main>
-          <MDXProvider components={{}}>{children}</MDXProvider>
-        </main>
+        <main>{children}</main>
         <OssidoScripts />
       </body>
     </html>

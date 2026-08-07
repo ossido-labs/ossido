@@ -40,6 +40,7 @@
   "author": "Valerio Ageno",
   "license": "MIT",
   "devDependencies": {
+    "@oxlint/plugins": "1.76.0",
     "@playwright/test": "1.54.1",
     "@types/node": "22.16.5",
     "@vitest/coverage-v8": "4.1.10",

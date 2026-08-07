@@ -38,10 +38,13 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@oxlint/plugins": "1.76.0",
     "eslint-plugin-react-refresh": "^0.5.3"
   },
+  "peerDependencies": {
+    "@oxlint/plugins": "^1.76.0"
+  },
   "devDependencies": {
+    "@oxlint/plugins": "1.76.0",
     "oxlint": "1.76.0",
     "tsdown": "0.22.14",
     "vite-config": "workspace:*",

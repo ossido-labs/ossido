@@ -5,6 +5,7 @@
     "": {
       "name": "workspace",
       "devDependencies": {
+        "@oxlint/plugins": "1.76.0",
         "@playwright/test": "1.54.1",
         "@types/node": "22.16.5",
         "@vitest/coverage-v8": "4.1.10",
@@ -45,6 +46,7 @@
         "react-dom": "^19.0.0",
       },
       "devDependencies": {
+        "@oxlint/plugins": "1.76.0",
         "@types/react": "^19.0.2",
         "@types/react-dom": "^19.0.2",
         "ossido-eslint-plugin": "workspace:*",
@@ -62,6 +64,7 @@
         "react-dom": "^19.0.0",
       },
       "devDependencies": {
+        "@oxlint/plugins": "1.76.0",
         "@types/react": "^19.0.2",
         "@types/react-dom": "^19.0.2",
         "ossido-eslint-plugin": "workspace:*",
@@ -74,13 +77,13 @@
       "name": "with-mdx",
       "version": "0.0.1",
       "dependencies": {
-        "@mdx-js/react": "^3.1.0",
         "ossido": "workspace:*",
+        "ossido-mdx": "workspace:*",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
       },
       "devDependencies": {
-        "@mdx-js/rollup": "^3.1.0",
+        "@oxlint/plugins": "1.76.0",
         "@types/react": "^19.0.2",
         "@types/react-dom": "^19.0.2",
         "ossido-eslint-plugin": "workspace:*",
@@ -100,6 +103,7 @@
         "tailwindcss": "^4.3.3",
       },
       "devDependencies": {
+        "@oxlint/plugins": "1.76.0",
         "@types/react": "^19.0.2",
         "@types/react-dom": "^19.0.2",
         "ossido-eslint-plugin": "workspace:*",
@@ -148,15 +152,38 @@
       "name": "ossido-eslint-plugin",
       "version": "0.20.0",
       "dependencies": {
-        "@oxlint/plugins": "1.76.0",
         "eslint-plugin-react-refresh": "^0.5.3",
       },
       "devDependencies": {
+        "@oxlint/plugins": "1.76.0",
         "oxlint": "1.76.0",
         "tsdown": "0.22.14",
         "vite-config": "workspace:*",
         "vitest": "4.1.10",
       },
+      "peerDependencies": {
+        "@oxlint/plugins": "^1.76.0",
+      },
+    },
+    "packages/ossido-mdx": {
+      "name": "ossido-mdx",
+      "version": "0.20.0",
+      "dependencies": {
+        "@mdx-js/rollup": "^3.1.0",
+        "@types/mdx": "^2.0.13",
+      },
+      "devDependencies": {
+        "tsdown": "0.22.14",
+        "vite": "^8.2.0",
+        "vite-config": "workspace:*",
+        "vitest": "4.1.10",
+      },
+      "peerDependencies": {
+        "vite": "^8.1.5",
+      },
+      "optionalPeers": [
+        "vite",
+      ],
     },
     "packages/ossido-react-vite-plugin": {
       "name": "ossido-react-vite-plugin",
@@ -366,8 +393,6 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "http://localhost:4873/@jridgewell/trace-mapping/-/trace-mapping-0.3.31.tgz", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@mdx-js/mdx": ["@mdx-js/mdx@3.1.1", "http://localhost:4873/@mdx-js/mdx/-/mdx-3.1.1.tgz", { "dependencies": { "@types/estree": "^1.0.0", "@types/estree-jsx": "^1.0.0", "@types/hast": "^3.0.0", "@types/mdx": "^2.0.0", "acorn": "^8.0.0", "collapse-white-space": "^2.0.0", "devlop": "^1.0.0", "estree-util-is-identifier-name": "^3.0.0", "estree-util-scope": "^1.0.0", "estree-walker": "^3.0.0", "hast-util-to-jsx-runtime": "^2.0.0", "markdown-extensions": "^2.0.0", "recma-build-jsx": "^1.0.0", "recma-jsx": "^1.0.0", "recma-stringify": "^1.0.0", "rehype-recma": "^1.0.0", "remark-mdx": "^3.0.0", "remark-parse": "^11.0.0", "remark-rehype": "^11.0.0", "source-map": "^0.7.0", "unified": "^11.0.0", "unist-util-position-from-estree": "^2.0.0", "unist-util-stringify-position": "^4.0.0", "unist-util-visit": "^5.0.0", "vfile": "^6.0.0" } }, "sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ=="],
-
-    "@mdx-js/react": ["@mdx-js/react@3.1.1", "http://localhost:4873/@mdx-js/react/-/react-3.1.1.tgz", { "dependencies": { "@types/mdx": "^2.0.0" }, "peerDependencies": { "@types/react": ">=16", "react": ">=16" } }, "sha512-f++rKLQgUVYDAtECQ6fn/is15GkEH9+nZPM3MS0RcxVqoTfawHvDlSCH7JbMhAM6uJ32v3eXLvLmLvjGu7PTQw=="],
 
     "@mdx-js/rollup": ["@mdx-js/rollup@3.1.1", "http://localhost:4873/@mdx-js/rollup/-/rollup-3.1.1.tgz", { "dependencies": { "@mdx-js/mdx": "^3.0.0", "@rollup/pluginutils": "^5.0.0", "source-map": "^0.7.0", "vfile": "^6.0.0" }, "peerDependencies": { "rollup": ">=2" } }, "sha512-v8satFmBB+DqDzYohnm1u2JOvxx6Hl3pUvqzJvfs2Zk/ngZ1aRUhsWpXvwPkNeGN9c2NCm/38H29ZqXQUjf8dw=="],
 
@@ -1252,6 +1277,8 @@
     "ossido-app": ["ossido-app@workspace:examples/ossido-app"],
 
     "ossido-eslint-plugin": ["ossido-eslint-plugin@workspace:packages/ossido-eslint-plugin"],
+
+    "ossido-mdx": ["ossido-mdx@workspace:packages/ossido-mdx"],
 
     "ossido-react-vite-plugin": ["ossido-react-vite-plugin@workspace:packages/ossido-react-vite-plugin"],
 

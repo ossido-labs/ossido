@@ -29,6 +29,8 @@ const PACKAGES = [
   // A devDependency of scaffolded projects (the Fast Refresh lint guardrail), so
   // it must be resolvable from the local registry when testing `ossido new`.
   'ossido-eslint-plugin',
+  // A dependency of MDX projects (the `ossido new --mdx` feature), likewise.
+  'ossido-mdx',
 ]
 
 /**
