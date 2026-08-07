@@ -8,7 +8,7 @@ interface BuildOptions {
 }
 
 /**
- * Shared tsdown build config for the tuono packages.
+ * Shared tsdown build config for the ossido packages.
  *
  * tsdown externalizes `dependencies` and `peerDependencies` by default and
  * emits `.d.ts` files natively, so it replaces the previous Vite library build

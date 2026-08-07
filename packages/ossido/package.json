@@ -1,0 +1,102 @@
+{
+  "name": "ossido",
+  "version": "0.20.0",
+  "description": "Superfast React fullstack framework",
+  "homepage": "https://ossido.dev",
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "lint": "oxlint",
+    "format": "oxfmt --check .",
+    "format:fix": "oxfmt .",
+    "typecheck": "tsc --noEmit",
+    "test:watch": "vitest",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChildishForces/ossido.git",
+    "directory": "packages/ossido"
+  },
+  "type": "module",
+  "types": "dist/esm/index.d.ts",
+  "main": "dist/esm/index.js",
+  "module": "dist/esm/index.js",
+  "exports": {
+    "./build": {
+      "types": "./dist/esm/build/index.d.ts",
+      "default": "./dist/esm/build/index.js"
+    },
+    "./build-client": {
+      "types": "./dist/esm/build-client/index.d.ts"
+    },
+    "./config": {
+      "types": "./dist/esm/config/index.d.ts",
+      "default": "./dist/esm/config/index.js"
+    },
+    "./ssr": {
+      "types": "./dist/esm/ssr/index.d.ts",
+      "default": "./dist/esm/ssr/index.js"
+    },
+    "./hydration": {
+      "types": "./dist/esm/hydration/index.d.ts",
+      "default": "./dist/esm/hydration/index.js"
+    },
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "default": "./dist/esm/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "ossido-dev-ssr": "./bin/dev-ssr.js",
+    "ossido-dev-watch": "./bin/watch.js",
+    "ossido-build-prod": "./bin/build-prod.js",
+    "ossido-build-config": "./bin/build-config.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "bin/**"
+  ],
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0",
+    "vite": "^8.2.0"
+  },
+  "dependencies": {
+    "@rollup/plugin-inject": "^5.0.5",
+    "@vitejs/plugin-react-swc": "^4.3.2",
+    "fast-text-encoding": "^1.0.6",
+    "ossido-react-vite-plugin": "workspace:*",
+    "ossido-router": "workspace:*",
+    "ossido-ui": "workspace:*",
+    "url-search-params-polyfill": "^8.2.5",
+    "web-streams-polyfill": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.16.5",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tsdown": "0.22.14",
+    "vite": "^8.2.0",
+    "vite-config": "workspace:*",
+    "vitest": "4.1.10"
+  },
+  "sideEffects": [
+    "**/ssr/server.*",
+    "**/ssr/polyfills/globalScope.*"
+  ],
+  "keywords": [
+    "react",
+    "typescript",
+    "fullstack",
+    "framework",
+    "rust"
+  ],
+  "author": "Valerio Ageno",
+  "license": "MIT"
+}

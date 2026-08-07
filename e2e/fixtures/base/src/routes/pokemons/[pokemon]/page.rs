@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tuono_lib::{Props, Request, Response, StaticPaths, Type, handler, static_paths};
+use ossido_lib::{Props, Request, Response, StaticPaths, Type, handler, static_paths};
 
 #[derive(Serialize, Type)]
 struct PokemonResponse {

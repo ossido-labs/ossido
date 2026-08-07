@@ -11,7 +11,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "types": ["tuono/build-client"],
+    "types": ["ossido/build-client"],
 
     // Interop Constraints
     "isolatedModules": true,
@@ -28,5 +28,5 @@
     // Completeness
     "skipLibCheck": true
   },
-  "include": ["src", "tuono.config.ts", "./.tuono/types.ts"]
+  "include": ["src", "ossido.config.ts", "./.ossido/types.ts"]
 }

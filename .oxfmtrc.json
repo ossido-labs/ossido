@@ -8,10 +8,10 @@
   "ignorePatterns": [
     "pnpm-lock.yaml",
     "dist",
-    ".tuono",
+    ".ossido",
     "out",
     "vite.config.ts.timestamp-*",
-    "packages/tuono-lazy-fn-vite-plugin/tests/sources/*",
+    "packages/ossido-lazy-fn-vite-plugin/tests/sources/*",
     "e2e/fixtures/*/test-results",
     "**/*.toml"
   ]

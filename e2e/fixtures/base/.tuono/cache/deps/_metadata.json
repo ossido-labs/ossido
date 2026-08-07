@@ -1,0 +1,108 @@
+{
+  "hash": "e83f7963",
+  "configHash": "3d866724",
+  "lockfileHash": "c17215c3",
+  "browserHash": "20898753",
+  "optimized": {
+    "@jridgewell/trace-mapping": {
+      "src": "../../../../../../node_modules/.bun/@jridgewell+trace-mapping@0.3.31/node_modules/@jridgewell/trace-mapping/dist/trace-mapping.mjs",
+      "file": "@jridgewell_trace-mapping.js",
+      "fileHash": "9de499a1",
+      "needsInterop": false
+    },
+    "@shikijs/langs/javascript": {
+      "src": "../../../../../../node_modules/.bun/@shikijs+langs@4.4.1/node_modules/@shikijs/langs/dist/javascript.mjs",
+      "file": "@shikijs_langs_javascript.js",
+      "fileHash": "54cdb6fc",
+      "needsInterop": false
+    },
+    "@shikijs/langs/rust": {
+      "src": "../../../../../../node_modules/.bun/@shikijs+langs@4.4.1/node_modules/@shikijs/langs/dist/rust.mjs",
+      "file": "@shikijs_langs_rust.js",
+      "fileHash": "974f6d61",
+      "needsInterop": false
+    },
+    "@shikijs/langs/tsx": {
+      "src": "../../../../../../node_modules/.bun/@shikijs+langs@4.4.1/node_modules/@shikijs/langs/dist/tsx.mjs",
+      "file": "@shikijs_langs_tsx.js",
+      "fileHash": "b7e5a63f",
+      "needsInterop": false
+    },
+    "@shikijs/langs/typescript": {
+      "src": "../../../../../../node_modules/.bun/@shikijs+langs@4.4.1/node_modules/@shikijs/langs/dist/typescript.mjs",
+      "file": "@shikijs_langs_typescript.js",
+      "fileHash": "72a5f462",
+      "needsInterop": false
+    },
+    "@shikijs/themes/github-dark": {
+      "src": "../../../../../../node_modules/.bun/@shikijs+themes@4.4.1/node_modules/@shikijs/themes/dist/github-dark.mjs",
+      "file": "@shikijs_themes_github-dark.js",
+      "fileHash": "da702790",
+      "needsInterop": false
+    },
+    "hast-util-to-html": {
+      "src": "../../../../../../node_modules/.bun/hast-util-to-html@9.0.5/node_modules/hast-util-to-html/index.js",
+      "file": "hast-util-to-html.js",
+      "fileHash": "680fb3b3",
+      "needsInterop": false
+    },
+    "react-dom": {
+      "src": "../../../../../../node_modules/.bun/react-dom@19.2.8+0f58469d5b3bd39f/node_modules/react-dom/index.js",
+      "file": "react-dom.js",
+      "fileHash": "723fd41b",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../../../../../node_modules/.bun/react-dom@19.2.8+0f58469d5b3bd39f/node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "39d05166",
+      "needsInterop": true
+    },
+    "react-intersection-observer": {
+      "src": "../../../../../../node_modules/.bun/react-intersection-observer@9.16.0+005eabf3d8b6ef06/node_modules/react-intersection-observer/dist/index.mjs",
+      "file": "react-intersection-observer.js",
+      "fileHash": "87260e71",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../../../../../node_modules/.bun/react@19.2.8/node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "aff78459",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../../../../../node_modules/.bun/react@19.2.8/node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "de553e2b",
+      "needsInterop": true
+    },
+    "react/jsx-runtime": {
+      "src": "../../../../../../node_modules/.bun/react@19.2.8/node_modules/react/jsx-runtime.js",
+      "file": "react_jsx-runtime.js",
+      "fileHash": "e57b705f",
+      "needsInterop": true
+    },
+    "shiki/core": {
+      "src": "../../../../../../node_modules/.bun/shiki@4.4.1/node_modules/shiki/dist/core.mjs",
+      "file": "shiki_core.js",
+      "fileHash": "ce768942",
+      "needsInterop": false
+    },
+    "shiki/engine/javascript": {
+      "src": "../../../../../../node_modules/.bun/shiki@4.4.1/node_modules/shiki/dist/engine-javascript.mjs",
+      "file": "shiki_engine_javascript.js",
+      "fileHash": "436f9989",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "hast-util-to-html-D8qA7M9X": {
+      "file": "hast-util-to-html-D8qA7M9X.js",
+      "isDynamicEntry": false
+    },
+    "rolldown-runtime-B-1-B7_t": {
+      "file": "rolldown-runtime-B-1-B7_t.js",
+      "isDynamicEntry": false
+    }
+  }
+}

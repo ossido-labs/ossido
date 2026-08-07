@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tuono_lib::{handler, Props, Request, Response, Type};
+use ossido_lib::{handler, Props, Request, Response, Type};
 
 #[derive(Serialize, Type)]
 struct MyResponse<'a> {

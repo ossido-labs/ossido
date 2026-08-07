@@ -1,0 +1,13 @@
+[package]
+name = "ossido-app"
+version = "0.0.1"
+edition = "2024"
+
+[[bin]]
+name = "ossido"
+path = ".ossido/main.rs"
+
+[dependencies]
+ossido_lib = { path = "../../crates/ossido_lib" }
+serde = { version = "1.0.202", features = ["derive"] }
+tower-http = { version = "0.6.8", features = ["full"]}

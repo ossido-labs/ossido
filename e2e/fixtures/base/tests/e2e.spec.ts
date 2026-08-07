@@ -4,7 +4,7 @@ test('it renders index page', async ({ page }) => {
   await page.goto('/')
   const header = await page.textContent('h1')
   const subtitle = await page.textContent('h2')
-  expect(header).toContain('TUONO')
+  expect(header).toContain('OSSIDO')
   expect(subtitle).toContain('Subtitle received from the server')
 })
 

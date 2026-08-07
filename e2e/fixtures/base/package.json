@@ -1,7 +1,7 @@
 {
   "name": "fixture-base",
   "type": "module",
-  "description": "Basic tuono application",
+  "description": "Basic ossido application",
   "version": "0.0.1",
   "scripts": {
     "test:e2e": "playwright test --config playwright.ssg.config.ts && playwright test"
@@ -9,7 +9,7 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tuono": "workspace:*"
+    "ossido": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.2",

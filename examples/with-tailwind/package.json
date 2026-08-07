@@ -1,8 +1,9 @@
 {
   "name": "with-tailwind",
-  "description": "Basic tuono application with tailwind",
+  "description": "Basic ossido application with tailwind",
   "version": "0.0.1",
   "scripts": {
+    "lint": "oxlint",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -10,11 +11,14 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.3.3",
-    "tuono": "workspace:*"
+    "ossido": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
-    "typescript": "^5.6.3"
+    "ossido-eslint-plugin": "workspace:*",
+    "oxlint": "1.76.0",
+    "typescript": "^5.6.3",
+    "vite": "^8.2.0"
   }
 }

@@ -2,13 +2,13 @@ import * as path from 'path'
 
 const __dirname = import.meta.dirname
 
-/** Path to the workspace-built tuono CLI binary. */
-export const tuonoBin = path.join(
+/** Path to the workspace-built ossido CLI binary. */
+export const ossidoBin = path.join(
   __dirname,
   '../../../',
   'target',
   'debug',
-  'tuono',
+  'ossido',
 )
 
 /** Shared e2e setup script (linking the workspace packages, etc.). */

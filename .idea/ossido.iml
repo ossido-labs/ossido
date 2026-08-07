@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="EMPTY_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido_internal/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido_internal/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido_lib/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido_lib/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido_lib_macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/ossido-app/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido_lib/benches" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/ossido_lib/examples" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/ssg-example/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/examples/ossido-tutorial/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/ossido-app/target" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/ssg-example/target" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/ossido-tutorial/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

@@ -31,9 +31,9 @@ RUN ["cargo", "install", "cargo-watch"]
 
 # global configuration done ! let's focus on the project itself
 
-## Copy project files into the container (excepted files/dir declared in .dockerignore) to /tuono directory
+## Copy project files into the container (excepted files/dir declared in .dockerignore) to /ossido directory
 
-WORKDIR /tuono
+WORKDIR /ossido
 COPY . .
 
 # pnpm installation based on version found in package.json
@@ -47,4 +47,4 @@ RUN ["pnpm", "install", "--frozen-lockfile", "--config.confirmModulesPurge=false
 ## Compile and add the directory with compiled binaries to the PATH for direct access
 
 RUN ["cargo", "build"]
-ENV PATH=/tuono/target/debug:$PATH
+ENV PATH=/ossido/target/debug:$PATH

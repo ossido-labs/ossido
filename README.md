@@ -1,18 +1,21 @@
-[Documentation](https://tuono.dev) | [Tutorial](https://tuono.dev/documentation/tutorial) |
-[Discord](https://discord.com/invite/khQzPa654B) | [✨Contributing](https://tuono.dev/documentation/contributing)
+[Documentation](https://ossido.dev) | [Tutorial](https://ossido.dev/documentation/tutorial) |
+[Discord](https://discord.com/invite/khQzPa654B) | [✨Contributing](https://ossido.dev/documentation/contributing)
 
-# Tuono
+# Ossido
 
-<img align="right" src="https://raw.githubusercontent.com/tuono-labs/tuono/main/assets/logo.png" width="160px">
+<img align="right" src="https://raw.githubusercontent.com/ChildishForces/ossido/main/assets/logo.png" width="160px">
 
-![](https://github.com/tuono-labs/tuono/actions/workflows/rust.yml/badge.svg)
-![](https://github.com/tuono-labs/tuono/actions/workflows/typescript.yml/badge.svg)
+![](https://github.com/ChildishForces/ossido/actions/workflows/rust.yml/badge.svg)
+![](https://github.com/ChildishForces/ossido/actions/workflows/typescript.yml/badge.svg)
 
-**Tuono is a full-stack web framework for building React applications using Rust as the backend with
+**Ossido is a full-stack web framework for building React applications using Rust as the backend with
 a strong focus on usability and performance.**
 
-Tuono (Italian word for "thunder", pronounced /2 Oh No/).
-Why Tuono? Just a badass name.
+> **Ossido is the successor to [Tuono](https://github.com/tuono-labs/tuono).** It began as a fork of
+> the (now unmaintained) Tuono framework and carries its development forward.
+>
+> The name is a nod to its origin: _Tuono_ is Italian for "thunder", and _Ossido_ is Italian for
+> "oxide" — a rust-themed wink to the Rust core that powers the backend.
 
 If you have experience with [Next.js](https://nextjs.org/) you will feel home here.
 
@@ -26,15 +29,15 @@ Some of its features are:
 
 ## Documentation
 
-The [documentation](https://tuono.dev/) is available on
-[tuono.dev](https://tuono.dev/).
+The [documentation](https://ossido.dev/) is available on
+[ossido.dev](https://ossido.dev/).
 
 ## Installation
 
 Available on MacOS, Linux and Windows.
 
 ```sh
-cargo install tuono
+cargo install ossido
 ```
 
 ## Getting started
@@ -42,21 +45,21 @@ cargo install tuono
 Create a new project with:
 
 ```sh
-tuono new [PROJECT_NAME]
+ossido new [PROJECT_NAME]
 ```
 
-> You can optionally pass the --template (or -t) flag to directly start from a [template](https://github.com/tuono-labs/tuono/tree/main/examples)
+> You can optionally pass the --template (or -t) flag to directly start from a [template](https://github.com/ChildishForces/ossido/tree/main/examples)
 
 Now just install the dependencies with you favourite JS package manager (i.e. `npm install`) and start the development environment
 
 ```sh
-tuono dev
+ossido dev
 ```
 
 ## Contributing
 
 Any help or suggestion will be appreciated and encouraged.
-Check the [✨Contributing](https://tuono.dev/documentation/contributing) page
+Check the [✨Contributing](https://ossido.dev/documentation/contributing) page
 
 ## License
 

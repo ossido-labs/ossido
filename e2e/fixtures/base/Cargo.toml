@@ -1,13 +1,13 @@
 [package]
-name = "tuono-app"
+name = "ossido-app"
 version = "0.0.1"
 edition = "2021"
 
 [[bin]]
-name = "tuono"
-path = ".tuono/main.rs"
+name = "ossido"
+path = ".ossido/main.rs"
 
 [dependencies]
-tuono_lib = { path = "../../../crates/tuono_lib" } 
+ossido_lib = { path = "../../../crates/ossido_lib" } 
 serde = { version = "1.0.202", features = ["derive"] }
 tower-http = { version = "0.6.8", features = ["full"]}

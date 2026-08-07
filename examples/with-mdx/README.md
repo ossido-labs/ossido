@@ -1,7 +1,7 @@
-# Tuono with MDX starter
+# Ossido with MDX starter
 
-This is the starter tuono project. To download it run in your terminal:
+This is the starter ossido project. To download it run in your terminal:
 
 ```sh
-tuono new tuono-with-mdx --template with-mdx
+ossido new ossido-with-mdx --template with-mdx
 ```

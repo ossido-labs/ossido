@@ -1,0 +1,40 @@
+.pokemon {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 24px;
+  border-radius: 18px;
+  border: 1px solid var(--ossido-border);
+  background: var(--ossido-surface);
+  padding: 24px 36px;
+}
+
+.name {
+  font-size: clamp(36px, 6vw, 50px);
+  font-weight: 700;
+  color: #fff;
+  text-transform: capitalize;
+}
+
+.pokemon img {
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+}
+
+.spec {
+  display: flex;
+  font-size: 18px;
+  margin-top: 10px;
+  color: var(--ossido-text-dim);
+
+  > dt {
+    margin-right: 6px;
+  }
+}
+
+.label {
+  font-weight: 600;
+  color: var(--ossido-text);
+}

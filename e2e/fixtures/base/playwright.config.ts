@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
 import {
-  tuonoBin,
+  ossidoBin,
   setupScript,
   sharedConfig,
   sharedWebServer,
@@ -12,7 +12,7 @@ export default defineConfig({
   testDir: './tests',
   webServer: {
     ...sharedWebServer,
-    command: `node ${setupScript} && ${tuonoBin} dev`,
+    command: `node ${setupScript} && ${ossidoBin} dev`,
     port: 3000,
   },
   use: {

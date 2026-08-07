@@ -41,7 +41,7 @@ jobs:
 
       - uses: katyo/publish-crates@v2
         with:
-          path: './crates/tuono'
+          path: './crates/ossido'
           dry-run: true
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           check-repo: true
@@ -60,8 +60,8 @@ jobs:
         with:
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Clone root README.md on tuono package
-        run: cp README.md packages/tuono/README.md
+      - name: Clone root README.md on ossido package
+        run: cp README.md packages/ossido/README.md
 
       - name: Build
         run: pnpm build
@@ -87,6 +87,6 @@ jobs:
 
       - uses: katyo/publish-crates@v2
         with:
-          path: './crates/tuono'
+          path: './crates/ossido'
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           check-repo: true

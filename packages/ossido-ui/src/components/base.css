@@ -1,0 +1,71 @@
+/*
+ * Design tokens shared by the framework's default screens (the dev error
+ * overlay, the production error fallback, the not-found page, …). Injected as a
+ * `<style>` element by `BaseStyles` — the router library has no CSS bundling
+ * step, so styles ship as strings.
+ *
+ * The Google Fonts import MUST stay the first rule in the sheet (CSS ignores
+ * `@import` that follows other rules). Noto Sans is the default body font;
+ * JetBrains Mono is used for code and stack traces.
+ */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Typography ------------------------------------------------------------ */
+  --ossido-font-sans:
+    'Noto Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --ossido-font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --ossido-font-size-xs: 12px;
+  --ossido-font-size-sm: 13px;
+  --ossido-font-size: 14px;
+  --ossido-font-size-lg: 18px;
+  --ossido-font-size-xl: 22px;
+
+  --ossido-font-weight-regular: 400;
+  --ossido-font-weight-medium: 500;
+  --ossido-font-weight-semibold: 600;
+  --ossido-font-weight-bold: 700;
+
+  --ossido-line-height: 1.5;
+  --ossido-line-height-tight: 1.25;
+  --ossido-letter-spacing-wide: 0.04em;
+
+  /* Colours (dark theme) -------------------------------------------------- */
+  --ossido-color-bg: #0a0a0e;
+  --ossido-color-surface: #101014;
+  --ossido-color-surface-hover: #1c1c22;
+  --ossido-color-surface-raised: #151519;
+  --ossido-color-border: rgba(255, 255, 255, 0.1);
+  --ossido-color-border-strong: #3a3a42;
+
+  --ossido-color-text: #e6e6e6;
+  --ossido-color-text-muted: #c7c7cf;
+  --ossido-color-text-subtle: #8a8a94;
+  --ossido-color-text-faint: #6f6f78;
+
+  --ossido-color-accent: #f43f5e;
+  --ossido-color-accent-text: #ff8fa3;
+  --ossido-color-on-accent: #ffffff;
+  --ossido-color-danger-surface: #4a1d27;
+
+  --ossido-color-success: #22c55e;
+  --ossido-color-success-text: #4ade80;
+  --ossido-color-success-surface: #16331f;
+
+  /* Radii ----------------------------------------------------------------- */
+  --ossido-radius-sm: 6px;
+  --ossido-radius: 8px;
+  --ossido-radius-pill: 999px;
+
+  /* Spacing --------------------------------------------------------------- */
+  --ossido-space-1: 0.25rem;
+  --ossido-space-2: 0.5rem;
+  --ossido-space-3: 0.75rem;
+  --ossido-space-4: 1rem;
+  --ossido-space-6: 1.5rem;
+  --ossido-space-8: 2rem;
+}

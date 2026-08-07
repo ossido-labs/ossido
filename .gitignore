@@ -34,3 +34,7 @@ vite.config.ts.timestamp*
 *.tgz
 # Test coverage output (cargo-llvm-cov / vitest)
 coverage/
+
+# Local Verdaccio registry (scripts/local-registry) — package storage + htpasswd
+scripts/local-registry/storage/
+scripts/local-registry/htpasswd

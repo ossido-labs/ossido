@@ -1,0 +1,14 @@
+[package]
+name = "ossido-tutorial"
+version = "0.0.1"
+edition = "2024"
+
+[[bin]]
+name = "ossido"
+path = ".ossido/main.rs"
+
+[dependencies]
+ossido_lib = { path = "../../crates/ossido_lib/" }
+serde = { version = "1.0.202", features = ["derive"] }
+reqwest = "0.12.9"
+

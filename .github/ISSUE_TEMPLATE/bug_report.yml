@@ -37,7 +37,7 @@ body:
     id: system-info
     attributes:
       label: System Info
-      description: Output of `npx envinfo --system --npmPackages 'tuono' --binaries --browsers`
+      description: Output of `npx envinfo --system --npmPackages 'ossido' --binaries --browsers`
       render: shell
       placeholder: System, Binaries, Browsers
     validations:
@@ -46,9 +46,9 @@ body:
     id: system-info-rust
     attributes:
       label: System info (Rust)
-      description: Output of `rustc --version && cargo --version && tuono --version`
+      description: Output of `rustc --version && cargo --version && ossido --version`
       render: shell
-      placeholder: 'rustc, cargo and tuono binary version'
+      placeholder: 'rustc, cargo and ossido binary version'
     validations:
       required: true
   - type: textarea

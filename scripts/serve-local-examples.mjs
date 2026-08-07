@@ -1,19 +1,19 @@
-// Serve the local `examples/` folder in the shape `tuono new` expects, so the
+// Serve the local `examples/` folder in the shape `ossido new` expects, so the
 // scaffolder pulls from your working copy instead of GitHub — no published tag
 // required.
 //
-// `tuono new` reads two GitHub endpoints, both rebased onto whatever URL is in
-// the `__INTERNAL_TUONO_TEST` env var:
-//   * the git API   (tree listing):  /repos/tuono-labs/tuono/git/...
-//   * the raw files (file contents):  /tuono-labs/tuono/<ref>/<path>
+// `ossido new` reads two GitHub endpoints, both rebased onto whatever URL is in
+// the `__INTERNAL_OSSIDO_TEST` env var:
+//   * the git API   (tree listing):  /repos/ChildishForces/ossido/git/...
+//   * the raw files (file contents):  /ChildishForces/ossido/<ref>/<path>
 // This server answers both from disk.
 //
 // Usage:
 //   node scripts/serve-local-examples.mjs [port] [repo-root]
 //
 // Then, in another shell:
-//   __INTERNAL_TUONO_TEST=http://localhost:8787 \
-//     cargo run -p tuono -- new demo-app --head true --yes --tailwind
+//   __INTERNAL_OSSIDO_TEST=http://localhost:8787 \
+//     cargo run -p ossido -- new demo-app --head true --yes --tailwind
 import { createServer } from 'node:http'
 import { readFile, readdir } from 'node:fs/promises'
 import { join, relative, normalize, resolve } from 'node:path'
@@ -29,7 +29,7 @@ const examplesDir = join(repoRoot, 'examples')
 const IGNORED = new Set([
   'node_modules',
   'target',
-  '.tuono',
+  '.ossido',
   '.turbo',
   'out',
   'dist',
@@ -82,10 +82,10 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  // Raw file: /tuono-labs/tuono/<ref>/<path> -> <path> under the repo. Strip the
-  // leading "", "tuono-labs", "tuono", "<ref>" segments.
+  // Raw file: /ChildishForces/ossido/<ref>/<path> -> <path> under the repo. Strip the
+  // leading "", "ChildishForces", "ossido", "<ref>" segments.
   const parts = path.replace(/^\//, '').split('/')
-  if (parts[0] === 'tuono-labs' && parts[1] === 'tuono' && parts.length >= 4) {
+  if (parts[0] === 'ChildishForces' && parts[1] === 'ossido' && parts.length >= 4) {
     const rel = parts.slice(3).join('/')
     const filePath = normalize(join(repoRoot, decodeURIComponent(rel)))
     // Prevent path traversal outside the repo root.

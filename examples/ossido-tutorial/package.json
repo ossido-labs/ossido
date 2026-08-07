@@ -1,0 +1,22 @@
+{
+  "name": "ossido-tutorial",
+  "description": "The basic tutorial for ossido applications",
+  "version": "0.0.1",
+  "scripts": {
+    "lint": "oxlint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "ossido": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "ossido-eslint-plugin": "workspace:*",
+    "oxlint": "1.76.0",
+    "typescript": "^5.6.3",
+    "vite": "^8.2.0"
+  }
+}

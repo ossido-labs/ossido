@@ -1,0 +1,1 @@
+{"server":{"host":"localhost","origin":null,"port":3000},"logging":{"format":"pretty","routeTree":false,"browser":{"enabled":true,"level":"info"}},"dev":{"criticalCss":true},"ssr":{"renderThreads":1}}

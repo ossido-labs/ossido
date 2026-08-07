@@ -4,7 +4,7 @@ import type { JSX } from 'react'
 /**
  * Test harness for the dev error overlay. Each button triggers a different kind
  * of error the overlay handles, so the e2e suite (and a human running
- * `tuono dev`) can exercise the overlay, its pager, and dismiss-to-badge.
+ * `ossido dev`) can exercise the overlay, its pager, and dismiss-to-badge.
  *
  * @see e2e/fixtures/base/tests/error-overlay.spec.ts
  */

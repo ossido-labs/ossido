@@ -1,12 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 @import 'tailwindcss' source('../..');
 
-/* Design tokens exposed as Tailwind theme values (e.g. `text-tuono-text-dim`). */
+/* Design tokens exposed as Tailwind theme values (e.g. `text-ossido-text-dim`). */
 @theme {
-  --color-tuono-cyan: #61dafb;
-  --color-tuono-yellow: #fbc100;
-  --color-tuono-text: #f4f4f6;
-  --color-tuono-text-dim: rgba(244, 244, 246, 0.58);
+  --color-ossido-cyan: #61dafb;
+  --color-ossido-yellow: #fbc100;
+  --color-ossido-text: #f4f4f6;
+  --color-ossido-text-dim: rgba(244, 244, 246, 0.58);
   --font-poppins: 'Poppins', sans-serif;
 }
 
@@ -15,7 +15,7 @@
     min-height: 100vh;
     font-family: var(--font-poppins);
     font-weight: 400;
-    color: var(--color-tuono-text);
+    color: var(--color-ossido-text);
     background: #0a0a0e;
   }
 }

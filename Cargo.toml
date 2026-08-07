@@ -3,15 +3,15 @@ edition = "2024"
 [workspace]
 resolver = "2"
 members = [
-  "crates/tuono", 
-  "crates/tuono_internal", 
-  "crates/tuono_lib", 
-  "crates/tuono_lib_macros"
+  "crates/ossido", 
+  "crates/ossido_internal", 
+  "crates/ossido_lib", 
+  "crates/ossido_lib_macros"
 ]
 exclude = [
   "examples/with-mdx",
-  "examples/tuono-app",
-  "examples/tuono-tutorial",
+  "examples/ossido-app",
+  "examples/ossido-tutorial",
   "examples/with-tailwind",
   "e2e/fixtures/base",
 ]

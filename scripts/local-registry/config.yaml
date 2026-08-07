@@ -1,0 +1,53 @@
+# Verdaccio config for the Ossido local registry.
+#
+# Serves the workspace packages (`ossido`, `ossido-*`) from local storage and
+# proxies every other package to npmjs.org. Point a test project at it with an
+# `.npmrc` containing `registry=http://localhost:4873` and its installs resolve
+# the local Ossido packages here while everything else is fetched (and cached)
+# from the real registry.
+#
+# Start:   bun run registry:start   (or: bunx verdaccio@6 --config scripts/local-registry/config.yaml)
+# Publish: bun run registry:publish
+
+# Package tarballs + metadata live here (gitignored, safe to delete to reset).
+storage: ./storage
+# htpasswd file is created on first `npm adduser`; unused for anonymous publish.
+auth:
+  htpasswd:
+    file: ./htpasswd
+    max_users: -1
+
+# Upstream real registry, used only by the `**` proxy rule below.
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+    maxage: 30m
+    cache: true
+
+packages:
+  # The Ossido packages are served ONLY from local storage (no `proxy`), so a
+  # stray unrelated package of the same name on npmjs can never shadow them, and
+  # an unpublished one fails fast instead of silently proxying. `$all` allows
+  # anonymous publish/unpublish (no login needed for local dev).
+  'ossido':
+    access: $all
+    publish: $all
+    unpublish: $all
+  'ossido-*':
+    access: $all
+    publish: $all
+    unpublish: $all
+
+  # Everything else proxies to npmjs (scoped + unscoped).
+  '@*/*':
+    access: $all
+    publish: $authenticated
+    proxy: npmjs
+  '**':
+    access: $all
+    publish: $authenticated
+    proxy: npmjs
+
+# Keep the console quiet; bump to `info`/`debug` when diagnosing.
+log: { type: stdout, format: pretty, level: warn }
+listen: 0.0.0.0:4873

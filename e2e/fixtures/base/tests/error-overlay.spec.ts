@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * The dev-only unified error overlay (tuono-ui `DevErrorOverlayHost`) surfaces
+ * The dev-only unified error overlay (ossido-ui `DevErrorOverlayHost`) surfaces
  * every kind of dev error in one floating, browsable window. The `/throws`
  * route provides a button per JS error kind, and `/rust-error` panics in its
- * Rust handler. `tuono dev` runs in `Dev` mode, so the overlay host is mounted.
+ * Rust handler. `ossido dev` runs in `Dev` mode, so the overlay host is mounted.
  */
 
 test('surfaces a Rust handler panic with the embedded, highlighted panic site', async ({
@@ -13,19 +13,19 @@ test('surfaces a Rust handler panic with the embedded, highlighted panic site', 
   // The handler panics during SSR, so the overlay is present on first load.
   await page.goto('/rust-error')
 
-  const overlay = page.locator('.tuono-err-window')
+  const overlay = page.locator('.ossido-err-window')
   await expect(overlay).toBeVisible()
-  await expect(page.locator('.tuono-err-name')).toHaveText('RustPanic')
-  await expect(page.locator('.tuono-err-message')).toContainText(
+  await expect(page.locator('.ossido-err-name')).toHaveText('RustPanic')
+  await expect(page.locator('.ossido-err-message')).toContainText(
     'This panic was raised inside a Rust route handler',
   )
   // The panic-site source is embedded by the server (no sourcemap) and shown
   // pointing at the exact `panic!` line.
-  await expect(page.locator('.tuono-err-source-file')).toContainText(
+  await expect(page.locator('.ossido-err-source-file')).toContainText(
     'src/routes/rust-error/page.rs',
   )
   await expect(
-    page.locator('.tuono-err-code-line--error .tuono-err-code-text'),
+    page.locator('.ossido-err-code-line--error .ossido-err-code-text'),
   ).toContainText('panic!(')
 })
 
@@ -39,12 +39,12 @@ test('surfaces a render error as a floating overlay and recovers on retry', asyn
 
   await page.getByTestId('throw-render').click()
 
-  const overlay = page.locator('.tuono-err-window')
+  const overlay = page.locator('.ossido-err-window')
   await expect(overlay).toBeVisible()
-  await expect(page.locator('.tuono-err-pager-kind')).toHaveText(
+  await expect(page.locator('.ossido-err-pager-kind')).toHaveText(
     'Runtime error',
   )
-  await expect(page.locator('.tuono-err-message')).toContainText(
+  await expect(page.locator('.ossido-err-message')).toContainText(
     'a component threw during render',
   )
 
@@ -62,9 +62,9 @@ test('collects multiple errors and pages through them, then dismisses to a badge
   // handler is attached.
   await page.goto('/throws', { waitUntil: 'networkidle' })
 
-  const overlay = page.locator('.tuono-err-window')
-  const count = page.locator('.tuono-err-pager-count')
-  const badge = page.locator('.tuono-err-fab')
+  const overlay = page.locator('.ossido-err-window')
+  const count = page.locator('.ossido-err-pager-count')
+  const badge = page.locator('.ossido-err-fab')
 
   // The first error opens the (modal) overlay.
   await page.getByTestId('throw-uncaught').click()
@@ -87,7 +87,7 @@ test('collects multiple errors and pages through them, then dismisses to a badge
   // Closing collapses to the corner indicator, which keeps a count bubble.
   await page.keyboard.press('Escape')
   await expect(badge).toBeVisible()
-  await expect(badge.locator('.tuono-err-fab-count')).toHaveText('2')
+  await expect(badge.locator('.ossido-err-fab-count')).toHaveText('2')
   await expect(overlay).toHaveCount(0)
 
   // The badge opens a menu; "View errors" reopens the overlay.
@@ -101,14 +101,14 @@ test('the dev indicator is always visible and its menu repositions and hides it'
 }) => {
   // No errors on the index route, but the indicator is still shown by default.
   await page.goto('/', { waitUntil: 'networkidle' })
-  const indicator = page.locator('.tuono-err-indicator')
+  const indicator = page.locator('.ossido-err-indicator')
   await expect(indicator).toBeVisible()
-  await expect(indicator).toHaveClass(/tuono-err-indicator--bottom-left/)
+  await expect(indicator).toHaveClass(/ossido-err-indicator--bottom-left/)
 
   // The menu repositions the indicator, and the choice persists across reloads.
-  await page.locator('.tuono-err-fab').click()
+  await page.locator('.ossido-err-fab').click()
   await page.getByRole('button', { name: 'Top right' }).click()
-  await expect(indicator).toHaveClass(/tuono-err-indicator--top-right/)
+  await expect(indicator).toHaveClass(/ossido-err-indicator--top-right/)
 
   // "Hide until reload" removes it for the session.
   await page.getByRole('menuitem', { name: /hide until reload/i }).click()
@@ -116,7 +116,7 @@ test('the dev indicator is always visible and its menu repositions and hides it'
 
   // A reload restores the indicator (hide is per-session) at the saved corner.
   await page.reload({ waitUntil: 'networkidle' })
-  await expect(page.locator('.tuono-err-indicator')).toHaveClass(
-    /tuono-err-indicator--top-right/,
+  await expect(page.locator('.ossido-err-indicator')).toHaveClass(
+    /ossido-err-indicator--top-right/,
   )
 })

@@ -1,5 +1,5 @@
 use tower_http::trace::TraceLayer;
-use tuono_lib::middleware;
+use ossido_lib::middleware;
 
 #[middleware]
 pub fn trace_layer(

@@ -1,4 +1,4 @@
-use tuono_lib::{handler, Request, Response};
+use ossido_lib::{handler, Request, Response};
 
 /// A route whose Rust handler panics — the dev error overlay surfaces the panic
 /// with the embedded panic-site source (no sourcemap involved). Used by the e2e

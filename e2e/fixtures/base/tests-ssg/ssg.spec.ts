@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-// These run against the `tuono build --static` output served from a plain static
+// These run against the `ossido build --static` output served from a plain static
 // file server (no rewrites), so they prove the export is deployable as-is.
 
 test('renders a dynamic [param] page from the static export', async ({
@@ -24,10 +24,10 @@ test('client-side navigation fetches the prerendered .json data', async ({
 
   // On client-side navigation the router fetches the pre-rendered `.json` data
   // file (the static-export URL). A 200 here is the whole point of the fix — a
-  // naive static host would 404 the extensionless `/__tuono/data/...` route.
+  // naive static host would 404 the extensionless `/__ossido/data/...` route.
   const dataResponse = page.waitForResponse(
     (res) =>
-      res.url().includes('/__tuono/data/pokemons/pikachu.json') &&
+      res.url().includes('/__ossido/data/pokemons/pikachu.json') &&
       res.status() === 200,
   )
 

@@ -1,4 +1,4 @@
-# Tuono SSR performance checklist
+# Ossido SSR performance checklist
 
 A living list of SSR-pipeline performance opportunities identified from a review
 of the render hot path (`ssr.rs`, `response.rs`, `payload.rs`, `source_builder.rs`
@@ -27,7 +27,7 @@ Before optimising, attribute where request time actually goes:
       Added a bounded render pool (`render_pool.rs`): a fixed set of OS threads, each
       owning a warm thread-local isolate, fed by a crossbeam MPMC queue; the async
       handlers submit the (serialized, `Send`) payload and `await` a oneshot. Size
-      defaults to `available_parallelism()`, overridable via `TUONO_SSR_THREADS`
+      defaults to `available_parallelism()`, overridable via `OSSIDO_SSR_THREADS`
       (floor 1). Render fns (`render_chain`, `render_error_to_string`, the macro's
       single-page handler, `catch_all`) are now async and route through the pool.
       Key gotcha: an `async fn` captures _all_ its params, so `Response` (holding a
@@ -51,15 +51,15 @@ Before optimising, attribute where request time actually goes:
   is latency/responsiveness, as predicted. Isolate count = pool size (same as the
   old per-worker model → no memory increase).
 
-  Pool size is configurable via **`ssr.renderThreads` in `tuono.config.ts`**
-  (DONE 2026-08-01) — TS `TuonoConfig.ssr` → normalized (`null` = auto) →
-  `config.json` → Rust `SsrConfig`; precedence is `TUONO_SSR_THREADS` env >
+  Pool size is configurable via **`ssr.renderThreads` in `ossido.config.ts`**
+  (DONE 2026-08-01) — TS `OssidoConfig.ssr` → normalized (`null` = auto) →
+  `config.json` → Rust `SsrConfig`; precedence is `OSSIDO_SSR_THREADS` env >
   config > available parallelism. Each pool thread pre-warms its isolate at
   startup (#7, done) so the first request skips the V8 compile.
 
   Original analysis + baseline, for reference:
   `render_chain` (`response.rs`) calls `Js::render_to_string` synchronously; the
-  generated `async fn __tuono_ssr_*` (`source_builder.rs`) calls it un-awaited,
+  generated `async fn __ossido_ssr_*` (`source_builder.rs`) calls it un-awaited,
   and `catch_all.rs` does the same — all on the default multi-threaded
   `#[tokio::main]` runtime. A render monopolises a worker thread for its whole
   duration (the V8 isolate is thread-local, and a synchronous render has **no
@@ -70,7 +70,7 @@ Before optimising, attribute where request time actually goes:
   _Impact: high (tail latency under load) · Effort: medium · Risk: medium._
 
   **Baseline measured (2026-08-01)** — prod fixture, `/heavy` = ~38 ms render
-  (975 KB), 8 concurrent heavy loaders, probe = `/__tuono/data/` (no V8). This is
+  (975 KB), 8 concurrent heavy loaders, probe = `/__ossido/data/` (no V8). This is
   a **constrained-machine problem**: catastrophic at low worker counts,
   negligible on a full box.
 
@@ -85,20 +85,20 @@ Before optimising, attribute where request time actually goes:
   time-slices the render thread, so a fast probe is served in ~ms instead of
   queuing behind whole renders. Fixes **latency/responsiveness** on constrained
   boxes, not render throughput (still core-bound). Reproduce: add a heavy route,
-  `tuono build`, pin `worker_threads` in `.tuono/main.rs`, `cargo build
+  `ossido build`, pin `worker_threads` in `.ossido/main.rs`, `cargo build
 --release`, run `scratchpad/serload.mjs` (probe idle vs under heavy load).
 
 - [x] **2. True streaming SSR.** DONE (2026-08-01) — approach (a), bridging the
       V8 render to an axum streaming body so the shell flushes without waiting for
       the whole page.
       - **ssr_rs 0.9.0** adds `render(entry, params)` (single named export) and
-        `render_to_stream(entry, params, on_chunk)` (invokes `__tuono_stream_write`
+        `render_to_stream(entry, params, on_chunk)` (invokes `__ossido_stream_write`
         per chunk). Consumed locally via the `[patch.crates-io]` override until
         published.
       - **JS** (`ssr/server.tsx`): `serverSideRendering` now returns two named
         exports — `renderFn` (buffered, for error pages / SSG / dev fallback) and
         `renderStream` (iterates `renderToReadableStream` *without* `allReady`,
-        writing each chunk through the injected `__tuono_stream_write`). A shell
+        writing each chunk through the injected `__ossido_stream_write`). A shell
         error rejects before any chunk, so the status can still be an error.
       - **Rust**: `Js::render_stream` + a `Job::Stream` variant on the render pool
         that forwards chunks over an **unbounded** channel (never block a render
@@ -122,7 +122,7 @@ Before optimising, attribute where request time actually goes:
   > lazy route component — the shell still flushes first and the route content
   > follows as a streamed reveal.
   >
-  > Test layering (each layer one job): `tuono_lib` `server_test` drives the
+  > Test layering (each layer one job): `ossido_lib` `server_test` drives the
   > Rust server/pool/streaming plumbing against a small **hand-written** SSR
   > bundle stub (`tests/assets/fake_ssr_bundle.js` — reviewable, no JS build
   > dependency); `createUtf8Streamer` has a `vitest` unit test covering
@@ -140,7 +140,7 @@ Before optimising, attribute where request time actually goes:
   _Impact: scales with payload size · Effort: low–medium · Risk: low._
 
 - [x] **4. `Request` is deep-cloned N+1× per request.** (DONE 2026-08-01)
-      The join calls `tuono_internal_props(req.clone(), …)` for the page and each
+      The join calls `ossido_internal_props(req.clone(), …)` for the page and each
       layout (`source_builder.rs`); `Request` owned a `HeaderMap` cloned each time
       (plus the initial `headers().to_owned()`). Fix: `Request.headers` is now
       `Arc<HeaderMap>` (`request.rs`), so `req.clone()` shares the header map instead
@@ -227,7 +227,7 @@ Before optimising, attribute where request time actually goes:
 
   The cached heavy route is now **bandwidth-bound** (177 KB × 13.8k ≈ 2.4 GB/s),
   not V8-bound. Light `○` routes were already at the no-V8 ceiling, so the cache
-  is a no-op win there (correctly). Verified: e2e 8/8, `tuono_lib` tests pass with
+  is a no-op win there (correctly). Verified: e2e 8/8, `ossido_lib` tests pass with
   the cache active (mock server runs `Mode::Prod`).
 
   _Follow-ups (optional):_ (a) eager pre-warm — render all `○` routes at startup
@@ -243,7 +243,7 @@ Before optimising, attribute where request time actually goes:
   | ------------------------- | --------- | ------------ | ------------------ | ---------- |
   | `/second-route` (trivial) | 515 B     | 0.2 ms       | ~30k req/s (c=50)  | 4.8 ms     |
   | `/heavy` (1500 rows)      | 177 KB    | 4.7 ms       | **~1.0k req/s** (c=16, saturated) | 81 ms |
-  | `/__tuono/data` (no V8)   | ~5 KB     | 0.3 ms       | ~29k req/s (c=50)  | 4.9 ms     |
+  | `/__ossido/data` (no V8)   | ~5 KB     | 0.3 ms       | ~29k req/s (c=50)  | 4.9 ms     |
 
   Takeaway: a **trivial** static route already runs at the no-V8 ceiling (~30k
   req/s) — V8 render (~0.2 ms) is noise, so #8 buys **nothing** there. A **heavy**
@@ -255,10 +255,10 @@ Before optimising, attribute where request time actually goes:
   _Revised: Impact high **only for heavy static routes** · Effort high · Risk medium._
 
   Note: this item is about the **dynamic prod server** serving static routes
-  without V8. The separate **static export** (`tuono build --static`) is a
+  without V8. The separate **static export** (`ossido build --static`) is a
   different deliverable and now supports **dynamic routes** too, via a
-  `#[tuono_lib::static_paths]` enumerator per dynamic `page.rs` (2026-08-01):
-  the codegen exposes an internal `/__tuono/static_paths/<module>` endpoint, and
+  `#[ossido_lib::static_paths]` enumerator per dynamic `page.rs` (2026-08-01):
+  the codegen exposes an internal `/__ossido/static_paths/<module>` endpoint, and
   the build substitutes each returned param set into the route pattern (single
   `[param]` and catch-all `[...slug]`, validated) to render every concrete
   page + its data JSON. `--static` now aborts only for a dynamic route that
@@ -293,7 +293,7 @@ Before optimising, attribute where request time actually goes:
 
   Heavy static route throughput: **13.8k → ~60k req/s** (p99 2.4 ms → **0.6 ms**) —
   no longer bandwidth-bound. Full journey vs the original V8-per-request: **~1k →
-  60k req/s (~60×)**. Verified: e2e 8/8, `tuono_lib` tests pass.
+  60k req/s (~60×)**. Verified: e2e 8/8, `ossido_lib` tests pass.
   _Follow-up (optional):_ precompressed static assets at build (`.br`/`.gz` +
   `ServeDir::precompressed_br`) to drop the per-request asset compression CPU.
   _Impact: high (every response; completes #8) · Effort: low · Risk: low._
@@ -310,10 +310,10 @@ Before optimising, attribute where request time actually goes:
 2. **Rust → V8** — the JSON string is passed into V8 as a JS string argument.
 3. **V8** — `JSON.parse(payload)` (`ssr/server.tsx`). **One parse.**
 4. **V8** — the parsed object is **re-serialized** with `JSON.stringify(serverPayload)`
-   and embedded in the HTML `<script>` (`shared/TuonoScripts.tsx`). **One re-encode
+   and embedded in the HTML `<script>` (`shared/OssidoScripts.tsx`). **One re-encode
    of the exact same data.**
 5. **Client** — the browser evaluates `window[...] = { … }` (native object-literal
-   parse) on load; the client never re-parses (`shared/TuonoContext.tsx`).
+   parse) on load; the client never re-parses (`shared/OssidoContext.tsx`).
 
 So the same payload is encoded in Rust, parsed in V8, and **re-encoded in V8** —
 a full parse + re-stringify round trip inside the isolate, every request.
@@ -322,7 +322,7 @@ a full parse + re-stringify round trip inside the isolate, every request.
 
 - [x] **Eliminate the V8 re-stringify (step 4).** DONE (2026-07-31). The raw
       payload string V8 already received is threaded through the context to
-      `TuonoScripts` and embedded verbatim (`dangerouslySetInnerHTML` +
+      `OssidoScripts` and embedded verbatim (`dangerouslySetInnerHTML` +
       `suppressHydrationWarning`), instead of `JSON.stringify`-ing the parsed object
       again. JS-only change (no Rust); removes ~735 µs of V8 encode per large-payload
       request (per the benchmark). Bonus: `<` is escaped to `<`, closing a
@@ -337,7 +337,7 @@ a full parse + re-stringify round trip inside the isolate, every request.
       serialized once and spliced rather than built-then-re-serialized. Enabled the
       `serde_json` `raw_value` feature. Only affects layout-wrapped pages (the chain
       path); the single-page path already single-encoded. ~330 µs on a large-payload
-      chain render (per the benchmark). Verified: `tuono_lib` 41 tests (incl.
+      chain render (per the benchmark). Verified: `ossido_lib` 41 tests (incl.
       `chain_json_*` asserting correct `layoutData` JSON), full workspace tests,
       e2e 7/7.
 

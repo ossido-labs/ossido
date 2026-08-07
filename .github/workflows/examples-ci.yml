@@ -27,15 +27,15 @@ jobs:
         working-directory: examples
         # produces the list of folder inside examples without leading `./` and trailing `/`:
         # ```text
-        # tuono-tutorial
+        # ossido-tutorial
         # with-tailwind
-        # tuono-app
+        # ossido-app
         # with-mdx
         # ```
         #
         # after, using `jq` the output is converted into a JSON array:
         # ```json
-        # ["tuono-tutorial","with-tailwind","tuono-app","with-mdx"]
+        # ["ossido-tutorial","with-tailwind","ossido-app","with-mdx"]
         # ```
         #
         # and added to `$GITHUB_OUTPUT` env variable:
@@ -57,7 +57,7 @@ jobs:
           # - 'windows-latest'
 
         # Only on this repo some examples build including plugins fails
-        # However, if the project is downloaded via `tuono new`` it will work
+        # However, if the project is downloaded via `ossido new`` it will work
         # @see https://github.com/tuono-labs/tuono/pull/605#pullrequestreview-2656262230
         # needs further investigations
         exclude:
@@ -85,7 +85,7 @@ jobs:
 
       - name: Check "build"
         working-directory: ./examples/${{ matrix.example_name }}
-        run: ../../target/debug/tuono build
+        run: ../../target/debug/ossido build
 
       - name: Check formatting
         run: bun run format

@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc", "import", "react", "vitest"],
+  "jsPlugins": ["ossido-eslint-plugin"],
   "categories": {
     "correctness": "error"
   },
@@ -27,6 +28,10 @@
     "import/no-named-as-default-member": "error",
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
+    "react-refresh/only-export-components": [
+      "warn",
+      { "allowConstantExport": true }
+    ],
     "no-case-declarations": "error",
     "no-empty": "error",
     "no-prototype-builtins": "error",
@@ -39,11 +44,12 @@
   "ignorePatterns": [
     "**/dist/**",
     "**/out/**",
+    "**/.ossido/**",
     "**/.tuono/**",
     "**/vite.config.ts.timestamp**",
-    "packages/tuono-react-vite-plugin/tests/generator/**",
-    "packages/tuono-lazy-fn-vite-plugin/tests/sources/**",
-    "packages/tuono/bin/**",
+    "packages/ossido-react-vite-plugin/tests/generator/**",
+    "packages/ossido-lazy-fn-vite-plugin/tests/sources/**",
+    "packages/ossido/bin/**",
     "examples/**"
   ],
   "overrides": [

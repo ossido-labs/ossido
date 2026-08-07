@@ -4,7 +4,7 @@
 
 ### Checklist
 
-- [ ] I have read [Contributing > Pull requests](https://tuono.dev/documentation/contributing/pull-requests)
+- [ ] I have read [Contributing > Pull requests](https://ossido.dev/documentation/contributing/pull-requests)
 
 ### Related issue
 

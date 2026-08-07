@@ -1,0 +1,2 @@
+[install]
+registry = { url = "http://localhost:4873", token = "ossido-local-registry" }

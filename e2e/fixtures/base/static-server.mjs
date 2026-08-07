@@ -1,7 +1,7 @@
 // Minimal, dependency-free static file server for the SSG e2e. Serves a
 // directory the way a plain static host would — directory-index (`index.html`)
 // resolution for extensionless routes and correct content types — so the
-// `tuono build --static` export is exercised exactly as it would be deployed
+// `ossido build --static` export is exercised exactly as it would be deployed
 // (no rewrites). Usage: `node static-server.mjs <root-dir> <port>`.
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
