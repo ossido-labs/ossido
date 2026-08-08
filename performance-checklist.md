@@ -122,7 +122,7 @@ Before optimising, attribute where request time actually goes:
   > lazy route component — the shell still flushes first and the route content
   > follows as a streamed reveal.
   >
-  > Test layering (each layer one job): `ossido_lib` `server_test` drives the
+  > Test layering (each layer one job): `ossido` `server_test` drives the
   > Rust server/pool/streaming plumbing against a small **hand-written** SSR
   > bundle stub (`tests/assets/fake_ssr_bundle.js` — reviewable, no JS build
   > dependency); `createUtf8Streamer` has a `vitest` unit test covering
@@ -227,7 +227,7 @@ Before optimising, attribute where request time actually goes:
 
   The cached heavy route is now **bandwidth-bound** (177 KB × 13.8k ≈ 2.4 GB/s),
   not V8-bound. Light `○` routes were already at the no-V8 ceiling, so the cache
-  is a no-op win there (correctly). Verified: e2e 8/8, `ossido_lib` tests pass with
+  is a no-op win there (correctly). Verified: e2e 8/8, `ossido` tests pass with
   the cache active (mock server runs `Mode::Prod`).
 
   _Follow-ups (optional):_ (a) eager pre-warm — render all `○` routes at startup
@@ -257,7 +257,7 @@ Before optimising, attribute where request time actually goes:
   Note: this item is about the **dynamic prod server** serving static routes
   without V8. The separate **static export** (`ossido build --static`) is a
   different deliverable and now supports **dynamic routes** too, via a
-  `#[ossido_lib::static_paths]` enumerator per dynamic `page.rs` (2026-08-01):
+  `#[ossido::static_paths]` enumerator per dynamic `page.rs` (2026-08-01):
   the codegen exposes an internal `/__ossido/static_paths/<module>` endpoint, and
   the build substitutes each returned param set into the route pattern (single
   `[param]` and catch-all `[...slug]`, validated) to render every concrete
@@ -293,7 +293,7 @@ Before optimising, attribute where request time actually goes:
 
   Heavy static route throughput: **13.8k → ~60k req/s** (p99 2.4 ms → **0.6 ms**) —
   no longer bandwidth-bound. Full journey vs the original V8-per-request: **~1k →
-  60k req/s (~60×)**. Verified: e2e 8/8, `ossido_lib` tests pass.
+  60k req/s (~60×)**. Verified: e2e 8/8, `ossido` tests pass.
   _Follow-up (optional):_ precompressed static assets at build (`.br`/`.gz` +
   `ServeDir::precompressed_br`) to drop the per-request asset compression CPU.
   _Impact: high (every response; completes #8) · Effort: low · Risk: low._
@@ -337,7 +337,7 @@ a full parse + re-stringify round trip inside the isolate, every request.
       serialized once and spliced rather than built-then-re-serialized. Enabled the
       `serde_json` `raw_value` feature. Only affects layout-wrapped pages (the chain
       path); the single-page path already single-encoded. ~330 µs on a large-payload
-      chain render (per the benchmark). Verified: `ossido_lib` 41 tests (incl.
+      chain render (per the benchmark). Verified: `ossido` 41 tests (incl.
       `chain_json_*` asserting correct `layoutData` JSON), full workspace tests,
       e2e 7/7.
 

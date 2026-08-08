@@ -55,7 +55,7 @@ export type RouteComponent = ComponentType<any> & {
 /**
  * Serialized Rust handler error, sent by the server (dev mode only) so a
  * backend panic can surface in the error overlay like a JS error.
- * @see crates/ossido_lib/src/server_error.rs
+ * @see crates/ossido/src/server_error.rs
  */
 export interface ServerErrorPayload {
   name: string

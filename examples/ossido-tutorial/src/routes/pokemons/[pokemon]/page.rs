@@ -1,10 +1,10 @@
 use reqwest::{Client, StatusCode};
-use serde::{Deserialize, Serialize};
-use ossido_lib::{handler, Props, Request, Response};
+use ossido::{handler, Props, Request, Response};
 
 const POKEMON_API: &str = "https://pokeapi.co/api/v2/pokemon";
 
-#[derive(Debug, Serialize, Deserialize, Props)]
+#[Props]
+#[derive(Debug)]
 struct Pokemon {
     name: String,
     id: u16,

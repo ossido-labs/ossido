@@ -61,7 +61,7 @@ interface OssidoApiResponse {
   info: {
     redirect_destination?: string
     // Present (dev only) when the Rust handler panicked — see `error_json` in
-    // crates/ossido_lib/src/response.rs.
+    // crates/ossido/src/response.rs.
     serverError?: ServerErrorPayload
   }
 }

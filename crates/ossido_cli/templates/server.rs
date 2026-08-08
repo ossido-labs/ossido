@@ -1,0 +1,23 @@
+// File automatically generated
+// Do not manually change it
+
+use ossido::{Mode, Server, axum::Router, tokio, ossido_internal_init_v8_platform};
+// AXUM_GET_ROUTE_HANDLER
+
+/*MODE*/
+
+// MODULE_IMPORTS
+
+//MAIN_FILE_IMPORT//
+
+#[tokio::main]
+async fn main() {
+    ossido_internal_init_v8_platform();
+
+    //MAIN_FILE_DEFINITION//
+
+    // ROUTE_BUILDER
+    //MAIN_FILE_USAGE//
+
+    Server::init(router, MODE).await.start().await
+}

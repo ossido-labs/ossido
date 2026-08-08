@@ -1,15 +1,16 @@
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use ossido_lib::{handler, Props, Request, Type};
+use ossido::{handler, Props, Request, Type};
 
 const ALL_POKEMON: &str = "https://pokeapi.co/api/v2/pokemon?limit=151";
 
-#[derive(Debug, Props, Type, Serialize, Deserialize)]
+#[Props]
+#[derive(Debug)]
 struct Pokemons {
     results: Vec<Pokemon>,
 }
 
-#[derive(Debug, Type, Serialize, Deserialize)]
+#[Type]
+#[derive(Debug)]
 struct Pokemon {
     name: String,
     url: String,

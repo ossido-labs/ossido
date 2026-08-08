@@ -1,7 +1,6 @@
-use serde::Serialize;
-use ossido_lib::{handler, Logger, Props, Request, Type};
+use ossido::{handler, Logger, Props, Request};
 
-#[derive(Serialize, Type, Props)]
+#[Props]
 struct MyResponse {
     subtitle: String,
 }

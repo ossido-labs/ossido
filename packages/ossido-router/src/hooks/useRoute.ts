@@ -11,7 +11,7 @@ export { sanitizePathname }
  * This hook is also implemented on server side to match the bundle
  * file to load at the first rendering.
  *
- * File: crates/ossido_lib/src/payload.rs
+ * File: crates/ossido/src/payload.rs
  *
  * Optimizations should occur on both
  */

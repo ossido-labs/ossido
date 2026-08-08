@@ -3,7 +3,7 @@ import type { ComponentType } from 'react'
 /**
  * The panic-site source file, embedded by the server (dev only) so the overlay
  * can show a highlighted excerpt — Rust has no sourcemap to resolve one from.
- * @see crates/ossido_lib/src/server_error.rs (`ErrorSource`)
+ * @see crates/ossido/src/server_error.rs (`ErrorSource`)
  */
 export interface ServerErrorSource {
   file: string

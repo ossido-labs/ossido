@@ -44,9 +44,9 @@ rustError.ossidoServerSource = {
   line: 8,
   column: 5,
   content: [
-    'use ossido_lib::{Request, Response};',
+    'use ossido::{Request, Response};',
     '',
-    '#[ossido_lib::handler]',
+    '#[ossido::handler]',
     'async fn rust_error(_req: Request) -> Response {',
     '    panic!("Boom! This panic was raised inside a Rust route handler");',
     '}',

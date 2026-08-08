@@ -12,7 +12,7 @@ interface DynamicRouteEntry {
  * once per `routesById` object instead of on every match. Keyed weakly so the
  * per-request SSR routers are garbage-collected with their cache entry. Sorted
  * by route id so matching order is deterministic and mirrors the server-side
- * matcher (crates/ossido_lib/src/manifest.rs).
+ * matcher (crates/ossido/src/manifest.rs).
  *
  * The route table is only rebuilt when the router receives a new route tree
  * (never after startup in practice), so keying by object identity is safe.
@@ -54,7 +54,7 @@ export function sanitizePathname(pathname: string): string {
  * time (to inspect the target route before committing).
  *
  * This matching is also implemented on the server side to pick the bundle to
- * load at the first rendering — see crates/ossido_lib/src/payload.rs. Any
+ * load at the first rendering — see crates/ossido/src/payload.rs. Any
  * optimization should happen on both.
  */
 export function matchRoute(

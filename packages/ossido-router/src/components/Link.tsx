@@ -1,4 +1,5 @@
-import type { JSX, MouseEvent } from 'react'
+import type { JSX, MouseEvent, Ref } from 'react'
+import { useCallback } from 'react'
 import { useInView } from 'react-intersection-observer'
 
 import { useRouter } from '../hooks/useRouter'
@@ -22,6 +23,12 @@ interface OssidoLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> 
    * @default false
    */
   replace?: boolean
+
+  /**
+   * Forwarded to the underlying `<a>`, merged with the internal preload ref.
+   * Lets wrappers (e.g. react-aria's `render`) connect their own ref.
+   */
+  ref?: Ref<HTMLAnchorElement>
 }
 
 function isEventModifierKeyActiveAndTargetDifferentFromSelf(
@@ -45,17 +52,33 @@ export function Link(componentProps: OssidoLinkProps): JSX.Element {
     href,
     replace,
     onClick,
+    ref: forwardedRef,
     ...rest
   } = componentProps
 
   const router = useRouter()
   const route = useRoute(href)
-  const { ref } = useInView({
+  const { ref: inViewRef } = useInView({
     onChange(inView) {
       if (inView && preload) route?.component.preload?.()
     },
     triggerOnce: true,
   })
+
+  // Merge the caller's ref (e.g. from react-aria's `render`) with the internal
+  // in-view ref, so both receive the underlying `<a>` node. Memoised so the
+  // callback ref identity is stable across renders.
+  const setRef = useCallback(
+    (node: HTMLAnchorElement | null): void => {
+      inViewRef(node)
+      if (typeof forwardedRef === 'function') {
+        forwardedRef(node)
+      } else if (forwardedRef) {
+        forwardedRef.current = node
+      }
+    },
+    [inViewRef, forwardedRef],
+  )
 
   const handleTransition: React.MouseEventHandler<HTMLAnchorElement> = (
     event,
@@ -79,7 +102,7 @@ export function Link(componentProps: OssidoLinkProps): JSX.Element {
   }
 
   return (
-    <a {...rest} href={href} ref={ref} onClick={handleTransition}>
+    <a {...rest} href={href} ref={setRef} onClick={handleTransition}>
       {children}
     </a>
   )

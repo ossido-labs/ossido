@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 // The index page renders through ossido's streaming SSR path (`finish_render` →
-// `render_pool::render_stream`). Unlike the ossido_lib unit test — which uses a
+// `render_pool::render_stream`). Unlike the ossido unit test — which uses a
 // hand-written stub bundle — this runs against a real `ossido` build, so it is
 // the layer that actually covers real `react-dom/server` output flowing through
 // the ssr_rs V8 runtime and its polyfills (e.g. the streaming UTF-8 decode that

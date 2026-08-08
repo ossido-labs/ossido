@@ -1,0 +1,118 @@
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::Once;
+use std::{env, fs};
+
+use fs_extra::dir::create_all;
+use tempfile::{TempDir, tempdir};
+use ossido::axum::Router;
+use ossido::axum::routing::{get, post};
+use ossido::{Mode, Server, ossido_internal_init_v8_platform};
+
+use crate::utils::catch_all::get_ossido_internal_api as catch_all;
+use crate::utils::dynamic_parameter::get_ossido_internal_api as dynamic_parameter;
+use crate::utils::env::get_ossido_internal_api as test_env;
+use crate::utils::form_data::post_ossido_internal_api as form_data_api;
+use crate::utils::health_check::get_ossido_internal_api as health_check;
+use crate::utils::post_api::post_ossido_internal_api as post_api;
+use crate::utils::route as html_route;
+use crate::utils::route::ossido_internal_api as route_api;
+
+static INIT: Once = Once::new();
+
+fn init_v8() {
+    INIT.call_once(|| {
+        ossido_internal_init_v8_platform();
+    })
+}
+
+fn add_file_with_content<'a>(path: &'a str, content: &'a str) {
+    let path = PathBuf::from(path);
+    create_all(
+        path.parent().expect("File path does not have any parent"),
+        false,
+    )
+    .unwrap_or_else(|_| {
+        panic!(
+            "Failed to create parent file directories: {}",
+            path.display()
+        )
+    });
+
+    let mut file = File::create(path).expect("Failed to create the file");
+    file.write_all(content.as_bytes())
+        .expect("Failed to write into the file");
+}
+
+#[derive(Debug)]
+pub struct MockOssidoServer {
+    pub address: String,
+    pub port: u16,
+    original_dir: PathBuf,
+    #[allow(dead_code)]
+    // Required for dropping the temp_dir when this struct drops
+    temp_dir: TempDir,
+}
+
+impl MockOssidoServer {
+    pub async fn spawn() -> Self {
+        init_v8();
+        let original_dir = env::current_dir().expect("Failed to read current_dir");
+        let temp_dir = tempdir().expect("Failed to create temp_dir");
+
+        let ssr_bundle = fs::read_to_string("./tests/assets/fake_ssr_bundle.js")
+            .expect("Failed to read fake_ssr_bundle.js");
+
+        env::set_current_dir(temp_dir.path()).expect("Failed to change current dir into temp_dir");
+
+        add_file_with_content(
+            "./.ossido/config/config.json",
+            r#"{"server": {"host": "127.0.0.1", "port": 0}}"#,
+        );
+
+        add_file_with_content("./out/server/prod-server.js", ssr_bundle.as_str());
+
+        add_file_with_content(
+            "./out/client/.vite/manifest.json",
+            r#"{"client-main.tsx": { "file": "assets/index.js", "name": "index", "src": "index.tsx", "isEntry": true,"dynamicImports": [],"css": []}}"#,
+        );
+
+        add_file_with_content("./.env", r#"MY_TEST_KEY="foobar""#);
+
+        let router = Router::new()
+            .route("/", get(html_route::ossido_internal_route))
+            .route("/ossido/data", get(html_route::ossido_internal_api))
+            .route("/health_check", get(health_check))
+            .route("/route-api", get(route_api))
+            .route("/catch_all/{*catch_all}", get(catch_all))
+            .route("/dynamic/{parameter}", get(dynamic_parameter))
+            .route("/api/post", post(post_api))
+            .route("/api/form_data", post(form_data_api))
+            .route("/env", get(test_env));
+
+        let server = Server::init(router, Mode::Prod).await;
+
+        let socket = server
+            .listener
+            .local_addr()
+            .expect("Failed to extract test server socket");
+
+        _ = tokio::spawn(server.start());
+
+        MockOssidoServer {
+            address: socket.ip().to_string(),
+            port: socket.port(),
+            original_dir,
+            temp_dir,
+        }
+    }
+}
+
+impl Drop for MockOssidoServer {
+    fn drop(&mut self) {
+        // Set back the current dir in the previous state
+        env::set_current_dir(&self.original_dir)
+            .expect("Failed to restore the original directory.");
+    }
+}

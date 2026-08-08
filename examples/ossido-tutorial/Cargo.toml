@@ -8,7 +8,7 @@ name = "ossido"
 path = ".ossido/main.rs"
 
 [dependencies]
-ossido_lib = { path = "../../crates/ossido_lib/" }
+ossido = { path = "../../crates/ossido/" }
 serde = { version = "1.0.202", features = ["derive"] }
 reqwest = "0.12.9"
 

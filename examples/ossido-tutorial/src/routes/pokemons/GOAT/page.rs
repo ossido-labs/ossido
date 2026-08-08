@@ -1,5 +1,5 @@
 // src/routes/pokemons/GOAT.rs
-use ossido_lib::{handler, Request, Response};
+use ossido::{handler, Request, Response};
 
 #[handler]
 async fn redirect_to_goat(_req: Request) -> Response {

@@ -139,6 +139,13 @@ const developmentSSRBundle = (): void => {
       mergeConfig<InlineConfig, InlineConfig>(
         createBaseViteConfigFromOssidoConfig(config),
         {
+          // A dedicated cache dir, separate from the client dev server's
+          // (`.ossido/cache`). Both run concurrently in dev, and this SSR bundle
+          // is rebuilt on every `.tsx`/`.mdx`/CSS-module edit — sharing the cache
+          // makes each rebuild invalidate the dev server's optimized-deps cache,
+          // which triggers a spurious full-page reload (and data refetch) right
+          // after the in-place Fast Refresh has already applied.
+          cacheDir: 'cache-ssr',
           plugins: VITE_SSR_PLUGINS,
           build: {
             ssr: true,

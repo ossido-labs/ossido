@@ -3,10 +3,10 @@ edition = "2024"
 [workspace]
 resolver = "2"
 members = [
-  "crates/ossido", 
-  "crates/ossido_internal", 
-  "crates/ossido_lib", 
-  "crates/ossido_lib_macros"
+  "crates/ossido_cli",
+  "crates/ossido_internal",
+  "crates/ossido",
+  "crates/ossido_macros"
 ]
 exclude = [
   "examples/with-mdx",

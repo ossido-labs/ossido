@@ -1,28 +1,10 @@
-#[derive(PartialEq, Eq, Debug, Clone)]
+use once_cell::sync::OnceCell;
+use serde::Serialize;
+
+#[derive(Debug, PartialEq, Eq, Serialize, Clone, Copy)]
 pub enum Mode {
-    Prod,
     Dev,
+    Prod,
 }
 
-impl Mode {
-    pub fn as_str<'a>(&self) -> &'a str {
-        if *self == Mode::Dev {
-            return "Mode::Dev";
-        }
-        "Mode::Prod"
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn should_correctly_print_the_mode_as_str() {
-        let dev = Mode::Dev.as_str();
-        let prod = Mode::Prod.as_str();
-        assert_eq!(dev, "Mode::Dev");
-        assert_eq!(prod, "Mode::Prod");
-    }
-}
+pub static GLOBAL_MODE: OnceCell<Mode> = OnceCell::new();

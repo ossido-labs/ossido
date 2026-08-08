@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useTransition } from 'react'
 
 import { useRouterContext } from '../components/RouterContext'
 
@@ -33,10 +33,27 @@ interface UseRouterResult {
    * Returns the current pathname
    */
   pathname: string
+
+  /**
+   * Re-fetch the current route's server props — its `page.rs` `#[handler]` data
+   * — and re-render the page with the fresh values. Use it when something has
+   * changed the data the page was server-rendered with (e.g. after a mutation)
+   * and you want the page to reflect it without a full navigation.
+   *
+   * The current page stays on screen while the refetch is in flight (no
+   * `loading.tsx` flash); read `isRefetching` to reflect the pending state.
+   */
+  refetchProps: () => void
+
+  /**
+   * `true` while a `refetchProps()` call from this hook is in flight.
+   */
+  isRefetching: boolean
 }
 
 export const useRouter = (): UseRouterResult => {
-  const { location, updateLocation } = useRouterContext()
+  const { location, updateLocation, retry } = useRouterContext()
+  const [isRefetching, startRefetch] = useTransition()
 
   const navigate = useCallback(
     (type: NavigationType, path: string, opts?: NavigationOptions): void => {
@@ -75,10 +92,23 @@ export const useRouter = (): UseRouterResult => {
     [navigate],
   )
 
+  const refetchProps = useCallback((): void => {
+    // `retry` bumps the navigation id, which changes the data-resource key and
+    // so triggers a refetch of the current route (same mechanism as the error
+    // boundary's reset). Wrapped in a transition so React keeps the current page
+    // rendered until the fresh props resolve, instead of flashing the loading
+    // fallback.
+    startRefetch(() => {
+      retry()
+    })
+  }, [retry])
+
   return {
     push,
     replace,
     query: location.search,
     pathname: location.pathname,
+    refetchProps,
+    isRefetching,
   }
 }

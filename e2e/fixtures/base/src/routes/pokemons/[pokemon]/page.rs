@@ -1,7 +1,6 @@
-use serde::Serialize;
-use ossido_lib::{Props, Request, Response, StaticPaths, Type, handler, static_paths};
+use ossido::{Props, Request, Response, StaticPaths, Type, handler, static_paths};
 
-#[derive(Serialize, Type)]
+#[Type]
 struct PokemonResponse {
     name: String,
 }

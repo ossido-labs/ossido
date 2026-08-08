@@ -23,7 +23,8 @@ export interface RouterContextValue {
   router: Router
   location: ParsedLocation
   /**
-   * Incremented on every navigation (and error retry). Combined with the
+   * Incremented on every navigation (and on error retry / a manual
+   * `refetchProps`). Combined with the
    * pathname it forms the data-resource key, so each navigation gets a fresh
    * resource (a refetch).
    *
@@ -43,7 +44,10 @@ export interface RouterContextValue {
     loc: ParsedLocation,
     options?: NavigationCommitOptions,
   ) => void
-  /** Re-run the current route's data load (used by error boundary `reset`). */
+  /**
+   * Re-run the current route's data load (a refetch). Used by the error
+   * boundary `reset` and by `useRouter().refetchProps`.
+   */
   retry: () => void
 }
 

@@ -17,7 +17,7 @@ export interface ServerPayloadLocation {
 }
 
 /**
- * @see crates/ossido_lib/src/payload.rs
+ * @see crates/ossido/src/payload.rs
  */
 export type ServerPayload<TData = unknown> = {
   location: ServerPayloadLocation

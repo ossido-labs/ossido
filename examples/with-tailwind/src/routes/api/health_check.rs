@@ -1,5 +1,5 @@
-use ossido_lib::{api, Request};
-use ossido_lib::axum::http::StatusCode;
+use ossido::{api, Request};
+use ossido::axum::http::StatusCode;
 
 #[api(GET)]
 pub async fn health_check(_req: Request) -> StatusCode {
