@@ -7,11 +7,11 @@
  * the `Register` interface below:
  *
  * ```ts
- * declare module "ossido/client" {
+ * declare module "@ossido-labs/ossido/client" {
  *   interface Register {
  *     apiRoutes: {
  *       "/api/pokemons/[name]": {
- *         GET: { params: { name: string }; response: import("ossido/types").Pokemon }
+ *         GET: { params: { name: string }; response: import("@ossido-labs/ossido/types").Pokemon }
  *       }
  *     }
  *   }
@@ -19,7 +19,7 @@
  * ```
  *
  * ```ts
- * import { apiClient } from 'ossido/client'
+ * import { apiClient } from '@ossido-labs/ossido/client'
  *
  * const res = await apiClient.get('/api/pokemons/[name]', { params: { name: 'pikachu' } })
  * const pokemon = await res.json() //=> Pokemon

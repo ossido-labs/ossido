@@ -605,9 +605,15 @@ fn update_package_json_version(folder_path: &Path) -> io::Result<()> {
     let package_json_path = folder_path.join(PathBuf::from("package.json"));
     let package_json = fs::read_to_string(&package_json_path)
         .unwrap_or_else(|err| exit_with_error(&format!("Failed to read package.json: {err}")));
-    let search = "\"ossido\": \"workspace:*\"";
-    let replace = format!("\"ossido\": \"{}\"", v);
-    let package_json = package_json.replace(search, &replace);
+    // Pin every `@ossido-labs/*` interlink (ossido, ossido-eslint-plugin,
+    // ossido-mdx, …) to this CLI's version — the packages are versioned
+    // together. `workspace:*` is only valid inside the monorepo, so leaving any
+    // behind would break `npm install` in the scaffolded app.
+    let workspace_dep = Regex::new(r#""(@ossido-labs/[^"]+)":\s*"workspace:\*""#)
+        .expect("valid workspace-dep regex");
+    let package_json = workspace_dep
+        .replace_all(&package_json, format!("\"${{1}}\": \"{v}\""))
+        .into_owned();
 
     let mut file = OpenOptions::new()
         .write(true)

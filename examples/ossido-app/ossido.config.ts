@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { OssidoConfig } from 'ossido/config';
+import type { OssidoConfig } from '@ossido-labs/ossido/config';
 
 const config: OssidoConfig = {
   server: { port: 3101 },

@@ -51,7 +51,7 @@ const rule = defineRule({
  * @example .oxlintrc.json
  * ```json
  * {
- *   "jsPlugins": ["ossido-eslint-plugin"],
+ *   "jsPlugins": ["@ossido-labs/ossido-eslint-plugin"],
  *   "rules": {
  *     "react-refresh/only-export-components": [
  *       "warn",

@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
-import { Link } from 'ossido';
-import type { MyResponse } from 'ossido/types';
+import { Link } from '@ossido-labs/ossido';
+import type { MyResponse } from '@ossido-labs/ossido/types';
 
 export default function IndexPage({ subtitle }: MyResponse): JSX.Element {
   return (

@@ -34,7 +34,7 @@ registry=http://localhost:4873/
 
 then install as usual (`npm install` / `bun install`). The Ossido packages come
 from the local registry; everything else is proxied from npmjs. A project made
-with `ossido new` already pins `"ossido": "0.1.0"`, so it just works.
+with `ossido new` already pins `"@ossido-labs/ossido": "0.1.0"`, so it just works.
 
 ## How it works
 

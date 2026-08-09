@@ -4,29 +4,29 @@ import {
   createRoute,
   __ossido__internal__lazyLoadRoute,
   __ossido__internal__applyRouteHot,
-} from 'ossido';
+} from '@ossido-labs/ossido'
 
-import RootLayoutImport from './routes/layout';
+import RootLayoutImport from './routes/layout'
 
 const PageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/page'),
-);
+)
 const AboutPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/about/page'),
-);
+)
 const PostsMyPostPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/my-post/page'),
-);
+)
 
 const rootRoute = createRoute({
   isRoot: true,
   component: RootLayoutImport,
   dataKey: '/layout',
-});
+})
 
-const Page = createRoute({ component: PageImport });
-const AboutPage = createRoute({ component: AboutPageImport });
-const PostsMyPostPage = createRoute({ component: PostsMyPostPageImport });
+const Page = createRoute({ component: PageImport })
+const AboutPage = createRoute({ component: AboutPageImport })
+const PostsMyPostPage = createRoute({ component: PostsMyPostPageImport })
 
 // Create/Update Routes
 
@@ -35,21 +35,21 @@ const PageRoute = Page.update({
   getParentRoute: () => rootRoute,
   filePath: '/',
   dataKey: '/page',
-});
+})
 
 const AboutPageRoute = AboutPage.update({
   path: '/about',
   getParentRoute: () => rootRoute,
   filePath: '/about/',
   dataKey: '/about/page',
-});
+})
 
 const PostsMyPostPageRoute = PostsMyPostPage.update({
   path: '/posts/my-post',
   getParentRoute: () => rootRoute,
   filePath: '/posts/my-post/',
   dataKey: '/posts/my-post/page',
-});
+})
 
 // Create and export the route tree
 
@@ -57,7 +57,7 @@ export const routeTree = rootRoute.addChildren([
   PageRoute,
   AboutPageRoute,
   PostsMyPostPageRoute,
-]);
+])
 
 if (import.meta.hot) {
   import.meta.hot.accept(
@@ -70,18 +70,18 @@ if (import.meta.hot) {
     ([m0, m1, m2, m3]) => {
       __ossido__internal__applyRouteHot(() => {
         if (m0) {
-          rootRoute.component = m0.default;
+          rootRoute.component = m0.default
         }
         if (m1) {
-          PageImport.update(m1.default);
+          PageImport.update(m1.default)
         }
         if (m2) {
-          AboutPageImport.update(m2.default);
+          AboutPageImport.update(m2.default)
         }
         if (m3) {
-          PostsMyPostPageImport.update(m3.default);
+          PostsMyPostPageImport.update(m3.default)
         }
-      });
+      })
     },
-  );
+  )
 }

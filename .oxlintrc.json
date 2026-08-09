@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc", "import", "react", "vitest"],
-  "jsPlugins": ["ossido-eslint-plugin"],
+  "jsPlugins": ["@ossido-labs/ossido-eslint-plugin"],
   "categories": {
     "correctness": "error"
   },

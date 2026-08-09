@@ -1,4 +1,4 @@
-import type { OssidoConfig } from 'ossido/config';
+import type { OssidoConfig } from '@ossido-labs/ossido/config';
 import tailwindcss from '@tailwindcss/vite';
 
 const config: OssidoConfig = {

@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { DefaultScreen } from 'ossido-ui';
+import { DefaultScreen } from '@ossido-labs/ossido-ui';
 
 import { Link } from './Link';
 

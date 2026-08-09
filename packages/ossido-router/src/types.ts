@@ -1,5 +1,5 @@
 import type { ReactNode, ComponentType } from 'react';
-import type { ServerErrorSource } from 'ossido-ui';
+import type { ServerErrorSource } from '@ossido-labs/ossido-ui';
 
 export type Mode = 'Dev' | 'Prod';
 
@@ -77,4 +77,4 @@ export type {
   OssidoErrorWithSource,
   ServerErrorSource,
   ErrorComponent,
-} from 'ossido-ui';
+} from '@ossido-labs/ossido-ui';

@@ -10,10 +10,12 @@ interface BuildOptions {
 /**
  * Shared tsdown build config for the ossido packages.
  *
- * tsdown externalizes `dependencies` and `peerDependencies` by default and
- * emits `.d.ts` files natively, so it replaces the previous Vite library build
- * plus the `vite-plugin-externalize-deps`, `unplugin-isolated-decl` and
- * `rollup-plugin-preserve-directives` plugins.
+ * tsdown externalizes `dependencies` and `peerDependencies` by default, so it
+ * replaces the previous Vite library build plus the
+ * `vite-plugin-externalize-deps` and `rollup-plugin-preserve-directives`
+ * plugins. Type declarations are generated separately by `tsc` (each package's
+ * `build` script runs `tsc -p tsconfig.build.json` after tsdown), which is the
+ * source of truth for `.d.ts` — so `dts` is off here.
  */
 export function defineBuildConfig({ entry, target }: BuildOptions): UserConfig {
   return {
@@ -28,7 +30,11 @@ export function defineBuildConfig({ entry, target }: BuildOptions): UserConfig {
     // matching the previous rollup `preserveModules` behaviour that the
     // package `exports` map relies on.
     unbundle: true,
-    dts: true,
+    // `.d.ts` come from `tsc` (see each package's tsconfig.build.json), not
+    // tsdown.
+    dts: false,
+    // Sourcemaps embed `sourcesContent`, so the packages ship maps (for
+    // debugging) without shipping `src`.
     sourcemap: true,
     minify: false,
     target,

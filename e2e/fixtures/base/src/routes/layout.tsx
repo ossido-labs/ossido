@@ -1,5 +1,5 @@
 import type { ReactNode, JSX } from 'react';
-import { OssidoScripts } from 'ossido';
+import { OssidoScripts } from '@ossido-labs/ossido';
 
 interface RootLayoutProps {
   children: ReactNode;

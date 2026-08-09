@@ -4,41 +4,41 @@ import {
   createRoute,
   __ossido__internal__lazyLoadRoute,
   __ossido__internal__applyRouteHot,
-} from 'ossido';
+} from '@ossido-labs/ossido'
 
-import RootLayoutImport from './routes/layout';
+import RootLayoutImport from './routes/layout'
 
 const PostsLayoutImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/layout'),
-);
+)
 const PageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/page'),
-);
+)
 const PostsPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/page'),
-);
+)
 const AboutPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/about/page'),
-);
+)
 const PostsMyPostPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/my-post/page'),
-);
+)
 const PostspostPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/[post]/page'),
-);
+)
 
 const rootRoute = createRoute({
   isRoot: true,
   component: RootLayoutImport,
   dataKey: '/layout',
-});
+})
 
-const PostsLayout = createRoute({ component: PostsLayoutImport, isRoot: true });
-const Page = createRoute({ component: PageImport });
-const PostsPage = createRoute({ component: PostsPageImport });
-const AboutPage = createRoute({ component: AboutPageImport });
-const PostsMyPostPage = createRoute({ component: PostsMyPostPageImport });
-const PostspostPage = createRoute({ component: PostspostPageImport });
+const PostsLayout = createRoute({ component: PostsLayoutImport, isRoot: true })
+const Page = createRoute({ component: PageImport })
+const PostsPage = createRoute({ component: PostsPageImport })
+const AboutPage = createRoute({ component: AboutPageImport })
+const PostsMyPostPage = createRoute({ component: PostsMyPostPageImport })
+const PostspostPage = createRoute({ component: PostspostPageImport })
 
 // Create/Update Routes
 
@@ -46,42 +46,42 @@ const PostsLayoutRoute = PostsLayout.update({
   getParentRoute: () => rootRoute,
   filePath: '/posts/layout',
   dataKey: '/posts/layout',
-});
+})
 
 const PageRoute = Page.update({
   path: '/',
   getParentRoute: () => rootRoute,
   filePath: '/',
   dataKey: '/page',
-});
+})
 
 const PostsPageRoute = PostsPage.update({
   path: '/posts',
   getParentRoute: () => PostsLayoutRoute,
   filePath: '/posts/',
   dataKey: '/posts/page',
-});
+})
 
 const AboutPageRoute = AboutPage.update({
   path: '/about',
   getParentRoute: () => rootRoute,
   filePath: '/about/',
   dataKey: '/about/page',
-});
+})
 
 const PostsMyPostPageRoute = PostsMyPostPage.update({
   path: '/posts/my-post',
   getParentRoute: () => PostsLayoutRoute,
   filePath: '/posts/my-post/',
   dataKey: '/posts/my-post/page',
-});
+})
 
 const PostspostPageRoute = PostspostPage.update({
   path: '/posts/[post]',
   getParentRoute: () => PostsLayoutRoute,
   filePath: '/posts/[post]/',
   dataKey: '/posts/[post]/page',
-});
+})
 
 // Create and export the route tree
 
@@ -96,7 +96,7 @@ export const routeTree = rootRoute.addChildren([
   PostsPageRoute,
   PostspostPageRoute,
   PostsMyPostPageRoute,
-]);
+])
 
 if (import.meta.hot) {
   import.meta.hot.accept(
@@ -112,27 +112,27 @@ if (import.meta.hot) {
     ([m0, m1, m2, m3, m4, m5, m6]) => {
       __ossido__internal__applyRouteHot(() => {
         if (m0) {
-          rootRoute.component = m0.default;
+          rootRoute.component = m0.default
         }
         if (m1) {
-          PostsLayoutImport.update(m1.default);
+          PostsLayoutImport.update(m1.default)
         }
         if (m2) {
-          PageImport.update(m2.default);
+          PageImport.update(m2.default)
         }
         if (m3) {
-          PostsPageImport.update(m3.default);
+          PostsPageImport.update(m3.default)
         }
         if (m4) {
-          AboutPageImport.update(m4.default);
+          AboutPageImport.update(m4.default)
         }
         if (m5) {
-          PostsMyPostPageImport.update(m5.default);
+          PostsMyPostPageImport.update(m5.default)
         }
         if (m6) {
-          PostspostPageImport.update(m6.default);
+          PostspostPageImport.update(m6.default)
         }
-      });
+      })
     },
-  );
+  )
 }

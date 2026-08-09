@@ -1,7 +1,7 @@
 import { lazy, createElement } from 'react';
 import type { ReactElement } from 'react';
 
-import type { RouteComponent } from 'ossido-router';
+import type { RouteComponent } from '@ossido-labs/ossido-router';
 
 type ImportFn = () => Promise<{ default: RouteComponent }>;
 

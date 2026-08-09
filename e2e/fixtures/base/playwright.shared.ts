@@ -8,7 +8,7 @@ export const ossidoBin = path.join(
   '../../../',
   'target',
   'debug',
-  'ossido',
+  '@ossido-labs/ossido',
 );
 
 /** Shared e2e setup script (linking the workspace packages, etc.). */

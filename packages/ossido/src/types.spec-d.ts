@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { describe, it, expectTypeOf } from 'vitest';
 
-import type { OssidoErrorProps } from 'ossido-router';
+import type { OssidoErrorProps } from '@ossido-labs/ossido-router';
 
 import type { OssidoLayoutProps } from './types';
 

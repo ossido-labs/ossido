@@ -9,15 +9,15 @@ MDX support for [ossido](https://ossido.dev), with a Next.js-style
 Install:
 
 ```sh
-npm install ossido-mdx
+npm install @ossido-labs/ossido-mdx
 ```
 
 Add the plugin to your ossido config:
 
 ```ts
 // ossido.config.ts
-import type { OssidoConfig } from 'ossido/config';
-import { ossidoMdx } from 'ossido-mdx/vite';
+import type { OssidoConfig } from '@ossido-labs/ossido/config';
+import { ossidoMdx } from '@ossido-labs/ossido-mdx/vite';
 
 const config: OssidoConfig = {
   vite: { plugins: [ossidoMdx()] },
@@ -36,8 +36,8 @@ so there's no provider to render):
 
 ```tsx
 // src/mdx-components.tsx
-import type { MDXComponents } from 'ossido-mdx';
-import { Link } from 'ossido';
+import type { MDXComponents } from '@ossido-labs/ossido-mdx';
+import { Link } from '@ossido-labs/ossido';
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {

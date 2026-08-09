@@ -5,7 +5,7 @@
  *
  * @example src/mdx-components.tsx
  * ```tsx
- * import type { MDXComponents } from 'ossido-mdx'
+ * import type { MDXComponents } from '@ossido-labs/ossido-mdx'
  *
  * export function useMDXComponents(components: MDXComponents): MDXComponents {
  *   return {

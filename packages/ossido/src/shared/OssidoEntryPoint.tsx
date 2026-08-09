@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import type { JSX } from 'react';
-import type { RouterInstanceType } from 'ossido-router';
+import type { RouterInstanceType } from '@ossido-labs/ossido-router';
 
 import type { ServerPayload } from '../types';
 

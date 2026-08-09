@@ -9,7 +9,7 @@ use syn::{GenericArgument, Item, ItemFn, PathArguments, ReturnType, Type};
 pub struct ApiMethod {
     pub method: String,
     /// The inner type of an `axum::Json<T>` return (`T`), referenced later as
-    /// `import("ossido/types").T`. `None` for opaque returns (`StatusCode`,
+    /// `import("@ossido-labs/ossido/types").T`. `None` for opaque returns (`StatusCode`,
     /// `Response`, `impl IntoResponse`, …), which type as `unknown`.
     pub response: Option<String>,
 }
@@ -24,7 +24,7 @@ pub struct ApiRoute {
 
 /// Collect every `src/routes/api/**/*.rs` route: its URL path and, per HTTP
 /// method, the JSON response type. Powers the generated `apiClient` typing
-/// (`declare module "ossido/client"`).
+/// (`declare module "@ossido-labs/ossido/client"`).
 pub fn collect_api_routes(base_path: &Path) -> Vec<ApiRoute> {
     let mut routes = Vec::new();
 
@@ -134,14 +134,14 @@ fn json_inner_type_name(ty: &Type) -> Option<String> {
     Some(inner.path.segments.last()?.ident.to_string())
 }
 
-/// Render the `apiClient` route map as an augmentation of `ossido/client`'s
+/// Render the `apiClient` route map as an augmentation of `@ossido-labs/ossido/client`'s
 /// `Register` interface. Returns an empty string when there are no API routes.
 pub fn render_api_routes(routes: &[ApiRoute]) -> String {
     if routes.is_empty() {
         return String::new();
     }
 
-    let mut ts = String::from("declare module \"ossido/client\" {\n  interface Register {\n    apiRoutes: {\n");
+    let mut ts = String::from("declare module \"@ossido-labs/ossido/client\" {\n  interface Register {\n    apiRoutes: {\n");
 
     for route in routes {
         let params = params_from_path(&route.path);
@@ -159,7 +159,7 @@ pub fn render_api_routes(routes: &[ApiRoute]) -> String {
         ts.push_str(&format!("      \"{}\": {{\n", route.path));
         for ApiMethod { method, response } in &route.methods {
             let response_ts = match response {
-                Some(name) => format!("import(\"ossido/types\").{name}"),
+                Some(name) => format!("import(\"@ossido-labs/ossido/types\").{name}"),
                 None => "unknown".to_string(),
             };
             ts.push_str(&format!(
@@ -245,11 +245,11 @@ mod tests {
             },
         ];
         let ts = render_api_routes(&routes);
-        assert!(ts.contains("declare module \"ossido/client\""));
+        assert!(ts.contains("declare module \"@ossido-labs/ossido/client\""));
         assert!(ts.contains("\"/api/health\": {"));
         assert!(ts.contains("GET: { params: Record<string, never>; response: unknown }"));
         assert!(ts.contains(
-            "GET: { params: { id: string }; response: import(\"ossido/types\").User }"
+            "GET: { params: { id: string }; response: import(\"@ossido-labs/ossido/types\").User }"
         ));
 
         // No routes → no augmentation.

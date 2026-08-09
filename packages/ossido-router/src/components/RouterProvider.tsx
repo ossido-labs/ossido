@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { DevErrorOverlayHost } from 'ossido-ui';
+import { DevErrorOverlayHost } from '@ossido-labs/ossido-ui';
 
 import type { ServerInitialLocation, Mode, ServerErrorPayload } from '../types';
 import type { Router } from '../router';

@@ -1,11 +1,15 @@
 {
-  "name": "ossido-ui",
+  "name": "@ossido-labs/ossido-ui",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Default UI components and design tokens for the ossido framework. Ossido is the react/rust fullstack framework",
   "homepage": "https://ossido.dev",
   "scripts": {
     "dev": "tsdown --watch",
-    "build": "tsdown",
+    "build": "tsdown && tsc -p tsconfig.build.json",
+    "prepack": "bun run build",
     "lint": "oxlint",
     "format": "oxfmt --check .",
     "format:fix": "oxfmt .",
@@ -29,7 +33,6 @@
   "module": "dist/esm/index.js",
   "files": [
     "dist",
-    "src",
     "README.md"
   ],
   "exports": {

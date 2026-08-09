@@ -1,6 +1,6 @@
 // src/components/PokemonLink.tsx
 import type { JSX } from 'react';
-import { Link } from 'ossido';
+import { Link } from '@ossido-labs/ossido';
 
 import styles from './PokemonLink.module.css';
 

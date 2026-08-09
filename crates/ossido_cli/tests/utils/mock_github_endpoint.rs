@@ -102,7 +102,7 @@ impl GitHubServerMock {
                 "ossido-labs/ossido/v{ossido_version}/examples/ossido-app/package.json"
             )))
             .respond_with(file_response_template(
-                r#"{"name": "ossido-app", "dependencies": { "ossido": "workspace:*" }}"#,
+                r#"{"name": "ossido-app", "dependencies": { "@ossido-labs/ossido": "workspace:*" }, "devDependencies": { "@ossido-labs/ossido-eslint-plugin": "workspace:*" }}"#,
             ))
             .mount(&server)
             .await;
@@ -112,7 +112,7 @@ impl GitHubServerMock {
                 "ossido-labs/ossido/v{ossido_version}/examples/ossido-app/ossido.config.ts"
             )))
             .respond_with(file_response_template(
-                "import type { OssidoConfig } from 'ossido/config'\n\nconst config: OssidoConfig = {}\n\nexport default config\n",
+                "import type { OssidoConfig } from '@ossido-labs/ossido/config'\n\nconst config: OssidoConfig = {}\n\nexport default config\n",
             ))
             .mount(&server)
             .await;

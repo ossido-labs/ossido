@@ -1,0 +1,21 @@
+{
+  "//": "Declaration-only emit for publishing. tsdown builds JS + sourcemaps; tsc owns the .d.ts. Emits dist/esm/<path>.d.ts mirroring src, matching the package `exports` types.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": false,
+    "rootDir": "src",
+    "outDir": "dist/esm"
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.spec-d.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.stories.tsx"
+  ]
+}

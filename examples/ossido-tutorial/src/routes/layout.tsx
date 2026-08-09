@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
-import { OssidoScripts } from 'ossido';
-import type { OssidoLayoutProps } from 'ossido';
+import { OssidoScripts } from '@ossido-labs/ossido';
+import type { OssidoLayoutProps } from '@ossido-labs/ossido';
 
 import '@/styles/global.css';
 

@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import type { OssidoPage } from 'ossido/types';
+import type { OssidoPage } from '@ossido-labs/ossido/types';
 
 import { Wordmark } from '../components/Wordmark.tsx';
 

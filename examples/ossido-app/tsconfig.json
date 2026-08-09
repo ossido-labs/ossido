@@ -11,7 +11,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "types": ["ossido/build-client"],
+    "types": ["@ossido-labs/ossido/build-client"],
 
     // Interop Constraints
     "isolatedModules": true,

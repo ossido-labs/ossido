@@ -47,7 +47,7 @@ pub fn static_paths(args: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 /// `#[ossido::Type]` — bundle `serde::{Serialize, Deserialize}` onto a struct or
-/// enum and generate its TypeScript type (exported from the `"ossido/types"`
+/// enum and generate its TypeScript type (exported from the `"@ossido-labs/ossido/types"`
 /// module). Replaces the old `#[derive(Serialize, Deserialize, Type)]`.
 #[proc_macro_attribute]
 #[allow(non_snake_case)]

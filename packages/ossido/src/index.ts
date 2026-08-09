@@ -4,9 +4,9 @@ export {
   createRouter,
   Link,
   useRouter,
-} from 'ossido-router';
+} from '@ossido-labs/ossido-router';
 
-export type { OssidoErrorProps } from 'ossido-router';
+export type { OssidoErrorProps } from '@ossido-labs/ossido-router';
 
 export {
   dynamic,

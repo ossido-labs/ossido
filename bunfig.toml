@@ -1,2 +1,2 @@
-[install]
-registry = { url = "http://localhost:4873", token = "ossido-local-registry" }
+[install.scopes]
+ossido-labs = { url = "https://registry.npmjs.org", token = "$NPM_TOKEN" }

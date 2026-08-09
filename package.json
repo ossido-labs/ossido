@@ -24,7 +24,8 @@
     "check-examples": "bun run examples:format && bun run examples:typecheck",
     "check-all": "bun run check-packages && bun run check-examples && bun run repo:root:format",
     "registry:start": "bunx verdaccio@6 --config scripts/local-registry/config.yaml",
-    "registry:publish": "bun scripts/local-registry/publish.ts"
+    "registry:publish": "bun scripts/local-registry/publish.ts",
+    "publish:packages": "bun scripts/publish-packages.ts"
   },
   "workspaces": {
     "packages": [
@@ -44,7 +45,7 @@
     "@playwright/test": "1.54.1",
     "@types/node": "22.16.5",
     "@vitest/coverage-v8": "4.1.10",
-    "ossido-eslint-plugin": "workspace:*",
+    "@ossido-labs/ossido-eslint-plugin": "workspace:*",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "turbo": "2.5.5",

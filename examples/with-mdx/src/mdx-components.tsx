@@ -1,4 +1,4 @@
-import type { MDXComponents } from 'ossido-mdx';
+import type { MDXComponents } from '@ossido-labs/ossido-mdx';
 
 /**
  * Global components every `.mdx` file renders with — the ossido equivalent of

@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react-swc';
 export default defineConfig({
   plugins: [react()],
   test: {
-    name: 'ossido-ui',
+    name: '@ossido-labs/ossido-ui',
     environment: 'happy-dom',
     globals: true,
   },

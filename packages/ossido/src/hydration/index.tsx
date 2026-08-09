@@ -1,7 +1,7 @@
 import { hydrateRoot } from 'react-dom/client';
-import { createRouter, preloadRouteChain } from 'ossido-router';
-import type { createRoute } from 'ossido-router';
-import { warmDevErrorSource } from 'ossido-ui';
+import { createRouter, preloadRouteChain } from '@ossido-labs/ossido-router';
+import type { createRoute } from '@ossido-labs/ossido-router';
+import { warmDevErrorSource } from '@ossido-labs/ossido-ui';
 
 import { OssidoEntryPoint } from '../shared/OssidoEntryPoint';
 import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants';

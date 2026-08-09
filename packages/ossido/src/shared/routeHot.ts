@@ -1,4 +1,4 @@
-import { notifyRouteHotUpdate } from 'ossido-router';
+import { notifyRouteHotUpdate } from '@ossido-labs/ossido-router';
 
 /**
  * Dev-only. Runs the generated route tree's component reassignments (swapping

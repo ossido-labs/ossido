@@ -1,6 +1,6 @@
 import { Wordmark } from '@/components/Wordmark';
 import PokemonLink from '@/components/PokemonLink';
-import type { OssidoPage } from 'ossido/types';
+import type { OssidoPage } from '@ossido-labs/ossido/types';
 
 const IndexPage: OssidoPage<'/'> = ({ results }) => {
   return (

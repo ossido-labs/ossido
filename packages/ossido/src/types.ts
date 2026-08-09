@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { ServerErrorPayload } from 'ossido-router';
+import type { ServerErrorPayload } from '@ossido-labs/ossido-router';
 
 import type { OssidoConfigServer } from './config';
 

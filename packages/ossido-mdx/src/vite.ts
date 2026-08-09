@@ -50,7 +50,7 @@ export interface OssidoMdxOptions {
  *
  * ```ts
  * // ossido.config.ts
- * import { ossidoMdx } from 'ossido-mdx/vite'
+ * import { ossidoMdx } from '@ossido-labs/ossido-mdx/vite'
  *
  * export default { vite: { plugins: [ossidoMdx()] } }
  * ```

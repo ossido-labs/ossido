@@ -67,7 +67,7 @@ async fn it_creates_a_new_project_and_replace_the_versions_in_the_manifest() {
     assert_eq!(cargo_toml_content, expected_cargo_toml_content);
 
     let expected_package_json_content = format!(
-        "{{\"name\": \"{project_folder}\", \"dependencies\": {{ \"ossido\": \"{version}\" }}}}"
+        "{{\"name\": \"{project_folder}\", \"dependencies\": {{ \"@ossido-labs/ossido\": \"{version}\" }}, \"devDependencies\": {{ \"@ossido-labs/ossido-eslint-plugin\": \"{version}\" }}}}"
     );
 
     assert_eq!(package_json_content, expected_package_json_content);
@@ -101,17 +101,17 @@ async fn it_patches_mdx_onto_the_base_template() {
 
     let package_json =
         fs::read_to_string(project_path.join("package.json")).expect("package.json missing");
-    // MDX dep merged in (the `ossido-mdx` plugin bundles @mdx-js), existing dep
+    // MDX dep merged in (the `@ossido-labs/ossido-mdx` plugin bundles @mdx-js), existing dep
     // preserved.
-    assert!(package_json.contains("\"ossido-mdx\""));
-    assert!(package_json.contains("\"ossido\""));
+    assert!(package_json.contains("\"@ossido-labs/ossido-mdx\""));
+    assert!(package_json.contains("\"@ossido-labs/ossido\""));
     // MDX is a patch, not a base swap — no Tailwind deps leak in.
     assert!(!package_json.contains("tailwindcss"));
 
     let config =
         fs::read_to_string(project_path.join("ossido.config.ts")).expect("ossido.config.ts missing");
     assert!(config.contains("output: 'static'"));
-    assert!(config.contains("import { ossidoMdx } from 'ossido-mdx/vite'"));
+    assert!(config.contains("import { ossidoMdx } from '@ossido-labs/ossido-mdx/vite'"));
     assert!(config.contains("ossidoMdx()"));
 }
 
@@ -143,7 +143,7 @@ async fn it_scaffolds_the_base_template_unchanged_with_no_features() {
     assert_eq!(
         package_json,
         format!(
-            "{{\"name\": \"{project_folder}\", \"dependencies\": {{ \"ossido\": \"{version}\" }}}}"
+            "{{\"name\": \"{project_folder}\", \"dependencies\": {{ \"@ossido-labs/ossido\": \"{version}\" }}, \"devDependencies\": {{ \"@ossido-labs/ossido-eslint-plugin\": \"{version}\" }}}}"
         )
     );
 

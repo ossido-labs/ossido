@@ -16,7 +16,7 @@ fn serde_derives() -> TokenStream {
 
 /// `#[ossido::Type]` — bundle `serde::{Serialize, Deserialize}` onto a struct or
 /// enum and register it for TypeScript generation (the type is exported from the
-/// `"ossido/types"` module). Replaces the old `#[derive(Serialize, Deserialize,
+/// `"@ossido-labs/ossido/types"` module). Replaces the old `#[derive(Serialize, Deserialize,
 /// Type)]`.
 ///
 /// TypeScript generation detects the `#[Type]` attribute by parsing the source

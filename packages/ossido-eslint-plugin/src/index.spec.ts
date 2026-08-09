@@ -7,7 +7,7 @@ interface RuleShape {
   create?: unknown;
 }
 
-describe('ossido-eslint-plugin', () => {
+describe('@ossido-labs/ossido-eslint-plugin', () => {
   it('is namespaced so the rule id is react-refresh/only-export-components', () => {
     expect(plugin.meta?.name).toBe('react-refresh');
   });

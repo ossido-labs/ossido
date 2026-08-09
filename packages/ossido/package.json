@@ -1,11 +1,15 @@
 {
-  "name": "ossido",
+  "name": "@ossido-labs/ossido",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Superfast React fullstack framework",
   "homepage": "https://ossido.dev",
   "scripts": {
     "dev": "tsdown --watch",
-    "build": "tsdown",
+    "build": "tsdown && tsc -p tsconfig.build.json",
+    "prepack": "bun run build",
     "lint": "oxlint",
     "format": "oxfmt --check .",
     "format:fix": "oxfmt .",
@@ -61,7 +65,6 @@
   },
   "files": [
     "dist",
-    "src",
     "README.md",
     "bin/**"
   ],
@@ -74,9 +77,9 @@
     "@rollup/plugin-inject": "^5.0.5",
     "@vitejs/plugin-react-swc": "^4.3.2",
     "fast-text-encoding": "^1.0.6",
-    "ossido-react-vite-plugin": "workspace:*",
-    "ossido-router": "workspace:*",
-    "ossido-ui": "workspace:*",
+    "@ossido-labs/ossido-react-vite-plugin": "workspace:*",
+    "@ossido-labs/ossido-router": "workspace:*",
+    "@ossido-labs/ossido-ui": "workspace:*",
     "url-search-params-polyfill": "^8.2.5",
     "web-streams-polyfill": "^4.0.0"
   },

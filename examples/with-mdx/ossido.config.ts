@@ -1,5 +1,5 @@
-import type { OssidoConfig } from 'ossido/config';
-import { ossidoMdx } from 'ossido-mdx/vite';
+import type { OssidoConfig } from '@ossido-labs/ossido/config';
+import { ossidoMdx } from '@ossido-labs/ossido-mdx/vite';
 
 const config: OssidoConfig = {
   vite: {

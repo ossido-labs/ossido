@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
-import { RouterProvider } from 'ossido-router';
-import type { RouterInstanceType } from 'ossido-router';
+import { RouterProvider } from '@ossido-labs/ossido-router';
+import type { RouterInstanceType } from '@ossido-labs/ossido-router';
 
 import { useOssidoContextServerPayload } from './ossido-context';
 

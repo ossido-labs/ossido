@@ -32,6 +32,16 @@ function run(
   return execFileSync(cmd, args, { cwd: ROOT, stdio: 'inherit', ...opts });
 }
 
+/**
+ * The published (scoped) name for a package `folder`, read from its
+ * package.json — the folders under `packages/` keep their bare names
+ * (`ossido-ui`), but the published packages are scoped (`@ossido-labs/ossido-ui`).
+ */
+function publishedName(folder: string): string {
+  const pkgJson = join(ROOT, 'packages', folder, 'package.json');
+  return JSON.parse(fs.readFileSync(pkgJson, 'utf8')).name as string;
+}
+
 async function ensureRegistryUp(): Promise<void> {
   try {
     const res = await fetch(`${REGISTRY}-/ping`);
@@ -63,10 +73,11 @@ fs.writeFileSync(
 
 try {
   for (const pkg of PACKAGES) {
-    console.log(`\n▸ ${pkg}: unpublish (if present) then publish`);
+    const name = publishedName(pkg);
+    console.log(`\n▸ ${name}: unpublish (if present) then publish`);
     try {
       // Remove any prior versions so re-publishing the same version succeeds.
-      run('npm', ['unpublish', pkg, '--force'], { stdio: 'ignore' });
+      run('npm', ['unpublish', name, '--force'], { stdio: 'ignore' });
     } catch {
       // Not previously published — fine.
     }
@@ -78,7 +89,7 @@ try {
 }
 
 console.log(
-  `\n✓ Published ${PACKAGES.join(', ')} to ${REGISTRY}\n\n` +
+  `\n✓ Published ${PACKAGES.map(publishedName).join(', ')} to ${REGISTRY}\n\n` +
     `To install them in a test project, add an .npmrc with:\n` +
     `  registry=${REGISTRY}\n` +
     `then run your install (npm install / bun install). Ossido packages come\n` +

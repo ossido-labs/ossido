@@ -143,7 +143,7 @@ fn concrete_type_name(ty: &Type) -> Option<String> {
 }
 
 /// Render the `RouteProps`/`OssidoPage` and `LayoutProps`/`OssidoLayout` helpers,
-/// to be inserted inside the generated `declare module "ossido/types"` block.
+/// to be inserted inside the generated `declare module "@ossido-labs/ossido/types"` block.
 pub fn render_route_props(
     route_props: &BTreeMap<String, String>,
     layout_props: &BTreeMap<String, String>,

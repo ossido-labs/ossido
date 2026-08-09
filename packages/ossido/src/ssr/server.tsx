@@ -47,8 +47,8 @@ import type { ReadableStream } from 'node:stream/web';
 
 import type { JSX } from 'react';
 import { renderToReadableStream } from 'react-dom/server';
-import { createRouter, preloadRouteChain } from 'ossido-router';
-import type { createRoute } from 'ossido-router';
+import { createRouter, preloadRouteChain } from '@ossido-labs/ossido-router';
+import type { createRoute } from '@ossido-labs/ossido-router';
 
 import { OssidoEntryPoint } from '../shared/OssidoEntryPoint';
 import type { ServerPayload } from '../types';

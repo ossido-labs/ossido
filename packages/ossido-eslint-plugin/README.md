@@ -24,14 +24,14 @@ at author time, before you feel it in dev.
 Install:
 
 ```sh
-npm install -D ossido-eslint-plugin
+npm install -D @ossido-labs/ossido-eslint-plugin
 ```
 
 ### oxlint (`.oxlintrc.json`)
 
 ```json
 {
-  "jsPlugins": ["ossido-eslint-plugin"],
+  "jsPlugins": ["@ossido-labs/ossido-eslint-plugin"],
   "rules": {
     "react-refresh/only-export-components": [
       "warn",
@@ -47,7 +47,7 @@ npm install -D ossido-eslint-plugin
 ### ESLint (`eslint.config.js`, flat config)
 
 ```js
-import reactRefresh from 'ossido-eslint-plugin';
+import reactRefresh from '@ossido-labs/ossido-eslint-plugin';
 
 export default [
   {

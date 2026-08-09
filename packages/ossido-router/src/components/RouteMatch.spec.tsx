@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 
-import { devErrorStore } from 'ossido-ui';
+import { devErrorStore } from '@ossido-labs/ossido-ui';
 
 import { Route } from '../route';
 import type { RouteComponent } from '../types';

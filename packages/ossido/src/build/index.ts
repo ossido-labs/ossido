@@ -7,8 +7,8 @@ import type { InlineConfig, Plugin } from 'vite';
 import { build, createServer, mergeConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import inject from '@rollup/plugin-inject';
-import { OssidoReactPlugin, routeGenerator } from 'ossido-react-vite-plugin';
-import { ErrorOverlayVitePlugin } from 'ossido-ui/vite-plugin';
+import { OssidoReactPlugin, routeGenerator } from '@ossido-labs/ossido-react-vite-plugin';
+import { ErrorOverlayVitePlugin } from '@ossido-labs/ossido-ui/vite-plugin';
 
 import type { OssidoConfig } from '../config';
 
@@ -37,11 +37,11 @@ const SERVER_MAIN_ENTRY = resolve('.ossido/server-main.tsx');
  * references the globals below — including third-party files deep in
  * `node_modules` (e.g. `react-dom/server`). Vite 8's bundler (rolldown)
  * resolves an injected bare specifier relative to the *importing* file, so
- * `'ossido/ssr'` fails to resolve from within `react-dom`. Resolving to
+ * `'@ossido-labs/ossido/ssr'` fails to resolve from within `react-dom`. Resolving to
  * absolute paths up-front makes the injected imports resolvable from anywhere
  * (and is a no-op for rollup on Vite <= 7).
  */
-const SSR_POLYFILLS_MODULE = require.resolve('ossido/ssr');
+const SSR_POLYFILLS_MODULE = require.resolve('@ossido-labs/ossido/ssr');
 const WEB_STREAMS_POLYFILL_MODULE = require.resolve('web-streams-polyfill');
 
 const VITE_SSR_PLUGINS: Array<Plugin> = [

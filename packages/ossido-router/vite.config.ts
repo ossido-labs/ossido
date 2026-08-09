@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react-swc';
 export default defineConfig({
   plugins: [react()],
   test: {
-    name: 'ossido-router',
+    name: '@ossido-labs/ossido-router',
     environment: 'happy-dom',
     globals: true,
   },

@@ -119,11 +119,11 @@ impl TypesJar {
 
     /// Generate the string containing all the typescript types found in the jar,
     /// plus `extra` (the route→props map + `OssidoPage`), inside the
-    /// `declare module "ossido/types"` block. `trailing` is appended verbatim
-    /// after that block (the `declare module "ossido/client"` API-routes map).
+    /// `declare module "@ossido-labs/ossido/types"` block. `trailing` is appended verbatim
+    /// after that block (the `declare module "@ossido-labs/ossido/client"` API-routes map).
     fn generate_typescript(&self, extra: &str, trailing: &str) -> String {
         self.log_duplicated_types();
-        let mut typescript = String::from("declare module \"ossido/types\" {\n");
+        let mut typescript = String::from("declare module \"@ossido-labs/ossido/types\" {\n");
         for ttype in &self.types {
             typescript.push_str(&format!(
                 "// START [{}]\n",
