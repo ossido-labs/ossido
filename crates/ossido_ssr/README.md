@@ -8,8 +8,9 @@ built JS bundle and return the rendered HTML string, with an opt-in streaming
 render path. It ships the ICU data (`icudtl.dat`) needed for `Intl` support.
 
 > This crate is vendored from the (now stagnant) upstream
-> [`ssr_rs`](https://crates.io/crates/ssr_rs) crate and renamed. It is maintained
-> as an internal part of Ossido; the public API is unchanged.
+> [`ssr_rs`](https://crates.io/crates/ssr_rs) crate by
+> [Valerio Ageno](https://github.com/Valerioageno), renamed and maintained as an
+> internal part of Ossido; the public API is unchanged.
 
 ## Example
 
@@ -32,3 +33,9 @@ Because rusty_v8 does not implement the V8 Locker API, an `Ssr` instance must no
 be shared across threads — use one isolate per thread (e.g. `thread_local!`).
 
 Check [ossido](https://github.com/ossido-labs/ossido) for more.
+
+## License & credits
+
+Originally authored by Valerio Ageno as [`ssr_rs`](https://github.com/Valerioageno/ssr-rs)
+(licensed `MIT OR Apache-2.0`). This derivative is distributed under the MIT
+license; see [`LICENSE`](./LICENSE), which retains the original copyright notice.
