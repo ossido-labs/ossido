@@ -37,7 +37,7 @@ The [documentation](https://ossido.dev/) is available on
 Available on MacOS, Linux and Windows.
 
 ```sh
-cargo install ossido
+cargo install ossido_cli
 ```
 
 ## Getting started

@@ -1,4 +1,4 @@
-# ossido-fs-router-vite-plugin
+# ossido-react-vite-plugin
 
 This is a vite plugin for [ossido](https://github.com/ossido-labs/ossido).
 
