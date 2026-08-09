@@ -1,7 +1,7 @@
-import type { Route } from '../route'
-import type { RouterInstanceType } from '../router'
+import type { Route } from '../route';
+import type { RouterInstanceType } from '../router';
 
-import { matchRoute } from './match-route'
+import { matchRoute } from './match-route';
 
 /**
  * Preload the code of the route matching `pathname` and of every layout that
@@ -21,18 +21,18 @@ export async function preloadRouteChain(
   router: RouterInstanceType,
   pathname?: string,
 ): Promise<void> {
-  const matched = matchRoute(router.routesById, pathname)
-  if (!matched) return
+  const matched = matchRoute(router.routesById, pathname);
+  if (!matched) return;
 
-  const pending: Array<Promise<void>> = []
+  const pending: Array<Promise<void>> = [];
   for (
     let node: Route | undefined = matched;
     node;
     node = node.isRoot ? undefined : node.options.getParentRoute?.()
   ) {
-    const preload = node.component.preload
-    if (preload) pending.push(preload().catch(() => undefined))
+    const preload = node.component.preload;
+    if (preload) pending.push(preload().catch(() => undefined));
   }
 
-  await Promise.all(pending)
+  await Promise.all(pending);
 }

@@ -1,5 +1,5 @@
-import * as React from 'react'
-import styles from './Wordmark.module.css'
+import * as React from 'react';
+import styles from './Wordmark.module.css';
 
 export const Wordmark: React.FC<React.SVGProps<SVGSVGElement>> = (props) => {
   return (
@@ -30,5 +30,5 @@ export const Wordmark: React.FC<React.SVGProps<SVGSVGElement>> = (props) => {
         d="M261.43 217.83c1.19 1.04 1.62 2.93 1.09 4.57l-7.81 23.73h14.41c1.34 0 2.54 1.02 3 2.55.46 1.54.07 3.25-.96 4.3l-28.68 29.04c-1.13 1.14-2.73 1.2-3.91.16-1.19-1.04-1.62-2.93-1.09-4.57l7.81-23.73h-14.41c-1.34 0-2.54-1.02-3-2.55-.46-1.54-.07-3.25.96-4.3l28.68-29.04c1.13-1.14 2.73-1.2 3.91-.16"
       />
     </svg>
-  )
-}
+  );
+};

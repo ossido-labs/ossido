@@ -1,60 +1,62 @@
 [package]
 name = "ossido"
-version = "0.20.0"
+version = "0.1.0"
 edition = "2024"
-authors = ["V. Ageno <valerioageno@yahoo.it>"]
+authors = ["Chris Schofield <chris@childishforces.com>"]
 description = "Superfast React fullstack framework"
 homepage = "https://ossido.dev"
 keywords = [ "react", "typescript", "fullstack", "web", "ssr"]
-repository = "https://github.com/ChildishForces/ossido"
+repository = "https://github.com/ossido-labs/ossido"
 readme = "../../README.md"
 license-file = "../../LICENSE.md"
 categories = ["web-programming"]
 include = [
     "src/**/*.rs",
-		"Cargo.toml"
+    "Cargo.toml"
 ]
 
 
 [dependencies]
-# 0.9.0 adds `render` (single named export) + surfaced `JsException` errors,
-# which the streaming bridge in `crate::ssr` builds on. Unpublished as of now,
-# so it's referenced by path from the local checkout. A path dependency
-# (unlike a workspace `[patch]`) propagates transitively, so the excluded
-# fixture/example apps that build against this crate resolve it too.
-# TEMPORARY: switch back to `ssr_rs = "0.9.0"` and drop the path once 0.9.0 is
-# published to crates.io (a path dependency can't be published).
-ssr_rs = { path = "../../../ssr-rs", version = "0.9.0" }
-axum = {version = "0.8.1", features = ["json", "ws"]}
-axum-extra = {version = "0.10.0", features = ["cookie"]}
-tokio = { version = "1.37.0", features = ["full"] }
-serde = { version = "1.0.202", features = ["derive"] }
-erased-serde = "0.4.5"
+# Vendored, in-repo SSR engine (the stagnant upstream `ssr_rs`, renamed). Its
+# streaming bridge in `crate::ssr` builds on the `render` single-named-export +
+# surfaced `JsException` errors. A path dependency (unlike a workspace `[patch]`)
+# propagates transitively, so the excluded fixture/example apps that build
+# against this crate resolve it too.
+ossido_ssr = { path = "../ossido_ssr", version = "0.1.0" }
+axum = {version = "0.8.9", features = ["json", "ws"]}
+axum-extra = {version = "0.12.6", features = ["cookie"]}
+tokio = { version = "1.53.1", features = ["full"] }
+serde = { version = "1.0.229", features = ["derive"] }
+erased-serde = "0.4.10"
 serde_json = { version = "1.0", features = ["raw_value"] }
 serde_urlencoded = "0.7.1"
-reqwest = {version = "0.12.4", features = ["json", "stream"]}
-once_cell = "1.19.0"
+# reqwest 0.13 switched its default TLS backend from native-tls to rustls
+# (pulling aws-lc-sys, which needs cmake + a C toolchain). Keep native-tls
+# explicitly to preserve 0.12's build footprint. `default-features = false`
+# drops the rustls `default-tls`, so re-add the other former defaults.
+reqwest = {version = "0.13.4", default-features = false, features = ["native-tls", "charset", "http2", "system-proxy", "json", "stream", "form"]}
+once_cell = "1.21.4"
 crossbeam-channel = "0.5"
-regex = "1.10.5"
-either = "1.13.0"
-tower-http = {version = "0.6.0", features = ["fs", "compression-br", "compression-gzip"]}
+regex = "1.13.1"
+either = "1.17.0"
+tower-http = {version = "0.7.0", features = ["fs", "compression-br", "compression-gzip"]}
 brotli = "8"
-colored = "3.0.0"
+colored = "3.1.1"
 
-ossido_macros = {path = "../ossido_macros", version = "0.20.0"}
-ossido_internal = {path = "../ossido_internal", version = "0.20.0"}
+ossido_macros = {path = "../ossido_macros", version = "0.1.0"}
+ossido_internal = {path = "../ossido_internal", version = "0.1.0"}
 # Match the same version used by axum
-tokio-tungstenite = "0.27.0"
+tokio-tungstenite = "0.29.0"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
-tungstenite = "0.27.0"
-http = "1.1.0"
-pin-project = "1.1.7"
-tower = "0.5.1"
+tungstenite = "0.29.0"
+http = "1.5.0"
+pin-project = "1.1.13"
+tower = "0.5.3"
 
 [dev-dependencies]
 fs_extra = "1.3.0"
-tempfile = "3.14.0"
-serial_test = "3.0.0"
+tempfile = "3.27.0"
+serial_test = "4.0.1"
 
 [[bench]]
 name = "streaming_vs_buffered"

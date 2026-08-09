@@ -1,5 +1,5 @@
 use axum::routing::{Router, get, post};
-use ssr_rs::Ssr;
+use ossido_ssr::Ssr;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use ossido_internal::config::Config;

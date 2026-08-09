@@ -1,21 +1,23 @@
-import { Component, useState } from 'react'
-import type { JSX, ReactNode } from 'react'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import { Component, useState } from 'react';
+import type { JSX, ReactNode } from 'react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import type { OssidoErrorWithSource } from '../types'
+import type { OssidoErrorWithSource } from '../types';
 
-import { DevErrorOverlay } from './DevErrorOverlay'
-import { DefaultScreen } from './DefaultScreen'
+import { DevErrorOverlay } from './DevErrorOverlay';
+import { DefaultScreen } from './DefaultScreen';
 
-const jsError = new Error('Cannot read properties of undefined (reading "map")')
+const jsError = new Error(
+  'Cannot read properties of undefined (reading "map")',
+);
 jsError.stack = `TypeError: Cannot read properties of undefined (reading "map")
     at IndexPage (http://localhost:3101/vite-server/@fs/Users/me/app/src/routes/index.tsx:12:24)
-    at renderWithHooks (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:4392:19)`
+    at renderWithHooks (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:4392:19)`;
 
 // A deep stack (> 5 frames) to exercise the "show more frames" toggle.
 const longStackError = new Error(
   'Cannot read properties of undefined (reading "map")',
-)
+);
 longStackError.stack = [
   'TypeError: Cannot read properties of undefined (reading "map")',
   '    at PokemonList (http://localhost:3101/vite-server/@fs/Users/me/app/src/components/PokemonList.tsx:18:22)',
@@ -26,19 +28,19 @@ longStackError.stack = [
   '    at performUnitOfWork (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:8916:12)',
   '    at workLoopSync (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:8837:9)',
   '    at renderRootSync (http://localhost:3101/vite-server/deps/react-dom_client.js?v=abc:8810:11)',
-].join('\n')
+].join('\n');
 
 const rustError: OssidoErrorWithSource = new Error(
   'Boom! This panic was raised inside a Rust route handler',
-)
-rustError.name = 'RustPanic'
+);
+rustError.name = 'RustPanic';
 rustError.stack = [
   '    at src/routes/rust-error.rs:8:5',
   '   4: ossido_app::routes::rust_error::{{closure}}',
   '             at src/routes/rust-error.rs:8:5',
   '   5: core::panicking::panic_fmt',
   '             at /rustc/abc/library/core/src/panicking.rs:80:14',
-].join('\n')
+].join('\n');
 rustError.ossidoServerSource = {
   file: 'src/routes/rust-error.rs',
   line: 8,
@@ -52,17 +54,17 @@ rustError.ossidoServerSource = {
     '}',
     '',
   ].join('\n'),
-}
+};
 
 // #region Interactive trigger
 /** Throws during render — the point of the "Triggered" story. */
 function Bomb(): never {
-  throw new Error('Cannot read properties of null (reading "toUpperCase")')
+  throw new Error('Cannot read properties of null (reading "toUpperCase")');
 }
 
 interface DemoBoundaryProps {
-  onReset: () => void
-  children: ReactNode
+  onReset: () => void;
+  children: ReactNode;
 }
 
 /**
@@ -74,32 +76,32 @@ class DemoBoundary extends Component<
   DemoBoundaryProps,
   { error: Error | null }
 > {
-  state: { error: Error | null } = { error: null }
+  state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error): { error: Error } {
-    return { error }
+    return { error };
   }
 
   render(): ReactNode {
     if (this.state.error) {
       return (
         <DevErrorOverlay error={this.state.error} reset={this.props.onReset} />
-      )
+      );
     }
-    return this.props.children
+    return this.props.children;
   }
 }
 
 function TriggerDemo(): JSX.Element {
   // Bumping `attempt` re-mounts the boundary (clearing its caught error), the
   // same trick RouteMatch uses to reset via the resource key.
-  const [attempt, setAttempt] = useState(0)
-  const [armed, setArmed] = useState(false)
+  const [attempt, setAttempt] = useState(0);
+  const [armed, setArmed] = useState(false);
 
   const reset = (): void => {
-    setArmed(false)
-    setAttempt((n) => n + 1)
-  }
+    setArmed(false);
+    setAttempt((n) => n + 1);
+  };
 
   return (
     <DemoBoundary key={attempt} onReset={reset}>
@@ -120,7 +122,7 @@ function TriggerDemo(): JSX.Element {
         </DefaultScreen>
       )}
     </DemoBoundary>
-  )
+  );
 }
 // #endregion
 
@@ -129,27 +131,27 @@ const meta = {
   component: DevErrorOverlay,
   parameters: { layout: 'fullscreen' },
   args: { reset: (): void => undefined, error: jsError },
-} satisfies Meta<typeof DevErrorOverlay>
+} satisfies Meta<typeof DevErrorOverlay>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** A JavaScript error — frames resolve to app source via sourcemaps. */
 export const JavaScriptError: Story = {
   args: { error: jsError },
-}
+};
 
 /** A Rust handler panic — the server-embedded source excerpt is highlighted. */
 export const RustPanic: Story = {
   args: { error: rustError },
-}
+};
 
 /** A deep stack: only the first 5 frames show until "show more frames". */
 export const LongStack: Story = {
   args: { error: longStackError },
-}
+};
 
 /** Interactive: click the button to throw a real render error into a boundary. */
 export const Triggered: Story = {
   render: (): JSX.Element => <TriggerDemo />,
-}
+};

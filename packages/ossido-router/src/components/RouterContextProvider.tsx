@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { ReactNode } from 'react';
 
-import type { Router } from '../router'
-import type { Route } from '../route'
-import type { ServerInitialLocation } from '../types'
-import { fromUrlToParsedLocation } from '../utils/from-url-to-parsed-location'
-import { matchRoute } from '../utils/match-route'
-import { buildResourceKey, getOrCreateResource } from '../data/resourceCache'
+import type { Router } from '../router';
+import type { Route } from '../route';
+import type { ServerInitialLocation } from '../types';
+import { fromUrlToParsedLocation } from '../utils/from-url-to-parsed-location';
+import { matchRoute } from '../utils/match-route';
+import { runCommit, VIEW_TRANSITIONS_ENABLED } from '../utils/view-transition';
+import { buildResourceKey, getOrCreateResource } from '../data/resourceCache';
 
 import {
   RouterContext,
@@ -14,9 +15,9 @@ import {
   type ParsedLocation,
   type NavigationCommitOptions,
   type RouterContextValue,
-} from './RouterContext'
+} from './RouterContext';
 
-const isServerSide = typeof window === 'undefined'
+const isServerSide = typeof window === 'undefined';
 
 /**
  * For a route with a `loading.tsx`, wait up to this long for the destination to
@@ -25,15 +26,15 @@ const isServerSide = typeof window === 'undefined'
  * resolved — so `use()` reads it synchronously and no fallback flashes. Only
  * genuinely slow navigations fall through and show the loading screen.
  */
-const FALLBACK_DELAY_MS = 100
+const FALLBACK_DELAY_MS = 100;
 
 const wait = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms))
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 // Kept in sync with `CriticalCss`. Its `<link rel="stylesheet" precedence>` is
 // dev-only, so the presence of one also tells us we're in dev.
-const CRITICAL_CSS_PATH = '/vite-server/ossido_internal__critical_css'
-const CRITICAL_CSS_LINK_SELECTOR = `link[href*="${CRITICAL_CSS_PATH.split('/').pop()}"]`
+const CRITICAL_CSS_PATH = '/vite-server/ossido_internal__critical_css';
+const CRITICAL_CSS_LINK_SELECTOR = `link[href*="${CRITICAL_CSS_PATH.split('/').pop()}"]`;
 
 /**
  * Warm a route's critical CSS before navigating to it, so the
@@ -42,26 +43,26 @@ const CRITICAL_CSS_LINK_SELECTOR = `link[href*="${CRITICAL_CSS_PATH.split('/').p
  * the resource is cached; never rejects.
  */
 function preloadCriticalCss(componentId: string): Promise<void> {
-  const href = `${CRITICAL_CSS_PATH}?componentId=${componentId}`
+  const href = `${CRITICAL_CSS_PATH}?componentId=${componentId}`;
   // Already warmed (or warming) for this route — don't stack up <link>s.
   if (document.querySelector(`link[rel="preload"][href="${href}"]`)) {
-    return Promise.resolve()
+    return Promise.resolve();
   }
   return new Promise((resolve) => {
-    const link = document.createElement('link')
-    link.rel = 'preload'
-    link.as = 'style'
-    link.href = href
-    link.onload = (): void => resolve()
-    link.onerror = (): void => resolve()
-    document.head.appendChild(link)
-  })
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'style';
+    link.href = href;
+    link.onload = (): void => resolve();
+    link.onerror = (): void => resolve();
+    document.head.appendChild(link);
+  });
 }
 
 interface RouterContextProviderProps {
-  router: Router
-  serverInitialLocation: ServerInitialLocation
-  children: ReactNode
+  router: Router;
+  serverInitialLocation: ServerInitialLocation;
+  children: ReactNode;
 }
 
 export function RouterContextProvider({
@@ -71,36 +72,52 @@ export function RouterContextProvider({
 }: RouterContextProviderProps): ReactNode {
   const [location, setLocation] = useState<ParsedLocation>(() =>
     getInitialLocation(serverInitialLocation),
-  )
-  const [navigationId, setNavigationId] = useState<number>(0)
+  );
+  const [navigationId, setNavigationId] = useState<number>(0);
 
   const updateLocation = useCallback(
     (
       newLocation: ParsedLocation,
       options: NavigationCommitOptions = {},
     ): void => {
+      // Apply the navigation's state change. Wrapped by `runCommit` so — when
+      // view transitions are enabled (globally or per-navigation) and supported
+      // — it animates via `document.startViewTransition`. Every commit path
+      // (immediate, loading-race, ready.then) goes through this `commit`.
+      //
+      // A same-page anchor navigation — the pathname and search are unchanged, so
+      // only the URL hash (e.g. `#tuono`) differs — is a scroll to an id, not a
+      // page change: never run a view transition for it.
+      const isSamePageAnchor =
+        newLocation.pathname === location.pathname &&
+        newLocation.searchStr === location.searchStr;
+      const useViewTransition =
+        !isSamePageAnchor &&
+        (options.viewTransition ?? VIEW_TRANSITIONS_ENABLED);
       const commit = (): void => {
-        setNavigationId((id) => id + 1)
-        setLocation(newLocation)
-        if (options.history) {
-          const { type, path } = options.history
-          window.history[type](path, '', path)
-        }
-        if (options.scroll) {
-          window.scroll(0, 0)
-        }
-      }
+        runCommit(() => {
+          setNavigationId((id) => id + 1);
+          setLocation(newLocation);
+          if (options.history) {
+            const { type, path } = options.history;
+            window.history[type](path, '', path);
+          }
+          if (options.scroll) {
+            window.scroll(0, 0);
+          }
+        }, useViewTransition);
+      };
 
-      const targetRoute = matchRoute(router.routesById, newLocation.pathname)
+      const targetRoute = matchRoute(router.routesById, newLocation.pathname);
 
       // On the server, or for an unknown route (which renders the not-found
       // fallback), commit immediately.
       if (!targetRoute || isServerSide) {
-        commit()
-        return
+        commit();
+        return;
       }
 
-      const pending: Array<PromiseLike<unknown>> = []
+      const pending: Array<PromiseLike<unknown>> = [];
 
       // 1. The route's server data (the key the destination render will read —
       //    navigationId is bumped by one on commit — so it reads it synchronously).
@@ -111,7 +128,7 @@ export function RouterContextProvider({
             targetRoute,
             newLocation,
           ),
-        )
+        );
       }
 
       // In dev the route's critical CSS is a `<link rel="stylesheet" precedence>`
@@ -119,7 +136,7 @@ export function RouterContextProvider({
       // the presence of one for the current page.
       const criticalCssEnabled = !!document.querySelector(
         CRITICAL_CSS_LINK_SELECTOR,
-      )
+      );
 
       // Everything else the destination needs to render without suspending:
       //  - the code chunk of the matched route and its lazy ancestor layouts
@@ -130,41 +147,41 @@ export function RouterContextProvider({
         node;
         node = node.isRoot ? undefined : node.options.getParentRoute?.()
       ) {
-        const preloadComponent = node.component.preload
-        if (preloadComponent) pending.push(preloadComponent())
+        const preloadComponent = node.component.preload;
+        if (preloadComponent) pending.push(preloadComponent());
 
-        const componentId = node.filePath || node.id
+        const componentId = node.filePath || node.id;
         if (criticalCssEnabled && componentId) {
-          pending.push(preloadCriticalCss(componentId))
+          pending.push(preloadCriticalCss(componentId));
         }
       }
 
       if (pending.length === 0) {
-        commit()
-        return
+        commit();
+        return;
       }
 
       // A rejected resource still navigates so the error boundary can surface it.
-      const ready = Promise.all(pending)
+      const ready = Promise.all(pending);
 
       if (targetRoute.options.loadingComponent) {
         // The route has a loading fallback: commit as soon as the destination is
         // ready, or after a short grace period — whichever comes first. Fast
         // navigations commit with data resolved (no fallback flash); slow ones
         // commit early and the loading component shows while data finishes.
-        Promise.race([ready, wait(FALLBACK_DELAY_MS)]).then(commit, commit)
+        Promise.race([ready, wait(FALLBACK_DELAY_MS)]).then(commit, commit);
       } else {
         // No loading fallback: wait for everything so the destination appears
         // fully (the current page stays visible until then, never a blank).
-        ready.then(commit, commit)
+        ready.then(commit, commit);
       }
     },
-    [router, navigationId],
-  )
+    [router, navigationId, location],
+  );
 
   const retry = useCallback((): void => {
-    setNavigationId((id) => id + 1)
-  }, [])
+    setNavigationId((id) => id + 1);
+  }, []);
 
   /**
    * Listen browser navigation events. The browser has already updated the URL,
@@ -175,16 +192,16 @@ export function RouterContextProvider({
     const updateLocationOnPopStateChange = ({
       target,
     }: PopStateEvent): void => {
-      const { location: targetLocation } = target as typeof window
-      updateLocation(fromUrlToParsedLocation(targetLocation.href))
-    }
+      const { location: targetLocation } = target as typeof window;
+      updateLocation(fromUrlToParsedLocation(targetLocation.href));
+    };
 
-    window.addEventListener('popstate', updateLocationOnPopStateChange)
+    window.addEventListener('popstate', updateLocationOnPopStateChange);
 
     return (): void => {
-      window.removeEventListener('popstate', updateLocationOnPopStateChange)
-    }
-  }, [updateLocation])
+      window.removeEventListener('popstate', updateLocationOnPopStateChange);
+    };
+  }, [updateLocation]);
 
   const contextValue: RouterContextValue = useMemo(
     () => ({
@@ -195,11 +212,11 @@ export function RouterContextProvider({
       retry,
     }),
     [location, router, navigationId, updateLocation, retry],
-  )
+  );
 
   return (
     <RouterContext.Provider value={contextValue}>
       {children}
     </RouterContext.Provider>
-  )
+  );
 }

@@ -4,5 +4,5 @@
  * `loading.tsx` for real loading UI.
  */
 export function DefaultLoading(): null {
-  return null
+  return null;
 }

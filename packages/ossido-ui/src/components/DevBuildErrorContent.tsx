@@ -1,6 +1,6 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import type { DevBuildError } from './devErrorStore'
+import type { DevBuildError } from './devErrorStore';
 
 /**
  * Renders a Vite build/compile error (reported into the store by the patched
@@ -11,13 +11,13 @@ import type { DevBuildError } from './devErrorStore'
 export function DevBuildErrorContent({
   build,
 }: {
-  build: DevBuildError
+  build: DevBuildError;
 }): JSX.Element {
-  const file = build.loc?.file ?? build.id
+  const file = build.loc?.file ?? build.id;
   const location =
     build.loc?.line != null
       ? `${file}:${build.loc.line}:${build.loc.column ?? 0}`
-      : file
+      : file;
 
   return (
     <>
@@ -50,5 +50,5 @@ export function DevBuildErrorContent({
         <pre className="ossido-err-rawstack">{build.stack}</pre>
       )}
     </>
-  )
+  );
 }

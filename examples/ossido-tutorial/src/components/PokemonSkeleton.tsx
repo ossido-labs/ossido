@@ -1,6 +1,6 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import styles from './PokemonView.module.css'
+import styles from './PokemonView.module.css';
 
 export default function PokemonSkeleton(): JSX.Element {
   return (
@@ -17,5 +17,5 @@ export default function PokemonSkeleton(): JSX.Element {
         </dl>
       </div>
     </div>
-  )
+  );
 }

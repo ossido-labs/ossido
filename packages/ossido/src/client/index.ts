@@ -26,8 +26,8 @@
  * ```
  */
 
-type MethodName = 'get' | 'post' | 'put' | 'patch' | 'delete'
-type HttpMethod = Uppercase<MethodName>
+type MethodName = 'get' | 'post' | 'put' | 'patch' | 'delete';
+type HttpMethod = Uppercase<MethodName>;
 
 /**
  * Augmentation target for the generated route map. Left empty here; the
@@ -39,10 +39,10 @@ export interface Register {}
 // Route params are always URL-segment strings; an empty route has
 // `Record<string, never>` (no fillable segments).
 interface ApiRouteEntry {
-  params: Record<string, string>
-  response: unknown
+  params: Record<string, string>;
+  response: unknown;
 }
-type AnyApiRoutes = Record<string, Partial<Record<HttpMethod, ApiRouteEntry>>>
+type AnyApiRoutes = Record<string, Partial<Record<HttpMethod, ApiRouteEntry>>>;
 
 /**
  * The registered routes, or a permissive fallback when a project hasn't
@@ -52,24 +52,33 @@ type ApiRoutes = Register extends { apiRoutes: infer R }
   ? R extends AnyApiRoutes
     ? R
     : AnyApiRoutes
-  : AnyApiRoutes
+  : AnyApiRoutes;
 
 /** Paths that serve the given HTTP method. */
 type PathsFor<M extends HttpMethod> = {
-  [P in keyof ApiRoutes]: M extends keyof ApiRoutes[P] ? P : never
+  [P in keyof ApiRoutes]: M extends keyof ApiRoutes[P] ? P : never;
 }[keyof ApiRoutes] &
-  string
+  string;
 
-type EntryFor<P extends string, M extends HttpMethod> = P extends keyof ApiRoutes
+type EntryFor<
+  P extends string,
+  M extends HttpMethod,
+> = P extends keyof ApiRoutes
   ? M extends keyof ApiRoutes[P]
     ? ApiRoutes[P][M] extends ApiRouteEntry
       ? ApiRoutes[P][M]
       : ApiRouteEntry
     : ApiRouteEntry
-  : ApiRouteEntry
+  : ApiRouteEntry;
 
-type ParamsOf<P extends string, M extends HttpMethod> = EntryFor<P, M>['params']
-type ResponseOf<P extends string, M extends HttpMethod> = EntryFor<P, M>['response']
+type ParamsOf<P extends string, M extends HttpMethod> = EntryFor<
+  P,
+  M
+>['params'];
+type ResponseOf<P extends string, M extends HttpMethod> = EntryFor<
+  P,
+  M
+>['response'];
 
 /**
  * Whether a params object *requires* any key. `{} extends T` is true only when
@@ -79,11 +88,11 @@ type ResponseOf<P extends string, M extends HttpMethod> = EntryFor<P, M>['respon
  * is `string`, not `never`.)
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-type HasKeys<T> = {} extends T ? false : true
+type HasKeys<T> = {} extends T ? false : true;
 
 /** A `fetch` {@link Response} whose `json()` is typed to the route's response. */
 export interface TypedResponse<T> extends Response {
-  json(): Promise<T>
+  json(): Promise<T>;
 }
 
 /**
@@ -93,48 +102,55 @@ export interface TypedResponse<T> extends Response {
 export type RequestOptions<Params> = Omit<RequestInit, 'method'> &
   (HasKeys<Params> extends true
     ? { params: Params }
-    : { params?: Record<string, never> })
+    : { params?: Record<string, never> });
 
 type MethodFn<M extends HttpMethod> = <P extends PathsFor<M>>(
   path: P,
   ...args: HasKeys<ParamsOf<P, M>> extends true
     ? [options: RequestOptions<ParamsOf<P, M>>]
     : [options?: RequestOptions<ParamsOf<P, M>>]
-) => Promise<TypedResponse<ResponseOf<P, M>>>
+) => Promise<TypedResponse<ResponseOf<P, M>>>;
 
-export type ApiClient = { [M in MethodName]: MethodFn<Uppercase<M>> }
+export type ApiClient = { [M in MethodName]: MethodFn<Uppercase<M>> };
 
 export interface CreateApiClientOptions {
   /** Prepended to every request path (e.g. an absolute origin for SSR fetches). */
-  baseUrl?: string
+  baseUrl?: string;
   /** Default `fetch` options merged into every request. */
-  defaults?: Omit<RequestInit, 'method'>
+  defaults?: Omit<RequestInit, 'method'>;
   /** Custom `fetch` implementation (defaults to the global `fetch`). */
-  fetch?: typeof fetch
+  fetch?: typeof fetch;
 }
 
 // Matches `[name]` and `[...slug]`, capturing the spread marker and the name.
-const PARAM_SEGMENT = /\[(\.\.\.)?([^\]]+)\]/g
+const PARAM_SEGMENT = /\[(\.\.\.)?([^\]]+)\]/g;
 
 /** Substitute `params` into a path template's `[segments]`. */
 function buildPath(path: string, params?: Record<string, unknown>): string {
-  if (!params) return path
-  return path.replace(PARAM_SEGMENT, (_match, spread: string | undefined, name: string) => {
-    const value = params[name]
-    if (value == null) {
-      throw new TypeError(`Missing value for route param "${name}" in "${path}"`)
-    }
-    const str = String(value)
-    // A catch-all (`[...slug]`) spans multiple segments, so keep its slashes.
-    return spread
-      ? str.split('/').map(encodeURIComponent).join('/')
-      : encodeURIComponent(str)
-  })
+  if (!params) return path;
+  return path.replace(
+    PARAM_SEGMENT,
+    (_match, spread: string | undefined, name: string) => {
+      const value = params[name];
+      if (value == null) {
+        throw new TypeError(
+          `Missing value for route param "${name}" in "${path}"`,
+        );
+      }
+      const str = String(value);
+      // A catch-all (`[...slug]`) spans multiple segments, so keep its slashes.
+      return spread
+        ? str.split('/').map(encodeURIComponent).join('/')
+        : encodeURIComponent(str);
+    },
+  );
 }
 
 /** Create an {@link ApiClient}, optionally with a base URL and default options. */
-export function createApiClient(options: CreateApiClientOptions = {}): ApiClient {
-  const { baseUrl = '', defaults, fetch: fetchImpl } = options
+export function createApiClient(
+  options: CreateApiClientOptions = {},
+): ApiClient {
+  const { baseUrl = '', defaults, fetch: fetchImpl } = options;
 
   const request =
     (method: HttpMethod) =>
@@ -142,10 +158,10 @@ export function createApiClient(options: CreateApiClientOptions = {}): ApiClient
       path: string,
       opts: RequestInit & { params?: Record<string, unknown> } = {},
     ): Promise<Response> => {
-      const { params, ...init } = opts
-      const url = baseUrl + buildPath(path, params)
-      return (fetchImpl ?? fetch)(url, { ...defaults, ...init, method })
-    }
+      const { params, ...init } = opts;
+      const url = baseUrl + buildPath(path, params);
+      return (fetchImpl ?? fetch)(url, { ...defaults, ...init, method });
+    };
 
   return {
     get: request('GET'),
@@ -153,8 +169,8 @@ export function createApiClient(options: CreateApiClientOptions = {}): ApiClient
     put: request('PUT'),
     patch: request('PATCH'),
     delete: request('DELETE'),
-  } as ApiClient
+  } as ApiClient;
 }
 
 /** The default client — global `fetch`, relative paths. */
-export const apiClient: ApiClient = createApiClient()
+export const apiClient: ApiClient = createApiClient();

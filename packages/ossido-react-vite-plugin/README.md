@@ -1,10 +1,10 @@
 # ossido-fs-router-vite-plugin
 
-This is a vite plugin for [ossido](https://github.com/ChildishForces/ossido).
+This is a vite plugin for [ossido](https://github.com/ossido-labs/ossido).
 
 This package specifically handles the file system based routing.
 
-Check [ossido](https://github.com/ChildishForces/ossido) for more.
+Check [ossido](https://github.com/ossido-labs/ossido) for more.
 
 ## Credits
 

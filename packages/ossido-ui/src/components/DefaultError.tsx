@@ -1,8 +1,8 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import type { OssidoErrorProps } from '../types'
+import type { OssidoErrorProps } from '../types';
 
-import { DefaultScreen } from './DefaultScreen'
+import { DefaultScreen } from './DefaultScreen';
 
 /**
  * Production error fallback used when a route has no `error.tsx`. Deliberately
@@ -20,5 +20,5 @@ export function DefaultError({ reset }: OssidoErrorProps): JSX.Element {
         Try again
       </button>
     </DefaultScreen>
-  )
+  );
 }

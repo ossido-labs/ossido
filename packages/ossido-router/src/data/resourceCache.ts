@@ -1,7 +1,7 @@
-import type { Route } from '../route'
-import type { ServerErrorPayload, OssidoErrorWithSource } from '../types'
+import type { Route } from '../route';
+import type { ServerErrorPayload, OssidoErrorWithSource } from '../types';
 
-const isServerSide = typeof window === 'undefined'
+const isServerSide = typeof window === 'undefined';
 
 /**
  * Baked to `true` by `ossido build --static` (via the vite `define`); the
@@ -10,9 +10,9 @@ const isServerSide = typeof window === 'undefined'
  * `/__ossido/data{path}` route, so data is pre-rendered to `.json` files, keyed
  * by path only (no query variants).
  */
-declare const __OSSIDO_STATIC__: boolean
+declare const __OSSIDO_STATIC__: boolean;
 const IS_STATIC_EXPORT =
-  typeof __OSSIDO_STATIC__ !== 'undefined' && __OSSIDO_STATIC__
+  typeof __OSSIDO_STATIC__ !== 'undefined' && __OSSIDO_STATIC__;
 
 /**
  * The data endpoint URL for a location. In a static export it targets the
@@ -24,9 +24,9 @@ function dataEndpointUrl({ pathname, searchStr }: LocationKeyParts): string {
   if (IS_STATIC_EXPORT) {
     return pathname === '/'
       ? '/__ossido/data.json'
-      : `/__ossido/data${pathname}.json`
+      : `/__ossido/data${pathname}.json`;
   }
-  return `/__ossido/data${pathname}${searchStr}`
+  return `/__ossido/data${pathname}${searchStr}`;
 }
 
 /**
@@ -35,7 +35,7 @@ function dataEndpointUrl({ pathname, searchStr }: LocationKeyParts): string {
  */
 export type RouteDataResult =
   | { kind: 'data'; props: Record<string, unknown> }
-  | { kind: 'redirect'; destination: string }
+  | { kind: 'redirect'; destination: string };
 
 /**
  * A promise annotated with `status`/`value`/`reason` so React's `use()` reads
@@ -43,27 +43,27 @@ export type RouteDataResult =
  * hydration first render resolve pre-seeded data without suspending.
  */
 export interface DataResource extends Promise<RouteDataResult> {
-  status: 'pending' | 'fulfilled' | 'rejected'
-  value?: RouteDataResult
-  reason?: unknown
+  status: 'pending' | 'fulfilled' | 'rejected';
+  value?: RouteDataResult;
+  reason?: unknown;
 }
 
 interface LocationKeyParts {
-  pathname: string
-  searchStr: string
+  pathname: string;
+  searchStr: string;
 }
 
 interface OssidoApiResponse {
-  data?: unknown
+  data?: unknown;
   // Server data for the `layout.rs` handlers wrapping this page, keyed by each
   // layout's `dataKey`. Present only when a wrapping layout has a data handler.
-  layoutData?: Record<string, unknown>
+  layoutData?: Record<string, unknown>;
   info: {
-    redirect_destination?: string
+    redirect_destination?: string;
     // Present (dev only) when the Rust handler panicked — see `error_json` in
     // crates/ossido/src/response.rs.
-    serverError?: ServerErrorPayload
-  }
+    serverError?: ServerErrorPayload;
+  };
 }
 
 /**
@@ -72,17 +72,17 @@ interface OssidoApiResponse {
  * error, preserving the panic message and backtrace.
  */
 export function serverErrorToError(payload: ServerErrorPayload): Error {
-  const error: OssidoErrorWithSource = new Error(payload.message)
-  error.name = payload.name
-  if (payload.stack) error.stack = payload.stack
+  const error: OssidoErrorWithSource = new Error(payload.message);
+  error.name = payload.name;
+  if (payload.stack) error.stack = payload.stack;
   // Carry the panic-site source through to the overlay for a highlighted
   // excerpt (Rust has no sourcemap the client could resolve one from).
-  if (payload.source) error.ossidoServerSource = payload.source
-  return error
+  if (payload.source) error.ossidoServerSource = payload.source;
+  return error;
 }
 
-const CACHE_LIMIT = 50
-const cache = new Map<string, DataResource>()
+const CACHE_LIMIT = 50;
+const cache = new Map<string, DataResource>();
 
 /**
  * Single source of truth for a resource key — used by both the seeder and the
@@ -93,12 +93,12 @@ export function buildResourceKey(
   navigationId: number,
   { pathname, searchStr }: LocationKeyParts,
 ): string {
-  return `${navigationId}::${pathname}${searchStr}`
+  return `${navigationId}::${pathname}${searchStr}`;
 }
 
 /** Normalize user server data into a `data` result for seeding. */
 export function toDataResult(props: unknown): RouteDataResult {
-  return { kind: 'data', props: (props ?? {}) as Record<string, unknown> }
+  return { kind: 'data', props: (props ?? {}) as Record<string, unknown> };
 }
 
 /**
@@ -108,7 +108,7 @@ export function toDataResult(props: unknown): RouteDataResult {
  * layouts persist in the tree.
  */
 function buildLayoutResourceKey(dataKey: string): string {
-  return `layout::${dataKey}`
+  return `layout::${dataKey}`;
 }
 
 /**
@@ -117,7 +117,7 @@ function buildLayoutResourceKey(dataKey: string): string {
  */
 export function seedLayoutData(layoutData: Record<string, unknown>): void {
   for (const [dataKey, props] of Object.entries(layoutData)) {
-    seedResource(buildLayoutResourceKey(dataKey), toDataResult(props))
+    seedResource(buildLayoutResourceKey(dataKey), toDataResult(props));
   }
 }
 
@@ -127,59 +127,59 @@ export function seedLayoutData(layoutData: Record<string, unknown>): void {
  * nothing is seeded yet (e.g. a loading-fallback navigation's first frame).
  */
 export function readLayoutData(dataKey: string): Record<string, unknown> {
-  const resource = cache.get(buildLayoutResourceKey(dataKey))
+  const resource = cache.get(buildLayoutResourceKey(dataKey));
   if (resource?.status === 'fulfilled' && resource.value?.kind === 'data') {
-    return resource.value.props
+    return resource.value.props;
   }
-  return {}
+  return {};
 }
 
 function annotate(promise: Promise<RouteDataResult>): DataResource {
-  const resource = promise as DataResource
-  resource.status = 'pending'
+  const resource = promise as DataResource;
+  resource.status = 'pending';
   resource.then(
     (value) => {
-      resource.status = 'fulfilled'
-      resource.value = value
+      resource.status = 'fulfilled';
+      resource.value = value;
     },
     (reason) => {
-      resource.status = 'rejected'
-      resource.reason = reason
+      resource.status = 'rejected';
+      resource.reason = reason;
     },
-  )
-  return resource
+  );
+  return resource;
 }
 
 async function fetchRouteData(
   location: LocationKeyParts,
 ): Promise<RouteDataResult> {
-  const res = await fetch(dataEndpointUrl(location))
+  const res = await fetch(dataEndpointUrl(location));
   // Read the body before the `res.ok` check: a panicked handler responds with a
   // 500 that still carries the structured error under `info.serverError` (dev).
-  const body = (await res.json().catch(() => null)) as OssidoApiResponse | null
+  const body = (await res.json().catch(() => null)) as OssidoApiResponse | null;
 
   if (body?.info.serverError) {
-    throw serverErrorToError(body.info.serverError)
+    throw serverErrorToError(body.info.serverError);
   }
   // A redirecting handler responds with a 308 whose destination lives in the
   // body (there is no `Location` header — this is a data envelope, not an HTTP
   // redirect the browser should follow). Handle it before the ok-status check,
   // since 308 is not an "ok" status.
   if (body?.info.redirect_destination) {
-    return { kind: 'redirect', destination: body.info.redirect_destination }
+    return { kind: 'redirect', destination: body.info.redirect_destination };
   }
 
   if (!res.ok || !body) {
     throw new Error(
       `Failed to load server data for "${location.pathname}" (status ${res.status})`,
-    )
+    );
   }
 
   // A page's data fetch also carries its wrapping layouts' data — seed those so
   // the layout components read them synchronously.
-  if (body.layoutData) seedLayoutData(body.layoutData)
+  if (body.layoutData) seedLayoutData(body.layoutData);
 
-  return toDataResult(body.data)
+  return toDataResult(body.data);
 }
 
 /**
@@ -190,11 +190,11 @@ export function seedResource(
   key: string,
   value: RouteDataResult,
 ): DataResource {
-  const resource = Promise.resolve(value) as DataResource
-  resource.status = 'fulfilled'
-  resource.value = value
-  cache.set(key, resource)
-  return resource
+  const resource = Promise.resolve(value) as DataResource;
+  resource.status = 'fulfilled';
+  resource.value = value;
+  cache.set(key, resource);
+  return resource;
 }
 
 /**
@@ -206,22 +206,22 @@ export function seedErrorResource(
   key: string,
   payload: ServerErrorPayload,
 ): DataResource {
-  const reason = serverErrorToError(payload)
-  const resource = Promise.reject(reason) as DataResource
+  const reason = serverErrorToError(payload);
+  const resource = Promise.reject(reason) as DataResource;
   // The rejection is consumed synchronously by `use()`, but attach a no-op
   // catch so it is never reported as an unhandled rejection.
-  resource.catch(() => undefined)
-  resource.status = 'rejected'
-  resource.reason = reason
-  cache.set(key, resource)
-  return resource
+  resource.catch(() => undefined);
+  resource.status = 'rejected';
+  resource.reason = reason;
+  cache.set(key, resource);
+  return resource;
 }
 
 /**
  * Return the cached resource for `key`, creating one on demand. Idempotent
  * (StrictMode-safe): at most one fetch is started per key.
  *
- * The server never fetches (the ssr_rs V8 runtime has no `fetch`); every
+ * The server never fetches (the ossido_ssr V8 runtime has no `fetch`); every
  * server-rendered route is pre-seeded, and any un-seeded server lookup resolves
  * to empty props rather than suspending.
  */
@@ -230,30 +230,30 @@ export function getOrCreateResource(
   route: Route,
   location: LocationKeyParts,
 ): DataResource {
-  const existing = cache.get(key)
-  if (existing) return existing
+  const existing = cache.get(key);
+  if (existing) return existing;
 
   if (isServerSide || !route.options.hasHandler) {
-    return seedResource(key, { kind: 'data', props: {} })
+    return seedResource(key, { kind: 'data', props: {} });
   }
 
-  const resource = annotate(fetchRouteData(location))
-  cache.set(key, resource)
-  evictStaleEntries(key)
-  return resource
+  const resource = annotate(fetchRouteData(location));
+  cache.set(key, resource);
+  evictStaleEntries(key);
+  return resource;
 }
 
 /** Drop a resource so the next lookup refetches (used by error `reset`). */
 export function invalidateResource(key: string): void {
-  cache.delete(key)
+  cache.delete(key);
 }
 
 function evictStaleEntries(currentKey: string): void {
-  if (cache.size <= CACHE_LIMIT) return
+  if (cache.size <= CACHE_LIMIT) return;
   // Map preserves insertion order, so this drops the oldest entries first and
   // never evicts the entry currently being rendered.
   for (const key of cache.keys()) {
-    if (cache.size <= CACHE_LIMIT) break
-    if (key !== currentKey) cache.delete(key)
+    if (cache.size <= CACHE_LIMIT) break;
+    if (key !== currentKey) cache.delete(key);
   }
 }

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react';
 
 // Dev-only HMR bridge for route components.
 //
@@ -15,24 +15,24 @@ import { useSyncExternalStore } from 'react'
 // remount. Prod builds never call `notifyRouteHotUpdate` (the generated hot
 // block is dead code under `if (import.meta.hot)` and is eliminated), so the
 // subscription is inert.
-let version = 0
-const listeners = new Set<() => void>()
+let version = 0;
+const listeners = new Set<() => void>();
 
 /** Bump the store and notify subscribers. Dev-only in practice. */
 export function notifyRouteHotUpdate(): void {
-  version += 1
-  for (const listener of listeners) listener()
+  version += 1;
+  for (const listener of listeners) listener();
 }
 
 function subscribe(listener: () => void): () => void {
-  listeners.add(listener)
+  listeners.add(listener);
   return () => {
-    listeners.delete(listener)
-  }
+    listeners.delete(listener);
+  };
 }
 
 function getSnapshot(): number {
-  return version
+  return version;
 }
 
 /**
@@ -42,5 +42,5 @@ function getSnapshot(): number {
  * nothing bumps the store.
  */
 export function useRouteHotVersion(): number {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

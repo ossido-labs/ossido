@@ -25,7 +25,7 @@ use std::sync::OnceLock;
 use axum::body::Body;
 use crossbeam_channel::{Sender, unbounded};
 use futures_util::stream::{self, StreamExt};
-use ssr_rs::SsrError;
+use ossido_ssr::SsrError;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::ssr::Js;
@@ -159,7 +159,7 @@ fn sender() -> &'static Sender<Job> {
                                 // side dropped the receiver (client disconnected),
                                 // in which case rendering simply completes unread.
                                 // The sink closure owns a clone of the sender; the
-                                // original stays for the terminal `Done`. `ssr_rs`
+                                // original stays for the terminal `Done`. `ossido_ssr`
                                 // lends each chunk as a borrowed `&str`, so own it
                                 // (`to_string`) to move it across the channel.
                                 let tx = chunks.clone();

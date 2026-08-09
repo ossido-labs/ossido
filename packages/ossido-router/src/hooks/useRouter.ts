@@ -1,38 +1,43 @@
-import { useCallback, useTransition } from 'react'
+import { useCallback, useTransition } from 'react';
 
-import { useRouterContext } from '../components/RouterContext'
+import { useRouterContext } from '../components/RouterContext';
 
-type NavigationType = 'pushState' | 'replaceState'
-type NavigationFn = (path: string, opts?: NavigationOptions) => void
+type NavigationType = 'pushState' | 'replaceState';
+type NavigationFn = (path: string, opts?: NavigationOptions) => void;
 
 interface NavigationOptions {
   /**
    * If "false" the scroll offset will be kept across page navigation. Default "true"
    */
-  scroll?: boolean
+  scroll?: boolean;
+  /**
+   * Override the app's `viewTransitions` config for this navigation: `true`
+   * forces a View Transition, `false` skips it. Defaults to the config value.
+   */
+  viewTransition?: boolean;
 }
 
 interface UseRouterResult {
   /**
    * Redirects to the path passed as argument updating the browser history.
    */
-  push: NavigationFn
+  push: NavigationFn;
 
   /**
    * Redirects to the path passed as argument replacing the current history
    * entry.
    */
-  replace: NavigationFn
+  replace: NavigationFn;
 
   /**
    * This object contains all the query params of the current route
    */
-  query: Record<string, string>
+  query: Record<string, string>;
 
   /**
    * Returns the current pathname
    */
-  pathname: string
+  pathname: string;
 
   /**
    * Re-fetch the current route's server props — its `page.rs` `#[handler]` data
@@ -43,22 +48,22 @@ interface UseRouterResult {
    * The current page stays on screen while the refetch is in flight (no
    * `loading.tsx` flash); read `isRefetching` to reflect the pending state.
    */
-  refetchProps: () => void
+  refetchProps: () => void;
 
   /**
    * `true` while a `refetchProps()` call from this hook is in flight.
    */
-  isRefetching: boolean
+  isRefetching: boolean;
 }
 
 export const useRouter = (): UseRouterResult => {
-  const { location, updateLocation, retry } = useRouterContext()
-  const [isRefetching, startRefetch] = useTransition()
+  const { location, updateLocation, retry } = useRouterContext();
+  const [isRefetching, startRefetch] = useTransition();
 
   const navigate = useCallback(
     (type: NavigationType, path: string, opts?: NavigationOptions): void => {
-      const { scroll = true } = opts || {}
-      const url = new URL(path, window.location.origin)
+      const { scroll = true, viewTransition } = opts || {};
+      const url = new URL(path, window.location.origin);
 
       // The history/scroll update is applied by `updateLocation` when the
       // navigation actually commits — which, for a route without `loading.tsx`,
@@ -72,25 +77,25 @@ export const useRouter = (): UseRouterResult => {
           searchStr: url.search,
           hash: url.hash,
         },
-        { history: { type, path }, scroll },
-      )
+        { history: { type, path }, scroll, viewTransition },
+      );
     },
     [updateLocation],
-  )
+  );
 
   const push = useCallback(
     (path: string, opts?: NavigationOptions): void => {
-      navigate('pushState', path, opts)
+      navigate('pushState', path, opts);
     },
     [navigate],
-  )
+  );
 
   const replace = useCallback(
     (path: string, opts?: NavigationOptions): void => {
-      navigate('replaceState', path, opts)
+      navigate('replaceState', path, opts);
     },
     [navigate],
-  )
+  );
 
   const refetchProps = useCallback((): void => {
     // `retry` bumps the navigation id, which changes the data-resource key and
@@ -99,9 +104,9 @@ export const useRouter = (): UseRouterResult => {
     // rendered until the fresh props resolve, instead of flashing the loading
     // fallback.
     startRefetch(() => {
-      retry()
-    })
-  }, [retry])
+      retry();
+    });
+  }, [retry]);
 
   return {
     push,
@@ -110,5 +115,5 @@ export const useRouter = (): UseRouterResult => {
     pathname: location.pathname,
     refetchProps,
     isRefetching,
-  }
-}
+  };
+};

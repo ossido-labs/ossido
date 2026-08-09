@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vitest';
 
-import { buildRouteConfig } from './build-route-config'
+import { buildRouteConfig } from './build-route-config';
 
 const routes = [
   {
@@ -60,13 +60,13 @@ const routes = [
     path: '/posts/',
     cleanedPath: '/posts/',
   },
-]
+];
 
 describe('buildRouteConfig works', () => {
   it('should build the correct config', () => {
-    const config = buildRouteConfig(routes)
+    const config = buildRouteConfig(routes);
     expect(config).toStrictEqual(
       'PostsMyPostRoute,PostsIndexRoute,PostspostIndexRoute',
-    )
-  })
-})
+    );
+  });
+});

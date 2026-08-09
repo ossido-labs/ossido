@@ -34,6 +34,7 @@ tells you what it covers.
 - **`OssidoConfig` type** — imported from `ossido/config`.
 - **`server`** — `port`, `host`.
 - **`output`** — `static` vs `server`.
+- **`viewTransitions`** — `true` to animate client navigations via the browser View Transitions API (default `false`). See §7.
 - **`build` hooks** — `build.prebuild` / `build.postbuild` async functions run around `ossido build` (both modes). Each gets a context: `mode`, `outputDirectory` (`out/static` for static, `out` for server), `publicDirectory`, `manifest` (emitted file list), and the resolved `config` — e.g. to write a `.nojekyll`/`CNAME` or push the output to a static host.
 - **`render_threads`** — SSR render-pool sizing.
 - **`logging`** — format, level, browser forwarding, prod JSON.
@@ -75,6 +76,7 @@ tells you what it covers.
 - **Page components** — receiving typed props from the Rust handler.
 - **Layouts & `children`** — composing shells around pages.
 - **Client navigation** — the `ossido-router` `Link` and navigation hooks.
+- **View transitions** — with `viewTransitions: true` in the config, `push`/`replace`/`<Link>`/back-forward navigations run inside `document.startViewTransition` (a crossfade by default). Override per navigation with `push(path, { viewTransition: false })` or `<Link viewTransition={false}>`. No-ops where unsupported or under `prefers-reduced-motion`. Customise with CSS — e.g. give a shared element `style={{ viewTransitionName: 'hero' }}` on both pages, and animate `::view-transition-group(hero)` / `::view-transition-old(root)` / `::view-transition-new(root)`.
 - **Router hooks** — current location, params, programmatic navigation.
 - **Head / metadata** — setting title and head tags.
 - **Loading & error boundaries** — how `loading.tsx` / error UI wire into Suspense.

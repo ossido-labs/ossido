@@ -1,7 +1,7 @@
-import type { JSX } from 'react'
-import { DefaultScreen } from 'ossido-ui'
+import type { JSX } from 'react';
+import { DefaultScreen } from 'ossido-ui';
 
-import { Link } from './Link'
+import { Link } from './Link';
 
 /**
  * Framework default 404 page, shown when no route matches and the app provides
@@ -18,5 +18,5 @@ export function NotFoundDefaultContent(): JSX.Element {
         Return to homepage
       </Link>
     </DefaultScreen>
-  )
+  );
 }

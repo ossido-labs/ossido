@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vitest';
 
-import { hasParentRoute } from './has-parent-route'
+import { hasParentRoute } from './has-parent-route';
 
 const routes = [
   {
@@ -39,7 +39,7 @@ const routes = [
     path: '/posts/my-post',
     cleanedPath: '/posts/my-post',
   },
-]
+];
 
 const parent = {
   filePath: 'posts/__layout.tsx',
@@ -49,7 +49,7 @@ const parent = {
   variableName: 'Postsroot',
   path: '/posts/__layout',
   cleanedPath: '/posts',
-}
+};
 
 const myPost = {
   filePath: 'posts/my-post.tsx',
@@ -59,7 +59,7 @@ const myPost = {
   variableName: 'PostsMyPost',
   path: '/posts/my-post',
   cleanedPath: '/posts/my-post',
-}
+};
 
 const dynamicRoute = {
   filePath: 'posts/[post].tsx',
@@ -69,18 +69,18 @@ const dynamicRoute = {
   variableName: 'Postspost',
   path: '/posts/[post]',
   cleanedPath: '/posts/[post]',
-}
+};
 
 describe('hasParentRoute works', () => {
   it('should detect parent route', () => {
-    const parentRoute = hasParentRoute(routes, myPost, myPost.path)
+    const parentRoute = hasParentRoute(routes, myPost, myPost.path);
 
-    expect(parentRoute).toStrictEqual(parent)
-  })
+    expect(parentRoute).toStrictEqual(parent);
+  });
 
   it('should detect parent route for dynamic routes', () => {
-    const parentRoute = hasParentRoute(routes, dynamicRoute, dynamicRoute.path)
+    const parentRoute = hasParentRoute(routes, dynamicRoute, dynamicRoute.path);
 
-    expect(parentRoute).toStrictEqual(parent)
-  })
-})
+    expect(parentRoute).toStrictEqual(parent);
+  });
+});

@@ -1,5 +1,5 @@
-import type { OssidoConfig } from 'ossido/config'
-import tailwindcss from '@tailwindcss/vite'
+import type { OssidoConfig } from 'ossido/config';
+import tailwindcss from '@tailwindcss/vite';
 
 const config: OssidoConfig = {
   vite: {
@@ -12,6 +12,6 @@ const config: OssidoConfig = {
       exclude: ['@tailwindcss/oxide'],
     },
   },
-}
+};
 
-export default config
+export default config;

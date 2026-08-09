@@ -1,17 +1,17 @@
 // src/components/PokemonView.tsx
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import styles from './PokemonView.module.css'
+import styles from './PokemonView.module.css';
 
 interface Pokemon {
-  id: number
-  name: string
-  weight: number
-  height: number
+  id: number;
+  name: string;
+  weight: number;
+  height: number;
 }
 
 interface PokemonViewProps {
-  pokemon: Pokemon
+  pokemon: Pokemon;
 }
 
 export default function PokemonView({
@@ -35,5 +35,5 @@ export default function PokemonView({
         alt=""
       />
     </div>
-  )
+  );
 }

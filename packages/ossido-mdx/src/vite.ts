@@ -1,8 +1,8 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import fs from 'node:fs';
+import path from 'node:path';
 
-import mdx from '@mdx-js/rollup'
-import type { Plugin } from 'vite'
+import mdx from '@mdx-js/rollup';
+import type { Plugin } from 'vite';
 
 /**
  * The module the MDX compiler imports `useMDXComponents` from (via
@@ -10,11 +10,11 @@ import type { Plugin } from 'vite'
  * resolves it to the project's `src/mdx-components` file, or a passthrough
  * default when that file doesn't exist yet.
  */
-const VIRTUAL_ID = 'virtual:ossido-mdx/components'
-const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID
+const VIRTUAL_ID = 'virtual:ossido-mdx/components';
+const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID;
 
-const COMPONENTS_BASENAME = 'mdx-components'
-const EXTENSIONS = ['tsx', 'jsx', 'ts', 'js'] as const
+const COMPONENTS_BASENAME = 'mdx-components';
+const EXTENSIONS = ['tsx', 'jsx', 'ts', 'js'] as const;
 
 /**
  * Locate the project's `src/mdx-components.{tsx,jsx,ts,js}`.
@@ -24,14 +24,14 @@ const EXTENSIONS = ['tsx', 'jsx', 'ts', 'js'] as const
  * this also works for a non-ossido vite project.
  */
 function findComponentsFile(viteRoot: string): string | undefined {
-  const projectRoots = [path.dirname(viteRoot), viteRoot]
+  const projectRoots = [path.dirname(viteRoot), viteRoot];
   for (const base of projectRoots) {
     for (const ext of EXTENSIONS) {
-      const candidate = path.join(base, 'src', `${COMPONENTS_BASENAME}.${ext}`)
-      if (fs.existsSync(candidate)) return candidate
+      const candidate = path.join(base, 'src', `${COMPONENTS_BASENAME}.${ext}`);
+      if (fs.existsSync(candidate)) return candidate;
     }
   }
-  return undefined
+  return undefined;
 }
 
 export interface OssidoMdxOptions {
@@ -40,7 +40,7 @@ export interface OssidoMdxOptions {
    * `providerImportSource` is managed by this plugin and can't be overridden.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  mdxOptions?: Record<string, any>
+  mdxOptions?: Record<string, any>;
 }
 
 /**
@@ -60,30 +60,30 @@ export interface OssidoMdxOptions {
  * needed. Until that file exists, MDX renders with plain HTML elements.
  */
 export function ossidoMdx(options: OssidoMdxOptions = {}): Array<Plugin> {
-  let viteRoot = process.cwd()
+  let viteRoot = process.cwd();
 
   const componentsPlugin: Plugin = {
     name: 'ossido-mdx:components',
     enforce: 'pre',
     configResolved(config): void {
-      viteRoot = config.root
+      viteRoot = config.root;
     },
     resolveId(id): string | undefined {
-      if (id === VIRTUAL_ID) return RESOLVED_VIRTUAL_ID
-      return undefined
+      if (id === VIRTUAL_ID) return RESOLVED_VIRTUAL_ID;
+      return undefined;
     },
     load(id): string | undefined {
-      if (id !== RESOLVED_VIRTUAL_ID) return undefined
+      if (id !== RESOLVED_VIRTUAL_ID) return undefined;
 
-      const file = findComponentsFile(viteRoot)
+      const file = findComponentsFile(viteRoot);
       if (file) {
         // Re-export the user's hook; the dependency on `file` also gives HMR.
-        return `export { useMDXComponents } from ${JSON.stringify(file)}`
+        return `export { useMDXComponents } from ${JSON.stringify(file)}`;
       }
       // Passthrough default: MDX works before a mdx-components file is created.
-      return `export function useMDXComponents(components) {\n  return components ?? {}\n}`
+      return `export function useMDXComponents(components) {\n  return components ?? {}\n}`;
     },
-  }
+  };
 
   const mdxPlugin: Plugin = {
     enforce: 'pre',
@@ -91,7 +91,7 @@ export function ossidoMdx(options: OssidoMdxOptions = {}): Array<Plugin> {
       ...options.mdxOptions,
       providerImportSource: VIRTUAL_ID,
     }) as Plugin),
-  }
+  };
 
-  return [componentsPlugin, mdxPlugin]
+  return [componentsPlugin, mdxPlugin];
 }

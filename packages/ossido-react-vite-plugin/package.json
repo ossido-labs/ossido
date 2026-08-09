@@ -1,6 +1,6 @@
 {
   "name": "ossido-react-vite-plugin",
-  "version": "0.20.0",
+  "version": "0.1.0",
   "description": "Plugin for the ossido's file system router. Ossido is the react/rust fullstack framework",
   "homepage": "https://ossido.dev",
   "scripts": {
@@ -15,11 +15,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ChildishForces/ossido.git",
+    "url": "git+https://github.com/ossido-labs/ossido.git",
     "directory": "packages/ossido-react-vite-plugin"
   },
   "keywords": [],
-  "author": "Valerio Ageno",
+  "author": "Chris Schofield <chris@childishforces.com>",
   "license": "MIT",
   "type": "module",
   "types": "dist/esm/index.d.ts",

@@ -1,16 +1,16 @@
-import { use } from 'react'
-import type { JSX } from 'react'
+import { use } from 'react';
+import type { JSX } from 'react';
 
-import type { Route } from '../route'
-import { getOrCreateResource } from '../data/resourceCache'
+import type { Route } from '../route';
+import { getOrCreateResource } from '../data/resourceCache';
 
-import type { ParsedLocation } from './RouterContext'
-import { Redirect } from './Redirect'
+import type { ParsedLocation } from './RouterContext';
+import { Redirect } from './Redirect';
 
 interface RouteDataLoaderProps {
-  route: Route
-  resourceKey: string
-  location: ParsedLocation
+  route: Route;
+  resourceKey: string;
+  location: ParsedLocation;
 }
 
 /**
@@ -29,14 +29,14 @@ export function RouteDataLoader({
   resourceKey,
   location,
 }: RouteDataLoaderProps): JSX.Element {
-  const result = use(getOrCreateResource(resourceKey, route, location))
+  const result = use(getOrCreateResource(resourceKey, route, location));
 
   if (result.kind === 'redirect') {
-    return <Redirect to={result.destination} />
+    return <Redirect to={result.destination} />;
   }
 
-  const Component = route.component
+  const Component = route.component;
 
   // Server data is spread directly as the page component's props.
-  return <Component {...result.props} />
+  return <Component {...result.props} />;
 }

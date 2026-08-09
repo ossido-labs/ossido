@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect } from 'react';
 
-import type { OssidoErrorProps } from '../types'
+import type { OssidoErrorProps } from '../types';
 
-import { devErrorStore } from './devErrorStore'
+import { devErrorStore } from './devErrorStore';
 
 /**
  * Development-only error-boundary fallback. Instead of rendering the overlay in
@@ -17,11 +17,11 @@ import { devErrorStore } from './devErrorStore'
  */
 export function DevErrorReporter({ error, reset }: OssidoErrorProps): null {
   useEffect(() => {
-    const id = devErrorStore.addJsError('runtime', error, reset)
+    const id = devErrorStore.addJsError('runtime', error, reset);
     return (): void => {
-      devErrorStore.removeById(id)
-    }
-  }, [error, reset])
+      devErrorStore.removeById(id);
+    };
+  }, [error, reset]);
 
-  return null
+  return null;
 }

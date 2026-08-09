@@ -1,20 +1,20 @@
-import type { RouteNode } from '../types'
+import type { RouteNode } from '../types';
 
 export function removeExt(d: string, keepExtension: boolean = false): string {
-  return keepExtension ? d : d.substring(0, d.lastIndexOf('.')) || d
+  return keepExtension ? d : d.substring(0, d.lastIndexOf('.')) || d;
 }
 
 export function replaceBackslash(s: string): string {
-  return s.replaceAll(/\\/gi, '/')
+  return s.replaceAll(/\\/gi, '/');
 }
 
 export function cleanPath(pathToClean: string): string {
   // remove double slashes
-  return pathToClean.replace(/\/{2,}/g, '/')
+  return pathToClean.replace(/\/{2,}/g, '/');
 }
 
 export function removeUnderscores(s?: string): string | undefined {
-  return s?.replaceAll(/(^_|_$)/gi, '').replaceAll(/(\/_|_\/)/gi, '/')
+  return s?.replaceAll(/(^_|_$)/gi, '').replaceAll(/(\/_|_\/)/gi, '/');
 }
 
 export function routePathToVariable(routePath: string): string {
@@ -28,7 +28,7 @@ export function routePathToVariable(routePath: string): string {
       .join('')
       .replace(/([^a-zA-Z0-9]|[.])/gm, '')
       .replace(/^(\d)/g, 'R$1') ?? ''
-  )
+  );
 }
 
 export function multiSortBy<T>(
@@ -39,41 +39,41 @@ export function multiSortBy<T>(
     .map((d, i) => [d, i] as const)
     .sort(([a, ai], [b, bi]) => {
       for (const accessor of accessors) {
-        const ao = accessor(a)
-        const bo = accessor(b)
+        const ao = accessor(a);
+        const bo = accessor(b);
 
         if (typeof ao === 'undefined') {
           if (typeof bo === 'undefined') {
-            continue
+            continue;
           }
-          return 1
+          return 1;
         }
 
         if (ao === bo) {
-          continue
+          continue;
         }
 
-        return (ao as number) > (bo as number) ? 1 : -1
+        return (ao as number) > (bo as number) ? 1 : -1;
       }
 
-      return ai - bi
+      return ai - bi;
     })
-    .map(([d]) => d)
+    .map(([d]) => d);
 }
 
 export function capitalize(s: string): string {
-  if (typeof s !== 'string') return ''
-  return s.charAt(0).toUpperCase() + s.slice(1)
+  if (typeof s !== 'string') return '';
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export function spaces(d: number): string {
   return Array.from({ length: d })
     .map(() => ' ')
-    .join('')
+    .join('');
 }
 
 export function removeTrailingUnderscores(s?: string): string | undefined {
-  return s?.replaceAll(/(_$)/gi, '').replaceAll(/(_\/)/gi, '/')
+  return s?.replaceAll(/(_$)/gi, '').replaceAll(/(_\/)/gi, '/');
 }
 
 /**
@@ -83,18 +83,18 @@ export function removeTrailingUnderscores(s?: string): string | undefined {
  * URL segment.
  */
 export function removeGroups(s: string): string {
-  return s.replace(/\([^/]*\)/g, '').replace(/\/{2,}/g, '/')
+  return s.replace(/\([^/]*\)/g, '').replace(/\/{2,}/g, '/');
 }
 
 export function trimPathLeft(pathToTrim: string): string {
-  return pathToTrim === '/' ? pathToTrim : pathToTrim.replace(/^\/{1,}/, '')
+  return pathToTrim === '/' ? pathToTrim : pathToTrim.replace(/^\/{1,}/, '');
 }
 
 export function removeLastSlash(str: string): string {
   if (str.length > 1 && str.endsWith('/')) {
-    return str.substring(0, str.length - 1)
+    return str.substring(0, str.length - 1);
   }
-  return str
+  return str;
 }
 
 /**
@@ -106,5 +106,5 @@ export function removeLastSlash(str: string): string {
 export function determineNodePath(node: RouteNode): string {
   return (node.path = node.parent
     ? node.routePath.replace(node.parent.routePath, '') || '/'
-    : node.routePath)
+    : node.routePath);
 }

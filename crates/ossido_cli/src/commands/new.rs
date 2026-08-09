@@ -384,7 +384,7 @@ fn scaffold_download(folder: &str, template: &str, select_head: Option<bool>) ->
     if new_project_files.is_empty() {
         eprintln!("Error: Template '{template}' not found");
         println!(
-            "Hint: you can view the available templates at https://github.com/ChildishForces/ossido/tree/main/examples"
+            "Hint: you can view the available templates at https://github.com/ossido-labs/ossido/tree/main/examples"
         );
         std::process::exit(1);
     }
@@ -521,9 +521,9 @@ fn generate_raw_content_url(
     url: &str,
 ) -> String {
     let tag = if select_head.unwrap_or(false) {
-        "/ChildishForces/ossido/main".to_string()
+        "/ossido-labs/ossido/main".to_string()
     } else {
-        format!("/ChildishForces/ossido/v{cli_version}")
+        format!("/ossido-labs/ossido/v{cli_version}")
     };
     format!("{url}{tag}/{path}")
 }
@@ -535,13 +535,13 @@ fn generate_tree_url(
     url: &str,
 ) -> String {
     if select_head.unwrap_or(false) {
-        return format!("{url}/repos/ChildishForces/ossido/git/trees/main?recursive=1");
+        return format!("{url}/repos/ossido-labs/ossido/git/trees/main?recursive=1");
     }
 
     // This string does not include the "v" version prefix
     let response = client
         .get(format!(
-            "{url}/repos/ChildishForces/ossido/git/ref/tags/v{cli_version}"
+            "{url}/repos/ossido-labs/ossido/git/ref/tags/v{cli_version}"
         ))
         .send()
         .unwrap_or_else(|_| {
@@ -574,7 +574,7 @@ fn generate_tree_url(
     });
 
     format!(
-        "{url}/repos/ChildishForces/ossido/git/trees/{}?recursive=1",
+        "{url}/repos/ossido-labs/ossido/git/trees/{}?recursive=1",
         res_tag.object.sha
     )
 }
@@ -675,7 +675,7 @@ mod tests {
     fn generate_valid_content_url_from_head() {
         let expected = format!(
             "{}/{}/{}",
-            "http://localhost:3000", "ChildishForces/ossido/main", "examples/ossido-app"
+            "http://localhost:3000", "ossido-labs/ossido/main", "examples/ossido-app"
         );
         let generated = generate_raw_content_url(
             Some(true),
@@ -691,7 +691,7 @@ mod tests {
         let expected = format!(
             "{}/{}/{}",
             "http://localhost:3000",
-            &format!("ChildishForces/ossido/v{}", crate_version!()),
+            &format!("ossido-labs/ossido/v{}", crate_version!()),
             "examples/ossido-app"
         );
         let generated = generate_raw_content_url(

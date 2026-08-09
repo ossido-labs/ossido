@@ -1,6 +1,6 @@
-import type { JSX } from 'react'
-import { Link } from 'ossido'
-import type { MyResponse } from 'ossido/types'
+import type { JSX } from 'react';
+import { Link } from 'ossido';
+import type { MyResponse } from 'ossido/types';
 
 export default function IndexPage({ subtitle }: MyResponse): JSX.Element {
   return (
@@ -14,5 +14,5 @@ export default function IndexPage({ subtitle }: MyResponse): JSX.Element {
         <Link href={'/pokemons/pikachu'}>Pikachu</Link>
       </nav>
     </>
-  )
+  );
 }

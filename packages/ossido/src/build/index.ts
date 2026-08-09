@@ -1,24 +1,24 @@
-import { createRequire } from 'node:module'
-import { resolve, join } from 'node:path'
-import { readdirSync, readFileSync } from 'node:fs'
-import { gzipSync } from 'node:zlib'
+import { createRequire } from 'node:module';
+import { resolve, join } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 
-import type { InlineConfig, Plugin } from 'vite'
-import { build, createServer, mergeConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
-import inject from '@rollup/plugin-inject'
-import { OssidoReactPlugin, routeGenerator } from 'ossido-react-vite-plugin'
-import { ErrorOverlayVitePlugin } from 'ossido-ui/vite-plugin'
+import type { InlineConfig, Plugin } from 'vite';
+import { build, createServer, mergeConfig } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import inject from '@rollup/plugin-inject';
+import { OssidoReactPlugin, routeGenerator } from 'ossido-react-vite-plugin';
+import { ErrorOverlayVitePlugin } from 'ossido-ui/vite-plugin';
 
-import type { OssidoConfig } from '../config'
+import type { OssidoConfig } from '../config';
 
-import type { InternalOssidoConfig } from './types'
-import { blockingAsync, listFilesRecursive } from './utils'
-import { createJsonConfig, loadConfig } from './config'
-import { ENV_PREFIX } from './constants'
-import { createOssidoViteLogger } from './logger'
+import type { InternalOssidoConfig } from './types';
+import { blockingAsync, listFilesRecursive } from './utils';
+import { createJsonConfig, loadConfig } from './config';
+import { ENV_PREFIX } from './constants';
+import { createOssidoViteLogger } from './logger';
 
-const require = createRequire(import.meta.url)
+const require = createRequire(import.meta.url);
 
 /**
  * Absolute entry paths for the generated `.ossido` scaffold.
@@ -29,8 +29,8 @@ const require = createRequire(import.meta.url)
  * `./.ossido/client-main.tsx` double-nests to `.ossido/.ossido/...` and fails to
  * resolve. Absolute paths are unambiguous across both code paths.
  */
-const CLIENT_MAIN_ENTRY = resolve('.ossido/client-main.tsx')
-const SERVER_MAIN_ENTRY = resolve('.ossido/server-main.tsx')
+const CLIENT_MAIN_ENTRY = resolve('.ossido/client-main.tsx');
+const SERVER_MAIN_ENTRY = resolve('.ossido/server-main.tsx');
 
 /**
  * `@rollup/plugin-inject` injects these imports into every module that
@@ -41,8 +41,8 @@ const SERVER_MAIN_ENTRY = resolve('.ossido/server-main.tsx')
  * absolute paths up-front makes the injected imports resolvable from anywhere
  * (and is a no-op for rollup on Vite <= 7).
  */
-const SSR_POLYFILLS_MODULE = require.resolve('ossido/ssr')
-const WEB_STREAMS_POLYFILL_MODULE = require.resolve('web-streams-polyfill')
+const SSR_POLYFILLS_MODULE = require.resolve('ossido/ssr');
+const WEB_STREAMS_POLYFILL_MODULE = require.resolve('web-streams-polyfill');
 
 const VITE_SSR_PLUGINS: Array<Plugin> = [
   {
@@ -61,7 +61,7 @@ const VITE_SSR_PLUGINS: Array<Plugin> = [
       Event: [SSR_POLYFILLS_MODULE, 'EventPolyfill'],
     }) as unknown as Plugin),
   },
-]
+];
 
 /**
  * From a resolved {@link InternalOssidoConfig} return a `vite` "mergeable"
@@ -74,7 +74,7 @@ function createBaseViteConfigFromOssidoConfig(
    * @warning Keep in sync with {@link LazyLoadingPlugin} tests:
    * packages/lazy-fn-vite-plugin/tests/transpileSource.test.ts
    */
-  const pluginFilesInclude = /\.(jsx|js|mdx|md|tsx|ts)$/
+  const pluginFilesInclude = /\.(jsx|js|mdx|md|tsx|ts)$/;
 
   const viteBaseConfig: InlineConfig = {
     root: '.ossido',
@@ -103,6 +103,12 @@ function createBaseViteConfigFromOssidoConfig(
       __OSSIDO_CRITICAL_CSS__: JSON.stringify(
         ossidoConfig.dev?.criticalCss ?? true,
       ),
+      // Baked into both bundles so the router wraps client navigations in
+      // `document.startViewTransition` only when the app opted in via
+      // `viewTransitions: true`. Off by default.
+      __OSSIDO_VIEW_TRANSITIONS__: JSON.stringify(
+        ossidoConfig.viewTransitions ?? false,
+      ),
     },
 
     resolve: {
@@ -128,15 +134,15 @@ function createBaseViteConfigFromOssidoConfig(
 
       OssidoReactPlugin({ criticalCss: ossidoConfig.dev?.criticalCss ?? true }),
     ],
-  }
+  };
 
   // seems redundant but it's useful to log the value when debugging, until we have a logging infrastructure.
-  return viteBaseConfig
+  return viteBaseConfig;
 }
 
 const developmentSSRBundle = (): void => {
   blockingAsync(async () => {
-    const config = await loadConfig()
+    const config = await loadConfig();
     await build(
       mergeConfig<InlineConfig, InlineConfig>(
         createBaseViteConfigFromOssidoConfig(config),
@@ -172,13 +178,13 @@ const developmentSSRBundle = (): void => {
           },
         },
       ),
-    )
-  })
-}
+    );
+  });
+};
 
 const developmentCSRWatch = (): void => {
   blockingAsync(async () => {
-    const config = await loadConfig()
+    const config = await loadConfig();
 
     const server = await createServer(
       mergeConfig<InlineConfig, InlineConfig>(
@@ -202,14 +208,14 @@ const developmentCSRWatch = (): void => {
           },
         },
       ),
-    )
-    await server.listen()
-  })
-}
+    );
+    await server.listen();
+  });
+};
 
-const KB = 1024
+const KB = 1024;
 
-const formatKb = (bytes: number): string => `${(bytes / KB).toFixed(1)} kB`
+const formatKb = (bytes: number): string => `${(bytes / KB).toFixed(1)} kB`;
 
 /**
  * Print a compact per-asset size summary (raw + gzip) for the prod build, so
@@ -218,9 +224,9 @@ const formatKb = (bytes: number): string => `${(bytes / KB).toFixed(1)} kB`
  */
 const printBundleSummary = (): void => {
   interface AssetRow {
-    label: string
-    size: number
-    gzip: number
+    label: string;
+    size: number;
+    gzip: number;
   }
 
   const collectDir = (dir: string, prefix: string): Array<AssetRow> => {
@@ -228,49 +234,49 @@ const printBundleSummary = (): void => {
       return readdirSync(dir, { recursive: true, encoding: 'utf-8' })
         .filter((file) => /\.(js|css)$/.test(file))
         .map((file) => {
-          const content = readFileSync(join(dir, file))
+          const content = readFileSync(join(dir, file));
           return {
             label: `${prefix}/${file}`,
             size: content.length,
             gzip: gzipSync(content).length,
-          }
-        })
+          };
+        });
     } catch {
-      return []
+      return [];
     }
-  }
+  };
 
   const assets = [
     ...collectDir(resolve('out/client'), 'client'),
     ...collectDir(resolve('out/server'), 'server'),
-  ].sort((a, b) => b.size - a.size)
+  ].sort((a, b) => b.size - a.size);
 
-  if (!assets.length) return
+  if (!assets.length) return;
 
-  const labelWidth = Math.max(...assets.map((asset) => asset.label.length))
-  console.log('')
+  const labelWidth = Math.max(...assets.map((asset) => asset.label.length));
+  console.log('');
   for (const asset of assets) {
     console.log(
       `  ${asset.label.padEnd(labelWidth)}  ${formatKb(asset.size).padStart(10)} │ gzip: ${formatKb(asset.gzip).padStart(9)}`,
-    )
+    );
   }
-  const total = assets.reduce((sum, asset) => sum + asset.size, 0)
-  const totalGzip = assets.reduce((sum, asset) => sum + asset.gzip, 0)
+  const total = assets.reduce((sum, asset) => sum + asset.size, 0);
+  const totalGzip = assets.reduce((sum, asset) => sum + asset.gzip, 0);
   console.log(
     `  ${'total'.padEnd(labelWidth)}  ${formatKb(total).padStart(10)} │ gzip: ${formatKb(totalGzip).padStart(9)}`,
-  )
-  console.log('')
-}
+  );
+  console.log('');
+};
 
 const buildProd = (): void => {
   blockingAsync(async () => {
-    const config = await loadConfig()
+    const config = await loadConfig();
 
     // Generate the route tree once up front. Both builds' plugin instances
     // re-run the generator on `configResolved`, but it skips the write when
     // the content is unchanged — pre-generating removes the concurrent-write
     // hazard so the two builds (independent outputs) can run in parallel.
-    await routeGenerator()
+    await routeGenerator();
 
     await Promise.all([
       build(
@@ -318,11 +324,11 @@ const buildProd = (): void => {
           },
         ),
       ),
-    ])
+    ]);
 
-    printBundleSummary()
-  })
-}
+    printBundleSummary();
+  });
+};
 
 const buildConfig = (): void => {
   blockingAsync(async (): Promise<void> => {
@@ -343,12 +349,12 @@ const buildConfig = (): void => {
           },
         },
       },
-    })
+    });
 
-    const config = await loadConfig()
-    await createJsonConfig(config)
-  })
-}
+    const config = await loadConfig();
+    await createJsonConfig(config);
+  });
+};
 
 /**
  * Run a user-defined build lifecycle hook (`prebuild` / `postbuild`) from
@@ -361,14 +367,15 @@ const buildConfig = (): void => {
  */
 const runBuildHook = (name: 'prebuild' | 'postbuild'): void =>
   blockingAsync(async () => {
-    const config = await loadConfig()
-    const hook = config.build?.[name]
-    if (typeof hook !== 'function') return
+    const config = await loadConfig();
+    const hook = config.build?.[name];
+    if (typeof hook !== 'function') return;
 
-    const mode = process.env.OSSIDO_STATIC === 'true' ? 'static' : 'server'
-    const outputDirectory = resolve(mode === 'static' ? 'out/static' : 'out')
-    const publicDirectory = resolve('public')
-    const manifest = name === 'postbuild' ? listFilesRecursive(outputDirectory) : []
+    const mode = process.env.OSSIDO_STATIC === 'true' ? 'static' : 'server';
+    const outputDirectory = resolve(mode === 'static' ? 'out/static' : 'out');
+    const publicDirectory = resolve('public');
+    const manifest =
+      name === 'postbuild' ? listFilesRecursive(outputDirectory) : [];
 
     // `loadConfig` returns the resolved `InternalOssidoConfig` (a structural
     // superset of the public `OssidoConfig` the hook context exposes).
@@ -378,8 +385,8 @@ const runBuildHook = (name: 'prebuild' | 'postbuild'): void =>
       publicDirectory,
       manifest,
       config: config as OssidoConfig,
-    })
-  })
+    });
+  });
 
 export {
   buildProd,
@@ -387,4 +394,4 @@ export {
   developmentCSRWatch,
   developmentSSRBundle,
   runBuildHook,
-}
+};

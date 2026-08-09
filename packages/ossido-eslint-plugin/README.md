@@ -47,7 +47,7 @@ npm install -D ossido-eslint-plugin
 ### ESLint (`eslint.config.js`, flat config)
 
 ```js
-import reactRefresh from 'ossido-eslint-plugin'
+import reactRefresh from 'ossido-eslint-plugin';
 
 export default [
   {
@@ -60,7 +60,7 @@ export default [
       ],
     },
   },
-]
+];
 ```
 
 `allowConstantExport: true` permits `export const FOO = 'bar'` (primitive
@@ -72,7 +72,7 @@ Move the non-component export to its own module:
 
 ```tsx
 // page.tsx  — clean boundary, hot-updates with state preserved
-import { PAGE_META } from './page.meta'
+import { PAGE_META } from './page.meta';
 export default function Page() {
   /* ... */
 }
@@ -80,5 +80,5 @@ export default function Page() {
 
 ```ts
 // page.meta.ts
-export const PAGE_META = { title: 'Home' }
+export const PAGE_META = { title: 'Home' };
 ```

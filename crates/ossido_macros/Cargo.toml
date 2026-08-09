@@ -1,11 +1,11 @@
 [package]
 name = "ossido_macros"
-version = "0.20.0"
+version = "0.1.0"
 edition = "2024"
 description = "Superfast React fullstack framework"
 homepage = "https://ossido.dev"
 keywords = [ "react", "typescript", "fullstack", "web", "ssr"]
-repository = "https://github.com/ChildishForces/ossido"
+repository = "https://github.com/ossido-labs/ossido"
 readme = "../../README.md"
 license-file = "../../LICENSE.md"
 categories = ["web-programming"]
@@ -18,6 +18,6 @@ include = [
 proc-macro = true
 
 [dependencies]
-syn = { version = "2.0.0", features = ["full"] }
+syn = { version = "3.0.3", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"

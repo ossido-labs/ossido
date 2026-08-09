@@ -45,7 +45,7 @@ pub use response::{
 pub use serde;
 pub use server::{Server, ossido_internal_init_v8_platform};
 pub use server_error::{ErrorSource, ServerError, catch_handler};
-pub use ssr_rs::Ssr;
+pub use ossido_ssr::Ssr;
 pub use static_paths::{SegmentValue, StaticParams, StaticPaths};
 pub use tokio;
 // `Props` is re-exported both as the struct (from `response`) and as the

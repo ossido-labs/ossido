@@ -1,10 +1,10 @@
-import { Component } from 'react'
-import type { ReactNode } from 'react'
+import { Component } from 'react';
+import type { ReactNode } from 'react';
 
-import type { ErrorComponent } from '../types'
+import type { ErrorComponent } from '../types';
 
 interface OssidoErrorBoundaryProps {
-  fallback: ErrorComponent
+  fallback: ErrorComponent;
   /**
    * Changes per navigation/retry (the route's data-resource key). When it
    * changes the boundary clears any caught error and re-renders its children —
@@ -12,18 +12,18 @@ interface OssidoErrorBoundaryProps {
    * `<Suspense>` stays mounted, so a navigation (whose data + code are already
    * prefetched) swaps straight to the new page instead of flashing the fallback.
    */
-  resetKey: string
+  resetKey: string;
   /**
    * Called by the fallback's `reset`. It bumps the navigation id (which changes
    * `resetKey`), clearing the error and creating a fresh data resource.
    */
-  onReset: () => void
-  children: ReactNode
+  onReset: () => void;
+  children: ReactNode;
 }
 
 interface OssidoErrorBoundaryState {
-  error: Error | null
-  resetKey: string
+  error: Error | null;
+  resetKey: string;
 }
 
 /**
@@ -40,12 +40,12 @@ export class OssidoErrorBoundary extends Component<
   state: OssidoErrorBoundaryState = {
     error: null,
     resetKey: this.props.resetKey,
-  }
+  };
 
   static getDerivedStateFromError(
     error: Error,
   ): Partial<OssidoErrorBoundaryState> {
-    return { error }
+    return { error };
   }
 
   static getDerivedStateFromProps(
@@ -54,23 +54,23 @@ export class OssidoErrorBoundary extends Component<
   ): Partial<OssidoErrorBoundaryState> | null {
     // A new navigation/retry: drop the caught error and try the children again.
     if (props.resetKey !== state.resetKey) {
-      return { error: null, resetKey: props.resetKey }
+      return { error: null, resetKey: props.resetKey };
     }
-    return null
+    return null;
   }
 
   reset = (): void => {
     // Bumps the navigation id → `resetKey` changes → the error is cleared and a
     // fresh data resource is created (a refetch).
-    this.props.onReset()
-  }
+    this.props.onReset();
+  };
 
   render(): ReactNode {
-    const { error } = this.state
+    const { error } = this.state;
     if (error) {
-      const Fallback = this.props.fallback
-      return <Fallback error={error} reset={this.reset} />
+      const Fallback = this.props.fallback;
+      return <Fallback error={error} reset={this.reset} />;
     }
-    return this.props.children
+    return this.props.children;
   }
 }

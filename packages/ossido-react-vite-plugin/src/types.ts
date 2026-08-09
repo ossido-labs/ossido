@@ -4,32 +4,32 @@
  * error boundary / not-found UI.
  */
 export interface SpecialFileNode {
-  filePath: string
-  fullPath: string
-  variableName: string
+  filePath: string;
+  fullPath: string;
+  variableName: string;
   /** Directory the file lives in, e.g. `.` or `posts` (forward-slashed). */
-  dir: string
+  dir: string;
 }
 
 export interface RouteNode {
-  filePath: string
-  fullPath: string
-  routePath: string
-  path?: string
-  cleanedPath?: string
-  isLayout?: boolean
-  children?: Array<RouteNode>
-  parent?: RouteNode
-  variableName?: string
+  filePath: string;
+  fullPath: string;
+  routePath: string;
+  path?: string;
+  cleanedPath?: string;
+  isLayout?: boolean;
+  children?: Array<RouteNode>;
+  parent?: RouteNode;
+  variableName?: string;
   /** Nearest-ancestor `loading.tsx`, resolved at generation time. */
-  loadingFile?: SpecialFileNode
+  loadingFile?: SpecialFileNode;
   /** Nearest-ancestor `error.tsx`, resolved at generation time. */
-  errorFile?: SpecialFileNode
+  errorFile?: SpecialFileNode;
   /** Nearest-ancestor `not-found.tsx`, resolved at generation time. */
-  notFoundFile?: SpecialFileNode
+  notFoundFile?: SpecialFileNode;
 }
 
 export interface Config {
-  folderName: string
-  generatedRouteTree: string
+  folderName: string;
+  generatedRouteTree: string;
 }

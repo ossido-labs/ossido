@@ -1,4 +1,4 @@
-import { notifyRouteHotUpdate } from 'ossido-router'
+import { notifyRouteHotUpdate } from 'ossido-router';
 
 /**
  * Dev-only. Runs the generated route tree's component reassignments (swapping
@@ -10,6 +10,6 @@ import { notifyRouteHotUpdate } from 'ossido-router'
  * eliminate it and tree-shake this helper away.
  */
 export function __ossido__internal__applyRouteHot(apply: () => void): void {
-  apply()
-  notifyRouteHotUpdate()
+  apply();
+  notifyRouteHotUpdate();
 }

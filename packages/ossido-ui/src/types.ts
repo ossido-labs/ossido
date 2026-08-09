@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType } from 'react';
 
 /**
  * The panic-site source file, embedded by the server (dev only) so the overlay
@@ -6,10 +6,10 @@ import type { ComponentType } from 'react'
  * @see crates/ossido/src/server_error.rs (`ErrorSource`)
  */
 export interface ServerErrorSource {
-  file: string
-  line: number
-  column: number
-  content: string
+  file: string;
+  line: number;
+  column: number;
+  content: string;
 }
 
 /**
@@ -17,14 +17,14 @@ export interface ServerErrorSource {
  * to render the excerpt. Attached by `serverErrorToError` in ossido-router.
  */
 export interface OssidoErrorWithSource extends Error {
-  ossidoServerSource?: ServerErrorSource
+  ossidoServerSource?: ServerErrorSource;
 }
 
 /** Props passed to a user `error.tsx` component (and the default error UI). */
 export interface OssidoErrorProps {
-  error: Error
-  reset: () => void
+  error: Error;
+  reset: () => void;
 }
 
 /** An `error.tsx` component. Rendered by the route error boundary. */
-export type ErrorComponent = ComponentType<OssidoErrorProps>
+export type ErrorComponent = ComponentType<OssidoErrorProps>;

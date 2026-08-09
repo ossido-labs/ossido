@@ -9,4 +9,4 @@ export type {
   OssidoBuildHook,
   OssidoLogFormat,
   OssidoLogLevel,
-} from './types'
+} from './types';

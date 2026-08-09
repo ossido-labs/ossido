@@ -1,15 +1,15 @@
-import * as path from 'path'
+import * as path from 'path';
 
-import { defineConfig } from '@playwright/test'
+import { defineConfig } from '@playwright/test';
 
 import {
   ossidoBin,
   setupScript,
   sharedConfig,
   sharedWebServer,
-} from './playwright.shared'
+} from './playwright.shared';
 
-const staticServer = path.join(import.meta.dirname, 'static-server.mjs')
+const staticServer = path.join(import.meta.dirname, 'static-server.mjs');
 
 // Exercises `ossido build --static`: the CLI generates `out/static` (its scrape
 // server uses port 3000 transiently during the build), then a plain static file
@@ -27,4 +27,4 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3001',
   },
-})
+});

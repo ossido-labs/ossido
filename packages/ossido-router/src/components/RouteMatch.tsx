@@ -1,20 +1,20 @@
-import type { JSX } from 'react'
-import { memo, Suspense, useMemo } from 'react'
+import type { JSX } from 'react';
+import { memo, Suspense, useMemo } from 'react';
 
-import { DefaultLoading, DefaultError, DevErrorReporter } from 'ossido-ui'
+import { DefaultLoading, DefaultError, DevErrorReporter } from 'ossido-ui';
 
-import type { Mode } from '../types'
-import type { Route } from '../route'
-import { buildResourceKey, readLayoutData } from '../data/resourceCache'
+import type { Mode } from '../types';
+import type { Route } from '../route';
+import { buildResourceKey, readLayoutData } from '../data/resourceCache';
 
-import { useRouterContext } from './RouterContext'
-import { CriticalCss } from './CriticalCss'
-import { RouteDataLoader } from './RouteDataLoader'
-import { OssidoErrorBoundary } from './OssidoErrorBoundary'
+import { useRouterContext } from './RouterContext';
+import { CriticalCss } from './CriticalCss';
+import { RouteDataLoader } from './RouteDataLoader';
+import { OssidoErrorBoundary } from './OssidoErrorBoundary';
 
 interface RouteMatchProps {
-  route: Route
-  mode?: Mode
+  route: Route;
+  mode?: Mode;
 }
 
 /**
@@ -24,20 +24,20 @@ interface RouteMatchProps {
  * remounts it and shows the loading fallback, while the layouts persist.
  */
 export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
-  const { location, navigationId, retry } = useRouterContext()
+  const { location, navigationId, retry } = useRouterContext();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const routes = useMemo(() => loadParentComponents(route), [route.id])
+  const routes = useMemo(() => loadParentComponents(route), [route.id]);
 
-  const resourceKey = buildResourceKey(navigationId, location)
+  const resourceKey = buildResourceKey(navigationId, location);
 
-  const LoadingComponent = route.options.loadingComponent ?? DefaultLoading
+  const LoadingComponent = route.options.loadingComponent ?? DefaultLoading;
   // In dev the boundary reports the error to the shared store (rendered by the
   // floating DevErrorOverlayHost); production falls back to a detail-free page
   // so source/stack are never leaked to end users.
   const ErrorComponent =
     route.options.errorComponent ??
-    (mode === 'Dev' ? DevErrorReporter : DefaultError)
+    (mode === 'Dev' ? DevErrorReporter : DefaultError);
 
   return (
     <TraverseRootComponents routes={routes} mode={mode}>
@@ -67,14 +67,14 @@ export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
         </OssidoErrorBoundary>
       </Suspense>
     </TraverseRootComponents>
-  )
-}
+  );
+};
 
 interface TraverseRootComponentsProps {
-  routes: Array<Route>
-  children?: React.ReactNode
-  index?: number
-  mode?: Mode
+  routes: Array<Route>;
+  children?: React.ReactNode;
+  index?: number;
+  mode?: Mode;
 }
 
 /**
@@ -91,12 +91,12 @@ const TraverseRootComponents = memo(
     children,
   }: TraverseRootComponentsProps): React.JSX.Element => {
     if (routes.length > index) {
-      const route = routes[index] as Route
-      const Parent = route.component
+      const route = routes[index] as Route;
+      const Parent = route.component;
 
       // Fallback to the route id if the filePath is not defined
       // as is the case for the root route
-      const routeFilePath = route.filePath || route.id
+      const routeFilePath = route.filePath || route.id;
 
       // A `layout.rs` handler's data is seeded (by SSR or the page's data fetch)
       // and read synchronously here, then spread as the layout's props alongside
@@ -104,7 +104,7 @@ const TraverseRootComponents = memo(
       const layoutProps =
         route.options.hasHandler && route.options.dataKey
           ? readLayoutData(route.options.dataKey)
-          : undefined
+          : undefined;
 
       return (
         <Parent {...layoutProps}>
@@ -113,25 +113,25 @@ const TraverseRootComponents = memo(
             {children}
           </TraverseRootComponents>
         </Parent>
-      )
+      );
     }
 
-    return <>{children}</>
+    return <>{children}</>;
   },
-)
-TraverseRootComponents.displayName = 'TraverseRootComponents'
+);
+TraverseRootComponents.displayName = 'TraverseRootComponents';
 
 const loadParentComponents = (
   route: Route,
   loader: Array<Route> = [],
 ): Array<Route> => {
-  const parentComponent = route.options.getParentRoute?.() as Route
+  const parentComponent = route.options.getParentRoute?.() as Route;
 
-  loader.push(parentComponent)
+  loader.push(parentComponent);
 
   if (!parentComponent.isRoot) {
-    return loadParentComponents(parentComponent, loader)
+    return loadParentComponents(parentComponent, loader);
   }
 
-  return loader.reverse()
-}
+  return loader.reverse();
+};

@@ -1,5 +1,5 @@
-import { defineBuildConfig } from 'vite-config'
+import { defineBuildConfig } from 'vite-config';
 
 export default defineBuildConfig({
   entry: './src/index.ts',
-})
+});

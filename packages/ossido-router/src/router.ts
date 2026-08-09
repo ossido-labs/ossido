@@ -1,46 +1,46 @@
-import type { ComponentType as ReactComponentType } from 'react'
+import type { ComponentType as ReactComponentType } from 'react';
 
-import { trimPath, trimPathRight } from './utils'
-import type { Route } from './route'
+import { trimPath, trimPathRight } from './utils';
+import type { Route } from './route';
 
-type RouteTree = Route
+type RouteTree = Route;
 
 interface CreateRouterOptions {
-  routeTree: RouteTree
-  basePath?: string
-  options?: RouterOptions
+  routeTree: RouteTree;
+  basePath?: string;
+  options?: RouterOptions;
 }
 
 interface RouterOptions {
-  component?: ReactComponentType
-  hasHandler?: boolean
-  routeTree?: RouteTree
+  component?: ReactComponentType;
+  hasHandler?: boolean;
+  routeTree?: RouteTree;
 }
 
 export function createRouter(options: CreateRouterOptions): Router {
-  return new Router(options)
+  return new Router(options);
 }
 
-export type RouterInstanceType = InstanceType<typeof Router>
+export type RouterInstanceType = InstanceType<typeof Router>;
 
 export class Router {
-  options?: RouterOptions
-  basePath = '/'
-  routeTree?: RouteTree
+  options?: RouterOptions;
+  basePath = '/';
+  routeTree?: RouteTree;
 
-  isServer: boolean = typeof document === 'undefined'
+  isServer: boolean = typeof document === 'undefined';
 
-  routesById: Record<string, Route> = {}
+  routesById: Record<string, Route> = {};
 
-  routesByPath: Record<string, Route> = {}
+  routesByPath: Record<string, Route> = {};
 
   constructor(options: CreateRouterOptions) {
     this.update({
       ...options,
-    })
+    });
 
     if (!this.isServer) {
-      window.__OSSIDO__ROUTER__ = this
+      window.__OSSIDO__ROUTER__ = this;
     }
   }
 
@@ -48,47 +48,48 @@ export class Router {
     this.options = {
       ...this.options,
       ...newOptions,
-    }
+    };
 
-    this.#updateBasePath(newOptions.basePath)
+    this.#updateBasePath(newOptions.basePath);
 
     if (this.options.routeTree !== this.routeTree) {
-      this.routeTree = this.options.routeTree
-      this.#buildRouteTree()
+      this.routeTree = this.options.routeTree;
+      this.#buildRouteTree();
     }
-  }
+  };
 
   #buildRouteTree = (): void => {
     const recurseRoutes = (childRoutes: Array<Route>): void => {
       childRoutes.forEach((route: Route, i: number) => {
-        route.init(i)
+        route.init(i);
 
-        this.routesById[route.id || ''] = route
+        this.routesById[route.id || ''] = route;
 
         if (!route.isRoot && route.options.path) {
-          const trimmedFullPath = trimPathRight(route.fullPath)
+          const trimmedFullPath = trimPathRight(route.fullPath);
           if (
             !this.routesByPath[trimmedFullPath] ||
             route.fullPath.endsWith('/')
           ) {
-            this.routesByPath[trimmedFullPath] = route
+            this.routesByPath[trimmedFullPath] = route;
           }
         }
 
-        const children = route.children
+        const children = route.children;
         if (children?.length) {
-          recurseRoutes(children)
+          recurseRoutes(children);
         }
-      })
-    }
+      });
+    };
 
-    recurseRoutes([this.routeTree as Route])
-  }
+    recurseRoutes([this.routeTree as Route]);
+  };
 
   #updateBasePath = (basePath?: string): void => {
     // No option passed → keep the current base path.
-    if (basePath === undefined) return
+    if (basePath === undefined) return;
 
-    this.basePath = basePath === '' || basePath === '/' ? '/' : `/${trimPath(basePath)}`
-  }
+    this.basePath =
+      basePath === '' || basePath === '/' ? '/' : `/${trimPath(basePath)}`;
+  };
 }

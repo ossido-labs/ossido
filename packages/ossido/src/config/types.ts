@@ -3,19 +3,19 @@ import type {
   DepOptimizationOptions,
   PluginOption,
   CSSOptions,
-} from 'vite'
+} from 'vite';
 
 export interface OssidoConfigServer {
-  host: string
-  origin: string | null
-  port: number
+  host: string;
+  origin: string | null;
+  port: number;
 }
 
 /** Output format for the server logs. */
-export type OssidoLogFormat = 'pretty' | 'json'
+export type OssidoLogFormat = 'pretty' | 'json';
 
 /** Log severities, lowest to highest. */
-export type OssidoLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error'
+export type OssidoLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
 
 export interface OssidoConfigLogging {
   /**
@@ -23,36 +23,36 @@ export interface OssidoConfigLogging {
    * - `'pretty'` (default): human, coloured, single line.
    * - `'json'`: one JSON object per line, GCP Cloud Logging compatible.
    */
-  format?: OssidoLogFormat
+  format?: OssidoLogFormat;
   /**
    * Print the route tree on `ossido dev` start-up. Default `false` — set to
    * `true` to opt in. (`ossido build` always prints it, regardless of this
    * option.)
    */
-  routeTree?: boolean
+  routeTree?: boolean;
   /** Forwarding of browser `console.*` to the dev server console (dev only). */
   browser?: {
     /** Whether to forward browser logs at all. Default `true`. */
-    enabled?: boolean
+    enabled?: boolean;
     /** Minimum console level to forward. Default `'info'`. */
-    level?: OssidoLogLevel
-  }
+    level?: OssidoLogLevel;
+  };
 }
 
 /**
  * @see http://ossido.dev/documentation/configuration
  */
 export interface OssidoConfig {
-  server?: Partial<OssidoConfigServer>
+  server?: Partial<OssidoConfigServer>;
   vite?: {
-    alias?: AliasOptions
-    css?: CSSOptions
-    optimizeDeps?: DepOptimizationOptions
-    plugins?: Array<PluginOption>
-  }
-  logging?: OssidoConfigLogging
-  dev?: OssidoConfigDev
-  ssr?: OssidoConfigSsr
+    alias?: AliasOptions;
+    css?: CSSOptions;
+    optimizeDeps?: DepOptimizationOptions;
+    plugins?: Array<PluginOption>;
+  };
+  logging?: OssidoConfigLogging;
+  dev?: OssidoConfigDev;
+  ssr?: OssidoConfigSsr;
   /**
    * Default build output mode. Default `'server'`.
    * - `'server'`: build the SSR server (`ossido build`).
@@ -61,48 +61,59 @@ export interface OssidoConfig {
    *
    * The `--static` / `--server` CLI flags override this per invocation.
    */
-  output?: OssidoConfigOutput
+  output?: OssidoConfigOutput;
   /** Build lifecycle hooks (`ossido build`, both output modes; not `dev`). */
-  build?: OssidoConfigBuild
+  build?: OssidoConfigBuild;
+  /**
+   * Animate client-side navigations with the browser
+   * [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API).
+   * Default `false`. When enabled, `push`/`replace`/`<Link>`/back-forward
+   * navigations run inside `document.startViewTransition` (a crossfade by
+   * default; customise with `view-transition-name` / `::view-transition-*` CSS).
+   * No-ops where unsupported or under `prefers-reduced-motion`; override per
+   * navigation with `push(path, { viewTransition: false })` or
+   * `<Link viewTransition={false}>`.
+   */
+  viewTransitions?: boolean;
 }
 
 /** Build output mode. */
-export type OssidoConfigOutput = 'static' | 'server'
+export type OssidoConfigOutput = 'static' | 'server';
 
 /**
  * Everything a build hook is given about the current `ossido build`.
  */
 export interface OssidoBuildContext {
   /** The resolved output mode for this build. */
-  mode: OssidoConfigOutput
+  mode: OssidoConfigOutput;
   /**
    * Absolute path to the deployable output directory: `out/static` for a static
    * build, `out` for a server build. The directory you'd upload/deploy.
    */
-  outputDirectory: string
+  outputDirectory: string;
   /** Absolute path to the project's source `public/` folder. */
-  publicDirectory: string
+  publicDirectory: string;
   /**
    * Emitted file paths, relative to `outputDirectory`. Populated for
    * `postbuild` (after all artifacts exist); empty for `prebuild`.
    */
-  manifest: Array<string>
+  manifest: Array<string>;
   /** The resolved Ossido config, so hooks can branch on build settings. */
-  config: OssidoConfig
+  config: OssidoConfig;
 }
 
 /**
  * A build lifecycle hook. May be async — the build awaits it, and a thrown
  * error fails the build.
  */
-export type OssidoBuildHook = (ctx: OssidoBuildContext) => void | Promise<void>
+export type OssidoBuildHook = (ctx: OssidoBuildContext) => void | Promise<void>;
 
 /** `prebuild` / `postbuild` hooks, defined under `build` in the config. */
 export interface OssidoConfigBuild {
   /** Runs before the build starts (its `ctx.manifest` is empty). */
-  prebuild?: OssidoBuildHook
+  prebuild?: OssidoBuildHook;
   /** Runs after all build artifacts have been produced. */
-  postbuild?: OssidoBuildHook
+  postbuild?: OssidoBuildHook;
 }
 
 /** Server-side rendering options. */
@@ -117,7 +128,7 @@ export interface OssidoConfigSsr {
    * core count only adds contention for CPU-bound rendering. Overridable at
    * runtime with the `OSSIDO_SSR_THREADS` environment variable.
    */
-  renderThreads?: number
+  renderThreads?: number;
 }
 
 /** Development-only tweaks. */
@@ -131,5 +142,5 @@ export interface OssidoConfigDev {
    * navigation. Set `false` for the snappiest dev navigation, accepting a brief
    * unstyled flash on first visit to a route.
    */
-  criticalCss?: boolean
+  criticalCss?: boolean;
 }

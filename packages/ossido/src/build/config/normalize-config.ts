@@ -1,12 +1,12 @@
-import path from 'node:path'
+import path from 'node:path';
 
-import type { AliasOptions } from 'vite'
+import type { AliasOptions } from 'vite';
 
-import type { OssidoConfig } from '../../config'
+import type { OssidoConfig } from '../../config';
 
-import type { InternalOssidoConfig } from '../types'
+import type { InternalOssidoConfig } from '../types';
 
-import { DOT_OSSIDO_FOLDER_NAME, CONFIG_FOLDER_NAME } from '../constants'
+import { DOT_OSSIDO_FOLDER_NAME, CONFIG_FOLDER_NAME } from '../constants';
 
 /**
  *  Normalize vite alias option:
@@ -16,18 +16,18 @@ import { DOT_OSSIDO_FOLDER_NAME, CONFIG_FOLDER_NAME } from '../constants'
  */
 const normalizeAliasPath = (aliasPath: string): string => {
   if (aliasPath.startsWith('./src') || aliasPath.startsWith('src')) {
-    return path.join(process.cwd(), aliasPath)
+    return path.join(process.cwd(), aliasPath);
   }
 
   if (path.isAbsolute(aliasPath)) {
     return aliasPath.replace(
       path.join(DOT_OSSIDO_FOLDER_NAME, CONFIG_FOLDER_NAME),
       '',
-    )
+    );
   }
 
-  return aliasPath
-}
+  return aliasPath;
+};
 
 /**
  * From a given vite aliasOptions apply {@link normalizeAliasPath} for each alias.
@@ -38,7 +38,7 @@ const normalizeAliasPath = (aliasPath: string): string => {
  * @see https://github.com/Valerioageno/tuono/pull/153#issuecomment-2508142877
  */
 const normalizeViteAlias = (alias?: AliasOptions): AliasOptions | undefined => {
-  if (!alias) return
+  if (!alias) return;
 
   if (Array.isArray(alias)) {
     return (alias as Extract<AliasOptions, ReadonlyArray<unknown>>).map(
@@ -46,19 +46,19 @@ const normalizeViteAlias = (alias?: AliasOptions): AliasOptions | undefined => {
         ...userAliasDefinition,
         replacement: normalizeAliasPath(replacement),
       }),
-    )
+    );
   }
 
   if (typeof alias === 'object') {
-    const normalizedAlias: AliasOptions = {}
+    const normalizedAlias: AliasOptions = {};
     for (const [key, value] of Object.entries(alias)) {
-      normalizedAlias[key] = normalizeAliasPath(value as string)
+      normalizedAlias[key] = normalizeAliasPath(value as string);
     }
-    return normalizedAlias
+    return normalizedAlias;
   }
 
-  return alias
-}
+  return alias;
+};
 
 /**
  * Wrapper function to normalize the ossido.config.ts file
@@ -97,9 +97,10 @@ export const normalizeConfig = (config: OssidoConfig): InternalOssidoConfig => {
       renderThreads: config.ssr?.renderThreads ?? null,
     },
     output: config.output ?? 'server',
+    viewTransitions: config.viewTransitions ?? false,
     // Carried through as-is (its `prebuild`/`postbuild` are functions, so they
     // are only reachable via `loadConfig`, never the JSON config). Spread
     // conditionally so an absent `build` isn't materialised as `undefined`.
     ...(config.build ? { build: config.build } : {}),
-  }
-}
+  };
+};

@@ -1,8 +1,8 @@
-import type { JSX } from 'react'
-import { OssidoScripts } from 'ossido'
-import type { OssidoLayoutProps } from 'ossido'
+import type { JSX } from 'react';
+import { OssidoScripts } from 'ossido';
+import type { OssidoLayoutProps } from 'ossido';
 
-import '../styles/global.css'
+import '../styles/global.css';
 
 export default function RootLayout({
   children,
@@ -19,5 +19,5 @@ export default function RootLayout({
         <OssidoScripts />
       </body>
     </html>
-  )
+  );
 }

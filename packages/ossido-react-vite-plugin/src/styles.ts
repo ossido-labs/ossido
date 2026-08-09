@@ -3,35 +3,35 @@
  *
  * source: https://github.com/remix-run/remix/blob/main/packages/remix-dev/vite/styles.ts
  */
-import path from 'path'
+import path from 'path';
 
-import type { ModuleNode, ViteDevServer } from 'vite'
+import type { ModuleNode, ViteDevServer } from 'vite';
 
-const isCssFile = (file: string): boolean => cssFileRegExp.test(file)
+const isCssFile = (file: string): boolean => cssFileRegExp.test(file);
 
 const cssFileRegExp =
-  /\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(?:$|\?)/
+  /\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(?:$|\?)/;
 
-const cssModulesRegExp = new RegExp(`\\.module${cssFileRegExp.source}`)
+const cssModulesRegExp = new RegExp(`\\.module${cssFileRegExp.source}`);
 
-const routesFolder = path.relative(process.cwd(), 'src/routes')
+const routesFolder = path.relative(process.cwd(), 'src/routes');
 
 const injectQuery = (url: string, query: string): string =>
-  url.includes('?') ? url.replace('?', `?${query}&`) : `${url}?${query}`
+  url.includes('?') ? url.replace('?', `?${query}&`) : `${url}?${query}`;
 
 export const isCssModulesFile = (file: string): boolean =>
-  cssModulesRegExp.test(file)
+  cssModulesRegExp.test(file);
 
-const cssUrlParamsWithoutSideEffects = ['url', 'inline', 'raw', 'inline-css']
+const cssUrlParamsWithoutSideEffects = ['url', 'inline', 'raw', 'inline-css'];
 
 const isCssUrlWithoutSideEffects = (url: string): boolean => {
-  const queryString = url.split('?')[1]
+  const queryString = url.split('?')[1];
 
   if (!queryString) {
-    return false
+    return false;
   }
 
-  const params = new URLSearchParams(queryString)
+  const params = new URLSearchParams(queryString);
   for (const paramWithoutSideEffects of cssUrlParamsWithoutSideEffects) {
     if (
       // Parameter is blank and not explicitly set, i.e. "?url", not "?url="
@@ -39,18 +39,18 @@ const isCssUrlWithoutSideEffects = (url: string): boolean => {
       !url.includes(`?${paramWithoutSideEffects}=`) &&
       !url.includes(`&${paramWithoutSideEffects}=`)
     ) {
-      return true
+      return true;
     }
   }
 
-  return false
-}
+  return false;
+};
 
 const normalizePath = (modulePath: string): string => {
   return modulePath.startsWith('node_modules')
     ? path.join(process.cwd(), modulePath)
-    : modulePath
-}
+    : modulePath;
+};
 
 export const getStylesForModule = async (
   viteDevServer: ViteDevServer,
@@ -60,13 +60,13 @@ export const getStylesForModule = async (
    */
   cssModulesManifest: Record<string, string>,
 ): Promise<string | undefined> => {
-  const styles: Record<string, string> = {}
-  const deps: Set<ModuleNode> = new Set()
+  const styles: Record<string, string> = {};
+  const deps: Set<ModuleNode> = new Set();
 
-  const moduleFilePath = normalizePath(moduleUrl)
+  const moduleFilePath = normalizePath(moduleUrl);
   try {
     let node: ModuleNode | undefined =
-      await viteDevServer.moduleGraph.getModuleByUrl(moduleFilePath)
+      await viteDevServer.moduleGraph.getModuleByUrl(moduleFilePath);
 
     // If the module is only present in the client module graph, it won't have
     // been found on the first request to the server. Prime it into the graph,
@@ -80,25 +80,25 @@ export const getStylesForModule = async (
     if (!node) {
       const resolved = await viteDevServer.pluginContainer
         .resolveId(moduleFilePath)
-        .catch(() => null)
-      const idToLoad = resolved?.id ?? moduleFilePath
+        .catch(() => null);
+      const idToLoad = resolved?.id ?? moduleFilePath;
 
-      await viteDevServer.transformRequest(idToLoad).catch(() => undefined)
+      await viteDevServer.transformRequest(idToLoad).catch(() => undefined);
 
       node =
         (await viteDevServer.moduleGraph.getModuleByUrl(idToLoad)) ??
-        (await viteDevServer.moduleGraph.getModuleByUrl(moduleFilePath))
+        (await viteDevServer.moduleGraph.getModuleByUrl(moduleFilePath));
     }
 
     // Critical CSS is best-effort: if the route's module still can't be resolved
     // (e.g. a loader vite can't reach here), skip it silently — the route still
     // loads its styles the normal way, so this is not an error worth surfacing.
     if (!node) {
-      return
+      return;
     }
-    await findNodeDependencies(viteDevServer, node, deps)
+    await findNodeDependencies(viteDevServer, node, deps);
   } catch {
-    return
+    return;
   }
 
   for (const dep of deps) {
@@ -117,18 +117,18 @@ export const getStylesForModule = async (
                 // server environment.
                 injectQuery(normalizePath(dep.file), 'inline'),
               )
-            ).default as string)
+            ).default as string);
 
         if (css === undefined) {
-          throw new Error()
+          throw new Error();
         }
 
-        styles[dep.url] = css
+        styles[dep.url] = css;
       } catch {
         // this can happen with dynamically imported modules
         console.warn(
           `[ossido] critical css: could not load ${dep.file} (resolved from ${dep.url})`,
-        )
+        );
       }
     }
   }
@@ -144,8 +144,8 @@ export const getStylesForModule = async (
       ])
       .flat()
       .join('\n') || undefined
-  )
-}
+  );
+};
 
 /**
  * This function transform the componentId into a file path.
@@ -153,14 +153,14 @@ export const getStylesForModule = async (
  */
 function findFileFromComponentId(id: string): string {
   if (id.endsWith('/')) {
-    return id + 'page'
+    return id + 'page';
   }
 
   if (id.includes('__root__')) {
-    return id.replaceAll('__root__', 'layout')
+    return id.replaceAll('__root__', 'layout');
   }
 
-  return id
+  return id;
 }
 
 export const getStylesForComponentId = async (
@@ -177,12 +177,12 @@ export const getStylesForComponentId = async (
   const relativeFilePath = path.join(
     routesFolder,
     findFileFromComponentId(componentId || ''),
-  )
+  );
 
-  const fileUrl = path.join(process.cwd(), relativeFilePath)
+  const fileUrl = path.join(process.cwd(), relativeFilePath);
 
-  return await getStylesForModule(viteDevServer, fileUrl, cssModulesManifest)
-}
+  return await getStylesForModule(viteDevServer, fileUrl, cssModulesManifest);
+};
 
 /**
  * This function is used to find all the dependencies of a module node.
@@ -200,24 +200,24 @@ const findNodeDependencies = async (
   // top-level route is primed. This also runs the plugin `transform` hook for
   // CSS modules, populating `cssModulesManifest` before it is read below.
   if (!node.ssrTransformResult && !node.transformResult) {
-    await vite.transformRequest(node.url).catch(() => undefined)
+    await vite.transformRequest(node.url).catch(() => undefined);
   }
   // since `ssrTransformResult.deps` contains URLs instead of `ModuleNode`s, this process is asynchronous.
   // instead of using `await`, we resolve all branches in parallel.
-  const branches: Array<Promise<void>> = []
+  const branches: Array<Promise<void>> = [];
 
   async function addFromNode(innerNode: ModuleNode): Promise<void> {
     if (!deps.has(innerNode)) {
-      deps.add(innerNode)
-      await findNodeDependencies(vite, innerNode, deps)
+      deps.add(innerNode);
+      await findNodeDependencies(vite, innerNode, deps);
     }
   }
 
   async function addFromUrl(url: string): Promise<void> {
-    const innerNode = await vite.moduleGraph.getModuleByUrl(url)
+    const innerNode = await vite.moduleGraph.getModuleByUrl(url);
 
     if (innerNode) {
-      await addFromNode(innerNode)
+      await addFromNode(innerNode);
     }
   }
 
@@ -225,13 +225,13 @@ const findNodeDependencies = async (
     if (node.ssrTransformResult.deps) {
       node.ssrTransformResult.deps.forEach((url) =>
         branches.push(addFromUrl(url)),
-      )
+      );
     }
   } else {
     node.importedModules.forEach((innerNode: ModuleNode) =>
       branches.push(addFromNode(innerNode)),
-    )
+    );
   }
 
-  await Promise.all(branches)
-}
+  await Promise.all(branches);
+};

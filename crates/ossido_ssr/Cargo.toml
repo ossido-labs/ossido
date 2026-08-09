@@ -1,0 +1,30 @@
+[package]
+name = "ossido_ssr"
+version = "0.1.0"
+edition = "2021"
+authors = ["Chris Schofield <chris@childishforces.com>"]
+description = "Server-side rendering with the V8 engine — the SSR backbone for Ossido"
+homepage = "https://ossido.dev"
+keywords = ["web", "ssr", "react", "v8", "server-side-render"]
+repository = "https://github.com/ossido-labs/ossido"
+readme = "../../README.md"
+license-file = "../../LICENSE.md"
+categories = ["web-programming"]
+# Vendored from the (stagnant) upstream `ssr_rs` crate and renamed. The 10 MB
+# `icudtl.dat` is embedded via `include_bytes!`, so it must ship in the package.
+include = [
+    "src/*.rs",
+    "src/icudtl.dat",
+    "Cargo.toml",
+]
+
+[lib]
+name = "ossido_ssr"
+path = "src/lib.rs"
+
+[dependencies]
+v8 = "135.1.0"
+
+[dev-dependencies]
+# Only the `svelte` integration test parses a rendered JSON payload.
+serde_json = "1.0"

@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { JSX } from 'react'
+import { useEffect, useMemo, useState } from 'react';
+import type { JSX } from 'react';
 
-import type { OssidoErrorWithSource } from '../types'
+import type { OssidoErrorWithSource } from '../types';
 
 import type {
   PlainExcerpt,
   ResolvedFrame,
   SourceExcerpt,
-} from './devErrorSource'
+} from './devErrorSource';
 import {
   errorLabel,
   extractExcerpt,
@@ -15,7 +15,7 @@ import {
   initialFrames,
   prettyPath,
   resolveDevErrorFrames,
-} from './devErrorSource'
+} from './devErrorSource';
 
 /**
  * Renders the details of a single JS error (a React render error, uncaught
@@ -35,11 +35,11 @@ import {
  */
 
 /** Stack frames shown before the "show more" toggle is expanded. */
-const MAX_VISIBLE_FRAMES = 5
+const MAX_VISIBLE_FRAMES = 5;
 
 /** Rows the excerpt spans (SOURCE_CONTEXT * 2 + 1) — the skeleton matches it so
  * the real excerpt drops into already-reserved space (no layout jump). */
-const EXCERPT_ROWS = 11
+const EXCERPT_ROWS = 11;
 
 /**
  * A fixed-height placeholder rendered while a JS error's excerpt is still being
@@ -67,7 +67,7 @@ function ExcerptSkeleton(): JSX.Element {
         ))}
       </pre>
     </div>
-  )
+  );
 }
 
 /**
@@ -76,16 +76,16 @@ function ExcerptSkeleton(): JSX.Element {
  * dependency's own `src/` (e.g. `node_modules/foo/src/…`) from matching.
  */
 function isAppSourceFrame(frame: ResolvedFrame): boolean {
-  return frame.isApp && !!frame.file && /(^|\/)src\//.test(frame.file)
+  return frame.isApp && !!frame.file && /(^|\/)src\//.test(frame.file);
 }
 
 export function DevErrorContent({ error }: { error: Error }): JSX.Element {
   // Long stacks are collapsed to the first few frames until expanded.
-  const [framesExpanded, setFramesExpanded] = useState(false)
+  const [framesExpanded, setFramesExpanded] = useState(false);
 
   // A Rust panic ships its own source (no sourcemap exists), so its plain
   // excerpt is available synchronously on the very first paint.
-  const serverSource = (error as OssidoErrorWithSource).ossidoServerSource
+  const serverSource = (error as OssidoErrorWithSource).ossidoServerSource;
   const initialPlain = useMemo<PlainExcerpt | null>(
     () =>
       serverSource
@@ -97,13 +97,13 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
           })
         : null,
     [serverSource],
-  )
+  );
 
   const [frames, setFrames] = useState<Array<ResolvedFrame>>(() =>
     initialFrames(error.stack),
-  )
-  const [plain, setPlain] = useState<PlainExcerpt | null>(initialPlain)
-  const [highlighted, setHighlighted] = useState<SourceExcerpt | null>(null)
+  );
+  const [plain, setPlain] = useState<PlainExcerpt | null>(initialPlain);
+  const [highlighted, setHighlighted] = useState<SourceExcerpt | null>(null);
 
   // Whether an excerpt is likely coming (a JS error with an application frame),
   // so its space can be reserved with a skeleton while the sourcemap resolves.
@@ -114,10 +114,10 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
         (frame) => frame.isApp && !!frame.file && frame.line != null,
       ),
     [error.stack, serverSource],
-  )
+  );
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     const resolve = async (): Promise<void> => {
       if (serverSource) {
@@ -127,40 +127,40 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
           file: prettyPath(serverSource.file),
           line: serverSource.line,
           column: serverSource.column,
-        }
-        const result = await highlightExcerpt(source)
-        if (!cancelled && result) setHighlighted(result)
-        return
+        };
+        const result = await highlightExcerpt(source);
+        if (!cancelled && result) setHighlighted(result);
+        return;
       }
 
       const { frames: resolvedFrames, source } = await resolveDevErrorFrames(
         error.stack,
-      )
-      if (cancelled) return
-      setFrames(resolvedFrames)
+      );
+      if (cancelled) return;
+      setFrames(resolvedFrames);
       if (source) {
         // Plain excerpt first (no layout jump), highlighting swaps in after.
-        setPlain(extractExcerpt(source))
-        const result = await highlightExcerpt(source)
-        if (!cancelled && result) setHighlighted(result)
+        setPlain(extractExcerpt(source));
+        const result = await highlightExcerpt(source);
+        if (!cancelled && result) setHighlighted(result);
       }
-    }
-    void resolve()
+    };
+    void resolve();
 
     return (): void => {
-      cancelled = true
-    }
-  }, [error, serverSource])
+      cancelled = true;
+    };
+  }, [error, serverSource]);
 
   // Prefer the highlighted excerpt once ready; both share the same line/gutter
   // structure, so swapping in the colours does not shift the layout.
-  const excerpt: SourceExcerpt | PlainExcerpt | null = highlighted ?? plain
-  const hiddenFrameCount = Math.max(0, frames.length - MAX_VISIBLE_FRAMES)
+  const excerpt: SourceExcerpt | PlainExcerpt | null = highlighted ?? plain;
+  const hiddenFrameCount = Math.max(0, frames.length - MAX_VISIBLE_FRAMES);
   const visibleFrames = framesExpanded
     ? frames
-    : frames.slice(0, MAX_VISIBLE_FRAMES)
+    : frames.slice(0, MAX_VISIBLE_FRAMES);
   // The constructor (class) name, shown on its own line under the badge.
-  const label = errorLabel(error)
+  const label = errorLabel(error);
 
   return (
     <>
@@ -196,7 +196,9 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
                     dangerouslySetInnerHTML={{ __html: sourceLine.html }}
                   />
                 ) : (
-                  <span className="ossido-err-code-text">{sourceLine.text}</span>
+                  <span className="ossido-err-code-text">
+                    {sourceLine.text}
+                  </span>
                 )}
               </div>
             ))}
@@ -242,7 +244,7 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
               type="button"
               className="ossido-err-frame-toggle"
               onClick={(): void => {
-                setFramesExpanded((expanded) => !expanded)
+                setFramesExpanded((expanded) => !expanded);
               }}
               aria-expanded={framesExpanded}
             >
@@ -254,5 +256,5 @@ export function DevErrorContent({ error }: { error: Error }): JSX.Element {
         </div>
       )}
     </>
-  )
+  );
 }

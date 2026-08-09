@@ -125,7 +125,7 @@ impl ProcessManager {
         self.start_process(ProcessId::BuildReactSSRSrc);
 
         // The Rust build is the long pole on a fresh project: it compiles the
-        // whole dependency tree (ossido + ssr_rs + V8), which is why the first
+        // whole dependency tree (ossido + ossido_ssr + V8), which is why the first
         // `ossido dev` can sit here for minutes.
         report("Compiling the Ossido server");
         self.wait_for_process(ProcessId::BuildRustSrc).await;

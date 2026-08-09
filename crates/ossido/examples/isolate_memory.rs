@@ -5,7 +5,7 @@
 //! compiling the bundle independently.
 //!
 //! V8 allocates in its own C++ heap, invisible to a Rust allocator, so we read
-//! the OS resident set size (`ps`). And because `ssr_rs` assumes one isolate per
+//! the OS resident set size (`ps`). And because `ossido_ssr` assumes one isolate per
 //! thread (as the pool does), each isolate lives on its own real thread.
 //!
 //! Build once, then sweep N in a separate process per point (clean isolation):

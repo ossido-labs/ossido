@@ -1,5 +1,5 @@
-import type { JSX } from 'react'
-import { Link } from 'ossido'
+import type { JSX } from 'react';
+import { Link } from 'ossido';
 
 // Rendered inside the root layout whenever no route matches.
 export default function NotFound(): JSX.Element {
@@ -16,5 +16,5 @@ export default function NotFound(): JSX.Element {
         Back home
       </Link>
     </div>
-  )
+  );
 }

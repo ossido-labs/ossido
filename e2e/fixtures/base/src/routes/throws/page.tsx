@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { JSX } from 'react'
+import { useState } from 'react';
+import type { JSX } from 'react';
 
 /**
  * Test harness for the dev error overlay. Each button triggers a different kind
@@ -11,11 +11,11 @@ import type { JSX } from 'react'
 
 /** Throws during render — caught by the route error boundary (a runtime error). */
 function Bomb(): never {
-  throw new Error('Render error: a component threw during render')
+  throw new Error('Render error: a component threw during render');
 }
 
 export default function ThrowsPage(): JSX.Element {
-  const [renderError, setRenderError] = useState(false)
+  const [renderError, setRenderError] = useState(false);
 
   return (
     <div>
@@ -34,8 +34,8 @@ export default function ThrowsPage(): JSX.Element {
         data-testid="throw-uncaught"
         onClick={(): void => {
           setTimeout(() => {
-            throw new Error('Uncaught error from a setTimeout callback')
-          }, 0)
+            throw new Error('Uncaught error from a setTimeout callback');
+          }, 0);
         }}
       >
         Throw an uncaught error
@@ -45,7 +45,7 @@ export default function ThrowsPage(): JSX.Element {
         type="button"
         data-testid="throw-rejection"
         onClick={(): void => {
-          void Promise.reject(new Error('Unhandled promise rejection'))
+          void Promise.reject(new Error('Unhandled promise rejection'));
         }}
       >
         Reject a promise
@@ -53,5 +53,5 @@ export default function ThrowsPage(): JSX.Element {
 
       {renderError && <Bomb />}
     </div>
-  )
+  );
 }

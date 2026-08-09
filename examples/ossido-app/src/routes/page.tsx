@@ -1,17 +1,17 @@
-import type { JSX } from 'react'
-import type { OssidoPage } from 'ossido/types'
+import type { JSX } from 'react';
+import type { OssidoPage } from 'ossido/types';
 
-import { Wordmark } from '../components/Wordmark.tsx'
+import { Wordmark } from '../components/Wordmark.tsx';
 
 interface NavLink {
-  href: string
-  label: string
-  desc: string
+  href: string;
+  label: string;
+  desc: string;
 }
 
 const LINKS: ReadonlyArray<NavLink> = [
   {
-    href: 'https://github.com/ChildishForces/ossido',
+    href: 'https://github.com/ossido-labs/ossido',
     label: 'GitHub',
     desc: 'Star the repo',
   },
@@ -25,7 +25,7 @@ const LINKS: ReadonlyArray<NavLink> = [
     label: 'npm',
     desc: 'The npm package',
   },
-]
+];
 
 function NavCard({ href, label, desc }: NavLink): JSX.Element {
   const body = (
@@ -38,13 +38,13 @@ function NavCard({ href, label, desc }: NavLink): JSX.Element {
       </span>
       <span className="nav-card__desc">{desc}</span>
     </>
-  )
+  );
 
   return (
     <a className="nav-card" href={href} target="_blank" rel="noreferrer">
       {body}
     </a>
-  )
+  );
 }
 
 const IndexPage: OssidoPage<'/'> = ({ subtitle }) => {
@@ -69,7 +69,7 @@ const IndexPage: OssidoPage<'/'> = ({ subtitle }) => {
         ))}
       </nav>
     </>
-  )
-}
+  );
+};
 
-export default IndexPage
+export default IndexPage;

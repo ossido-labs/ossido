@@ -208,6 +208,7 @@
       "devDependencies": {
         "@testing-library/react": "16.3.0",
         "@types/react": "19.1.8",
+        "@types/react-dom": "19.1.6",
         "@vitejs/plugin-react-swc": "4.3.2",
         "happy-dom": "18.0.1",
         "react": "^19.2.8",
@@ -219,6 +220,7 @@
       },
       "peerDependencies": {
         "react": ">=19.0.0",
+        "react-dom": ">=19.0.0",
       },
     },
     "packages/ossido-ui": {
@@ -1589,6 +1591,8 @@
     "ossido/@types/react-dom": ["@types/react-dom@19.1.6", "http://localhost:4873/@types/react-dom/-/react-dom-19.1.6.tgz", { "peerDependencies": { "@types/react": "^19.0.0" } }, "sha512-4hOiT/dwO8Ko0gV1m/TJZYk3y0KBnY9vzDh7W+DH17b2HFSOGgdj33dhihPeuy3l0q23+4e+hoXHV6hCC4dCXw=="],
 
     "ossido-router/@types/react": ["@types/react@19.1.8", "http://localhost:4873/@types/react/-/react-19.1.8.tgz", { "dependencies": { "csstype": "^3.0.2" } }, "sha512-AwAfQ2Wa5bCx9WP8nZL2uMZWod7J7/JSplxbTmBQ5ms6QpqNYm672H0Vu9ZVKVngQ+ii4R/byguVEUZQyeg44g=="],
+
+    "ossido-router/@types/react-dom": ["@types/react-dom@19.1.6", "http://localhost:4873/@types/react-dom/-/react-dom-19.1.6.tgz", { "peerDependencies": { "@types/react": "^19.0.0" } }, "sha512-4hOiT/dwO8Ko0gV1m/TJZYk3y0KBnY9vzDh7W+DH17b2HFSOGgdj33dhihPeuy3l0q23+4e+hoXHV6hCC4dCXw=="],
 
     "ossido-router/@vitejs/plugin-react-swc": ["@vitejs/plugin-react-swc@4.3.2", "http://localhost:4873/@vitejs/plugin-react-swc/-/plugin-react-swc-4.3.2.tgz", { "dependencies": { "@rolldown/pluginutils": "^1.0.1", "@swc/core": "^1.15.46" }, "peerDependencies": { "vite": "^4 || ^5 || ^6 || ^7 || ^8" } }, "sha512-MlSlmSAYbYwPjGa+CjOAqwij09iPYAQDHwx8osVkwoDamCxXlg+avpkC65Ysv+L/uqUWvRTsnJCKPjVhZih/sA=="],
 

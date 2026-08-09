@@ -15,11 +15,11 @@
  * @see packages/ossido-ui/src/components/devErrorStore.ts (the bridge target)
  * @see https://github.com/tuono-labs/tuono/pull/607
  */
-import type { ErrorPayload, Plugin } from 'vite'
+import type { ErrorPayload, Plugin } from 'vite';
 
 const HTMLElement: typeof globalThis.HTMLElement =
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  globalThis.HTMLElement ?? (class {} as typeof globalThis.HTMLElement)
+  globalThis.HTMLElement ?? (class {} as typeof globalThis.HTMLElement);
 
 /**
  * The element Vite instantiates on a build error. It never renders; it reports
@@ -30,8 +30,8 @@ const HTMLElement: typeof globalThis.HTMLElement =
  */
 export class ErrorOverlay extends HTMLElement {
   constructor(err: ErrorPayload['err']) {
-    super()
-    const globalWindow = window as unknown as Record<string, unknown>
+    super();
+    const globalWindow = window as unknown as Record<string, unknown>;
     const build = {
       message: err.message,
       stack: err.stack,
@@ -39,27 +39,27 @@ export class ErrorOverlay extends HTMLElement {
       frame: err.frame,
       plugin: err.plugin,
       loc: err.loc,
-    }
+    };
     const store = globalWindow['__OSSIDO_DEV_ERRORS__'] as
       | { addBuildError?: (b: unknown) => void }
-      | undefined
+      | undefined;
     if (typeof store?.addBuildError === 'function') {
-      store.addBuildError(build)
+      store.addBuildError(build);
     } else {
       // The store module hasn't loaded yet — buffer for it to drain on init.
       const buffer = (globalWindow['__OSSIDO_DEV_ERRORS_BUFFER__'] ??=
-        []) as Array<unknown>
-      buffer.push(build)
+        []) as Array<unknown>;
+      buffer.push(build);
     }
   }
 
   close(): void {
-    const globalWindow = window as unknown as Record<string, unknown>
+    const globalWindow = window as unknown as Record<string, unknown>;
     const store = globalWindow['__OSSIDO_DEV_ERRORS__'] as
       | { clearBuildErrors?: () => void }
-      | undefined
-    store?.clearBuildErrors?.()
-    this.parentNode?.removeChild(this)
+      | undefined;
+    store?.clearBuildErrors?.();
+    this.parentNode?.removeChild(this);
   }
 }
 
@@ -68,7 +68,7 @@ function getOverlayCode(): string {
   // an anonymous expression, which is a syntax error as a bare statement. The
   // binding also shadows Vite's class (renamed to `ViteErrorOverlay`) so
   // `customElements.define(overlayId, ErrorOverlay)` registers ours.
-  return `const ErrorOverlay = ${ErrorOverlay.toString()};`
+  return `const ErrorOverlay = ${ErrorOverlay.toString()};`;
 }
 
 // The exact declaration of Vite's built-in overlay class in its HMR client.
@@ -76,7 +76,7 @@ function getOverlayCode(): string {
 // used `class ErrorOverlay extends HTMLElement`). We match on this string —
 // which only appears in Vite's client — instead of the module id, so the patch
 // survives changes to how the client module is resolved/served.
-const VITE_OVERLAY_CLASS_DECL = 'var ErrorOverlay = class extends HTMLElement'
+const VITE_OVERLAY_CLASS_DECL = 'var ErrorOverlay = class extends HTMLElement';
 
 function patchOverlay(code: string): string {
   // Replace Vite's overlay class with our bridge, and rename Vite's so it stays
@@ -84,15 +84,15 @@ function patchOverlay(code: string): string {
   return code.replace(
     VITE_OVERLAY_CLASS_DECL,
     getOverlayCode() + '\nvar ViteErrorOverlay = class extends HTMLElement',
-  )
+  );
 }
 
 export const ErrorOverlayVitePlugin: Plugin = {
   name: 'ossido-error-overlay-plugin',
   transform(code, _id, opts) {
-    if (opts?.ssr) return
-    if (!code.includes(VITE_OVERLAY_CLASS_DECL)) return
+    if (opts?.ssr) return;
+    if (!code.includes(VITE_OVERLAY_CLASS_DECL)) return;
 
-    return patchOverlay(code)
+    return patchOverlay(code);
   },
-}
+};

@@ -1,12 +1,12 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import PokemonView from '@/components/PokemonView'
+import PokemonView from '@/components/PokemonView';
 
 interface Pokemon {
-  id: number
-  name: string
-  weight: number
-  height: number
+  id: number;
+  name: string;
+  weight: number;
+  height: number;
 }
 
 export default function PokemonPage(pokemon: Pokemon): JSX.Element {
@@ -15,5 +15,5 @@ export default function PokemonPage(pokemon: Pokemon): JSX.Element {
       <title>{`Pokemon: ${pokemon.name}`}</title>
       <PokemonView pokemon={pokemon} />
     </>
-  )
+  );
 }

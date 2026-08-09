@@ -3,13 +3,13 @@
 // resolution for extensionless routes and correct content types — so the
 // `ossido build --static` export is exercised exactly as it would be deployed
 // (no rewrites). Usage: `node static-server.mjs <root-dir> <port>`.
-import { createServer } from 'node:http'
-import { readFile, stat } from 'node:fs/promises'
-import { join, normalize, extname } from 'node:path'
+import { createServer } from 'node:http';
+import { readFile, stat } from 'node:fs/promises';
+import { join, normalize, extname } from 'node:path';
 
-const [, , rootArg, portArg] = process.argv
-const root = normalize(join(process.cwd(), rootArg ?? 'out/static'))
-const port = Number(portArg ?? 3001)
+const [, , rootArg, portArg] = process.argv;
+const root = normalize(join(process.cwd(), rootArg ?? 'out/static'));
+const port = Number(portArg ?? 3001);
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -29,43 +29,43 @@ const CONTENT_TYPES = {
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
-}
+};
 
 async function resolveFile(url) {
-  const decoded = decodeURIComponent(url.split('?')[0])
-  const filePath = normalize(join(root, decoded))
+  const decoded = decodeURIComponent(url.split('?')[0]);
+  const filePath = normalize(join(root, decoded));
   // Prevent path traversal outside the served root.
-  if (filePath !== root && !filePath.startsWith(root + '/')) return null
+  if (filePath !== root && !filePath.startsWith(root + '/')) return null;
 
   try {
-    const info = await stat(filePath)
+    const info = await stat(filePath);
     if (info.isDirectory()) {
-      const indexPath = join(filePath, 'index.html')
-      await stat(indexPath)
-      return indexPath
+      const indexPath = join(filePath, 'index.html');
+      await stat(indexPath);
+      return indexPath;
     }
-    return filePath
+    return filePath;
   } catch {
-    return null
+    return null;
   }
 }
 
 const server = createServer(async (req, res) => {
-  const filePath = await resolveFile(req.url ?? '/')
+  const filePath = await resolveFile(req.url ?? '/');
   if (!filePath) {
-    res.writeHead(404, { 'content-type': 'text/plain' })
-    res.end('Not found')
-    return
+    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.end('Not found');
+    return;
   }
-  const body = await readFile(filePath)
+  const body = await readFile(filePath);
   res.writeHead(200, {
     'content-type':
       CONTENT_TYPES[extname(filePath)] ?? 'application/octet-stream',
-  })
-  res.end(body)
-})
+  });
+  res.end(body);
+});
 
 server.listen(port, () => {
   // eslint-disable-next-line no-console
-  console.log(`[ssg-static] serving ${root} on http://localhost:${port}`)
-})
+  console.log(`[ssg-static] serving ${root} on http://localhost:${port}`);
+});

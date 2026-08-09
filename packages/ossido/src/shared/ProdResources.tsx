@@ -1,8 +1,8 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
 interface ProdResourcesProps {
-  jsBundles: Array<string> | null
-  cssBundles: Array<string> | null
+  jsBundles: Array<string> | null;
+  cssBundles: Array<string> | null;
 }
 
 export const ProdResources = ({
@@ -25,5 +25,5 @@ export const ProdResources = ({
         <script key={scriptSrc} type="module" src={`/${scriptSrc}`}></script>
       ))}
     </>
-  )
-}
+  );
+};

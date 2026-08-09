@@ -1,5 +1,5 @@
 //! Benchmark: streaming SSR (`Ssr::streaming`) vs buffered full-string SSR
-//! (`Ssr::render`) — the two ssr_rs render paths ossido uses. Benchmarking at the
+//! (`Ssr::render`) — the two ossido_ssr render paths ossido uses. Benchmarking at the
 //! `Ssr` boundary isolates the difference that matters; the ossido render-pool
 //! layer is identical plumbing on top of both.
 //!
@@ -141,7 +141,7 @@ fn fmt_time(ns: f64) -> String {
 }
 
 /// Run the streaming export with `sink` installed as the chunk sink, using
-/// ssr_rs's opt-in `Ssr::streaming` helper (the same path ossido takes).
+/// ossido_ssr's opt-in `Ssr::streaming` helper (the same path ossido takes).
 fn stream(ssr: &mut Ssr<'static, 'static>, payload: &str, mut sink: impl FnMut(&str)) {
     ssr.streaming("__ssr_write")
         .unwrap()

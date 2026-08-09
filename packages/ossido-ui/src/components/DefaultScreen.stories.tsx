@@ -1,15 +1,15 @@
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { DefaultScreen } from './DefaultScreen'
+import { DefaultScreen } from './DefaultScreen';
 
 const meta = {
   title: 'Default Screens/DefaultScreen',
   component: DefaultScreen,
   parameters: { layout: 'fullscreen' },
-} satisfies Meta<typeof DefaultScreen>
+} satisfies Meta<typeof DefaultScreen>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 /** The shell used by the 404 page (router supplies the real `<Link>`). */
 export const NotFound: Story = {
@@ -27,7 +27,7 @@ export const NotFound: Story = {
       </>
     ),
   },
-}
+};
 
 /** Generic usage — any badge + title with custom content. */
 export const Generic: Story = {
@@ -38,4 +38,4 @@ export const Generic: Story = {
       <p className="ossido-screen-text">This screen is a blank canvas.</p>
     ),
   },
-}
+};

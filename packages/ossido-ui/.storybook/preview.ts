@@ -1,4 +1,4 @@
-import type { Preview } from '@storybook/react-vite'
+import type { Preview } from '@storybook/react-vite';
 
 const preview: Preview = {
   parameters: {
@@ -6,6 +6,6 @@ const preview: Preview = {
     // them without Storybook's padded canvas.
     layout: 'fullscreen',
   },
-}
+};
 
-export default preview
+export default preview;

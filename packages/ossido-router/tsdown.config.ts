@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
-import { defineBuildConfig } from 'vite-config'
-import type { Plugin } from 'rolldown'
+import { defineBuildConfig } from 'vite-config';
+import type { Plugin } from 'rolldown';
 
-const RAW_CSS_SUFFIX = '?raw-css'
+const RAW_CSS_SUFFIX = '?raw-css';
 
 /**
  * Import `.css` files as raw text strings so the default screens can inject
@@ -17,18 +17,18 @@ function rawCss(): Plugin {
     name: 'ossido:raw-css',
     resolveId(id, importer) {
       if (importer && id.startsWith('.') && id.endsWith('.css')) {
-        return resolve(dirname(importer), id) + RAW_CSS_SUFFIX
+        return resolve(dirname(importer), id) + RAW_CSS_SUFFIX;
       }
-      return null
+      return null;
     },
     load(id) {
       if (id.endsWith(RAW_CSS_SUFFIX)) {
-        const file = id.slice(0, -RAW_CSS_SUFFIX.length)
-        return `export default ${JSON.stringify(readFileSync(file, 'utf8'))}`
+        const file = id.slice(0, -RAW_CSS_SUFFIX.length);
+        return `export default ${JSON.stringify(readFileSync(file, 'utf8'))}`;
       }
-      return null
+      return null;
     },
-  }
+  };
 }
 
 export default {
@@ -36,4 +36,4 @@ export default {
     entry: './src/index.ts',
   }),
   plugins: [rawCss()],
-}
+};

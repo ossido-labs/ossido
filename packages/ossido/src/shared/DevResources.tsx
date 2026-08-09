@@ -1,23 +1,23 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import type { OssidoConfigServer } from '../config'
+import type { OssidoConfigServer } from '../config';
 
-const DEFAULT_SERVER_CONFIG = { host: 'localhost', origin: null, port: 3000 }
-const VITE_PROXY_PATH = '/vite-server'
+const DEFAULT_SERVER_CONFIG = { host: 'localhost', origin: null, port: 3000 };
+const VITE_PROXY_PATH = '/vite-server';
 
 interface DevResourcesProps {
-  devServerConfig?: OssidoConfigServer
+  devServerConfig?: OssidoConfigServer;
 }
 
 export const DevResources = ({
   devServerConfig,
 }: DevResourcesProps): JSX.Element => {
-  const { host, origin, port } = devServerConfig ?? DEFAULT_SERVER_CONFIG
+  const { host, origin, port } = devServerConfig ?? DEFAULT_SERVER_CONFIG;
 
   const viteBaseUrl =
     origin != null
       ? `${origin}${VITE_PROXY_PATH}`
-      : `http://${host}:${port}${VITE_PROXY_PATH}`
+      : `http://${host}:${port}${VITE_PROXY_PATH}`;
 
   /**
    * These scripts must execute in order: the react-refresh preamble has to run
@@ -41,5 +41,5 @@ export const DevResources = ({
       <script type="module" src={`${viteBaseUrl}/@vite/client`}></script>
       <script type="module" src={`${viteBaseUrl}/client-main.tsx`}></script>
     </>
-  )
-}
+  );
+};

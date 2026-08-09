@@ -1,11 +1,11 @@
-import { defineConfig } from '@playwright/test'
+import { defineConfig } from '@playwright/test';
 
 import {
   ossidoBin,
   setupScript,
   sharedConfig,
   sharedWebServer,
-} from './playwright.shared'
+} from './playwright.shared';
 
 export default defineConfig({
   ...sharedConfig,
@@ -18,4 +18,4 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
   },
-})
+});

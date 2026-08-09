@@ -3,10 +3,10 @@
 
 # Ossido
 
-<img align="right" src="https://raw.githubusercontent.com/ChildishForces/ossido/main/assets/logo.png" width="160px">
+<img align="right" src="https://raw.githubusercontent.com/ossido-labs/ossido/main/assets/logo.png" width="160px">
 
-![](https://github.com/ChildishForces/ossido/actions/workflows/rust.yml/badge.svg)
-![](https://github.com/ChildishForces/ossido/actions/workflows/typescript.yml/badge.svg)
+![](https://github.com/ossido-labs/ossido/actions/workflows/rust.yml/badge.svg)
+![](https://github.com/ossido-labs/ossido/actions/workflows/typescript.yml/badge.svg)
 
 **Ossido is a full-stack web framework for building React applications using Rust as the backend with
 a strong focus on usability and performance.**
@@ -48,7 +48,7 @@ Create a new project with:
 ossido new [PROJECT_NAME]
 ```
 
-> You can optionally pass the --template (or -t) flag to directly start from a [template](https://github.com/ChildishForces/ossido/tree/main/examples)
+> You can optionally pass the --template (or -t) flag to directly start from a [template](https://github.com/ossido-labs/ossido/tree/main/examples)
 
 Now just install the dependencies with you favourite JS package manager (i.e. `npm install`) and start the development environment
 

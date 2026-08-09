@@ -1,12 +1,12 @@
 // src/components/PokemonLink.tsx
-import type { JSX } from 'react'
-import { Link } from 'ossido'
+import type { JSX } from 'react';
+import { Link } from 'ossido';
 
-import styles from './PokemonLink.module.css'
+import styles from './PokemonLink.module.css';
 
 interface PokemonLinkProps {
-  id: number
-  name: string
+  id: number;
+  name: string;
 }
 
 export default function PokemonLink({
@@ -21,5 +21,5 @@ export default function PokemonLink({
         alt=""
       />
     </Link>
-  )
+  );
 }

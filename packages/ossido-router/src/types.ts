@@ -1,11 +1,11 @@
-import type { ReactNode, ComponentType } from 'react'
-import type { ServerErrorSource } from 'ossido-ui'
+import type { ReactNode, ComponentType } from 'react';
+import type { ServerErrorSource } from 'ossido-ui';
 
-export type Mode = 'Dev' | 'Prod'
+export type Mode = 'Dev' | 'Prod';
 
 export interface Segment {
-  type: 'pathname' | 'param' | 'wildcard'
-  value: string
+  type: 'pathname' | 'param' | 'wildcard';
+  value: string;
 }
 
 /**
@@ -13,9 +13,9 @@ export interface Segment {
  * @see ossido {@link ServerPayloadLocation}
  */
 export interface ServerInitialLocation {
-  href: string
-  pathname: string
-  searchStr: string
+  href: string;
+  pathname: string;
+  searchStr: string;
 }
 
 /**
@@ -26,7 +26,7 @@ export interface ServerInitialLocation {
  * type. Layout/root components receive `children`.
  */
 export interface RouteProps {
-  children?: ReactNode
+  children?: ReactNode;
 }
 
 /**
@@ -42,15 +42,15 @@ export type RouteComponent = ComponentType<any> & {
    * so the component then renders synchronously). Present on lazily-loaded route
    * components; absent on eagerly-imported ones (e.g. the root layout).
    */
-  preload?: () => Promise<void>
+  preload?: () => Promise<void>;
   /**
    * Dev-only. Swap the resolved component behind a lazily-loaded route in place,
    * so an HMR update to the route module renders without re-running the dynamic
    * import. Set by the lazy-load wrapper; used by the generated route tree's hot
    * accept handler. Absent in prod and on eagerly-imported components.
    */
-  update?: (next: RouteComponent) => void
-}
+  update?: (next: RouteComponent) => void;
+};
 
 /**
  * Serialized Rust handler error, sent by the server (dev mode only) so a
@@ -58,17 +58,17 @@ export type RouteComponent = ComponentType<any> & {
  * @see crates/ossido/src/server_error.rs
  */
 export interface ServerErrorPayload {
-  name: string
-  message: string
-  stack?: string
-  source?: ServerErrorSource
+  name: string;
+  message: string;
+  stack?: string;
+  source?: ServerErrorSource;
 }
 
 /** A `loading.tsx` component. Rendered as a `<Suspense>` fallback (no props). */
-export type LoadingComponent = ComponentType
+export type LoadingComponent = ComponentType;
 
 /** A `not-found.tsx` component. Rendered when no route matches (no props). */
-export type NotFoundComponent = ComponentType
+export type NotFoundComponent = ComponentType;
 
 // The error UI and its types live in the design system (ossido-ui); re-exported
 // here so router consumers keep importing them from `ossido-router`.
@@ -77,4 +77,4 @@ export type {
   OssidoErrorWithSource,
   ServerErrorSource,
   ErrorComponent,
-} from 'ossido-ui'
+} from 'ossido-ui';

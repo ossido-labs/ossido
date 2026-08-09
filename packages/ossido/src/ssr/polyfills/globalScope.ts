@@ -1,5 +1,5 @@
 /**
- * The `ssr_rs` V8 runtime only exposes `globalThis` — it defines neither
+ * The `ossido_ssr` V8 runtime only exposes `globalThis` — it defines neither
  * `window` nor `global`.
  *
  * Some UMD-style polyfills install themselves onto whichever global object
@@ -26,9 +26,9 @@
  */
 declare global {
   // eslint-disable-next-line no-var
-  var global: typeof globalThis
+  var global: typeof globalThis;
 }
 
-;(globalThis as { global?: typeof globalThis }).global ??= globalThis
+(globalThis as { global?: typeof globalThis }).global ??= globalThis;
 
-export {}
+export {};

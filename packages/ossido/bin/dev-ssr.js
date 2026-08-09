@@ -1,5 +1,5 @@
 #!/usr/bin/env node
 
-import { developmentSSRBundle } from '../dist/esm/build/index.js'
+import { developmentSSRBundle } from '../dist/esm/build/index.js';
 
-developmentSSRBundle()
+developmentSSRBundle();

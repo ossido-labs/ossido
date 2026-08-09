@@ -1,3 +1,3 @@
 export default function PostsIndex() {
-  return <h1>Posts</h1>
+  return <h1>Posts</h1>;
 }

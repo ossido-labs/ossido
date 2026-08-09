@@ -1,10 +1,10 @@
-import type { Route } from '../route'
+import type { Route } from '../route';
 
-const DYNAMIC_PATH_REGEX = /\[(.*?)\]/
+const DYNAMIC_PATH_REGEX = /\[(.*?)\]/;
 
 interface DynamicRouteEntry {
-  route: string
-  segments: Array<string>
+  route: string;
+  segments: Array<string>;
 }
 
 /**
@@ -20,20 +20,20 @@ interface DynamicRouteEntry {
 const dynamicRoutesCache = new WeakMap<
   Record<string, Route>,
   Array<DynamicRouteEntry>
->()
+>();
 
 function getDynamicRoutes(
   routesById: Record<string, Route>,
 ): Array<DynamicRouteEntry> {
-  let cached = dynamicRoutesCache.get(routesById)
+  let cached = dynamicRoutesCache.get(routesById);
   if (!cached) {
     cached = Object.keys(routesById)
       .filter((route) => DYNAMIC_PATH_REGEX.test(route))
       .sort()
-      .map((route) => ({ route, segments: route.split('/').filter(Boolean) }))
-    dynamicRoutesCache.set(routesById, cached)
+      .map((route) => ({ route, segments: route.split('/').filter(Boolean) }));
+    dynamicRoutesCache.set(routesById, cached);
   }
-  return cached
+  return cached;
 }
 
 /**
@@ -42,10 +42,10 @@ function getDynamicRoutes(
  */
 export function sanitizePathname(pathname: string): string {
   if (pathname.endsWith('/') && pathname !== '/') {
-    return pathname.substring(0, pathname.length - 1)
+    return pathname.substring(0, pathname.length - 1);
   }
 
-  return pathname
+  return pathname;
 }
 
 /**
@@ -61,45 +61,45 @@ export function matchRoute(
   routesById: Record<string, Route>,
   pathname?: string,
 ): Route | undefined {
-  if (!pathname) return
+  if (!pathname) return;
 
-  pathname = sanitizePathname(pathname)
+  pathname = sanitizePathname(pathname);
 
-  if (routesById[pathname]) return routesById[pathname]
+  if (routesById[pathname]) return routesById[pathname];
 
-  const dynamicRoutes = getDynamicRoutes(routesById)
+  const dynamicRoutes = getDynamicRoutes(routesById);
 
-  if (!dynamicRoutes.length) return
+  if (!dynamicRoutes.length) return;
 
-  const pathSegments = pathname.split('/').filter(Boolean)
+  const pathSegments = pathname.split('/').filter(Boolean);
 
-  let match = undefined
+  let match = undefined;
 
   for (const { segments: dynamicRouteSegments } of dynamicRoutes) {
-    const routeSegmentsCollector: Array<string> = []
+    const routeSegmentsCollector: Array<string> = [];
 
     for (let i = 0; i < dynamicRouteSegments.length; i++) {
       if (dynamicRouteSegments[i]?.startsWith('[...')) {
-        routeSegmentsCollector.push(dynamicRouteSegments[i] ?? '')
-        match = `/${routeSegmentsCollector.join('/')}`
-        break
+        routeSegmentsCollector.push(dynamicRouteSegments[i] ?? '');
+        match = `/${routeSegmentsCollector.join('/')}`;
+        break;
       }
       if (
         dynamicRouteSegments[i] === pathSegments[i] ||
         DYNAMIC_PATH_REGEX.test(dynamicRouteSegments[i] || '')
       ) {
-        routeSegmentsCollector.push(dynamicRouteSegments[i] ?? '')
+        routeSegmentsCollector.push(dynamicRouteSegments[i] ?? '');
       } else {
-        break
+        break;
       }
     }
 
     if (routeSegmentsCollector.length === pathSegments.length) {
-      match = `/${routeSegmentsCollector.join('/')}`
-      break
+      match = `/${routeSegmentsCollector.join('/')}`;
+      break;
     }
   }
 
-  if (!match) return
-  return routesById[match]
+  if (!match) return;
+  return routesById[match];
 }

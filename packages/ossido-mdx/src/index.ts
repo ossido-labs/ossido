@@ -15,4 +15,4 @@
  * }
  * ```
  */
-export type { MDXComponents } from 'mdx/types'
+export type { MDXComponents } from 'mdx/types';

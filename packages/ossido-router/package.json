@@ -1,6 +1,6 @@
 {
   "name": "ossido-router",
-  "version": "0.20.0",
+  "version": "0.1.0",
   "description": "React routing component for the framework ossido. Ossido is the react/rust fullstack framework",
   "homepage": "https://ossido.dev",
   "scripts": {
@@ -15,11 +15,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ChildishForces/ossido.git",
+    "url": "git+https://github.com/ossido-labs/ossido.git",
     "directory": "packages/ossido-router"
   },
   "keywords": [],
-  "author": "Valerio Ageno",
+  "author": "Chris Schofield <chris@childishforces.com>",
   "license": "MIT",
   "type": "module",
   "types": "dist/esm/index.d.ts",
@@ -38,7 +38,8 @@
     "./package.json": "./package.json"
   },
   "peerDependencies": {
-    "react": ">=19.0.0"
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
   },
   "dependencies": {
     "react-intersection-observer": "^9.13.0",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@testing-library/react": "16.3.0",
     "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
     "@vitejs/plugin-react-swc": "4.3.2",
     "happy-dom": "18.0.1",
     "react": "^19.2.8",

@@ -1,12 +1,12 @@
 [package]
 name = "ossido_cli"
-version = "0.20.0"
+version = "0.1.0"
 edition = "2024"
-authors = ["V. Ageno <valerioageno@yahoo.it>"]
+authors = ["Chris Schofield <chris@childishforces.com>"]
 description = "Superfast React fullstack framework"
 homepage = "https://ossido.dev"
 keywords = ["react", "typescript", "fullstack", "web", "ssr"]
-repository = "https://github.com/ChildishForces/ossido"
+repository = "https://github.com/ossido-labs/ossido"
 readme = "../../README.md"
 license-file = "../../LICENSE.md"
 categories = ["web-programming"]
@@ -22,37 +22,39 @@ name = "ossido"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5.4", features = ["derive", "cargo"] }
-syn = { version = "2.0.100", features = ["full","extra-traits"] }
-tracing = "0.1.41"
-tracing-subscriber = {version = "0.3.19", features = ["env-filter"]}
-miette = "7.2.0"
+clap = { version = "4.6.6", features = ["derive", "cargo"] }
+syn = { version = "3.0.3", features = ["full","extra-traits"] }
+tracing = "0.1.44"
+tracing-subscriber = {version = "0.3.23", features = ["env-filter"]}
+miette = "7.6.0"
 
-colored = "3.0.0"
-once_cell = "1.19.0"
+colored = "3.1.1"
+once_cell = "1.21.4"
 watchexec = "5.0.0"
 watchexec-signals = "4.0.0"
 watchexec-events = "4.0.0"
 watchexec-supervisor = "3.0.0"
 tokio = { version = "1", features = ["full"] }
-serde = { version = "1.0.202", features = ["derive"] }
-glob = "0.3.1"
-regex = "1.10.4"
-reqwest = { version = "0.12.4", features = ["blocking", "json"] }
+serde = { version = "1.0.229", features = ["derive"] }
+glob = "0.3.4"
+regex = "1.13.1"
+# See the ossido crate's reqwest entry: keep native-tls to avoid 0.13's new
+# rustls/aws-lc build requirement (cmake + C toolchain).
+reqwest = { version = "0.13.4", default-features = false, features = ["native-tls", "charset", "http2", "system-proxy", "blocking", "json"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
-cliclack = "0.3"
+cliclack = "0.5"
 fs_extra = "1.3.0"
 http = "1.1.0"
-ossido_internal = {path = "../ossido_internal", version = "0.20.0"}
-spinners = "4.1.1"
-console = "0.16.0"
-convert_case = "0.8.0"
-quote = "1.0.45"
-prettyplease = "0.2.29"
+ossido_internal = {path = "../ossido_internal", version = "0.1.0"}
+spinners = "4.2.0"
+console = "0.16.4"
+convert_case = "0.11.0"
+quote = "1.0.47"
+prettyplease = "0.3.0"
 
 [dev-dependencies]
-wiremock = "0.6.2"
-tempfile = "3.14.0"
-assert_cmd = "2.0.16"
-serial_test = "3.0.0"
+wiremock = "0.6.5"
+tempfile = "3.27.0"
+assert_cmd = "2.2.2"
+serial_test = "4.0.1"
 

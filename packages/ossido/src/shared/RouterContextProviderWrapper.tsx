@@ -1,11 +1,11 @@
-import type { JSX } from 'react'
-import { RouterProvider } from 'ossido-router'
-import type { RouterInstanceType } from 'ossido-router'
+import type { JSX } from 'react';
+import { RouterProvider } from 'ossido-router';
+import type { RouterInstanceType } from 'ossido-router';
 
-import { useOssidoContextServerPayload } from './ossido-context'
+import { useOssidoContextServerPayload } from './ossido-context';
 
 interface RouterContextProviderWrapperProps {
-  router: RouterInstanceType
+  router: RouterInstanceType;
 }
 
 /**
@@ -18,7 +18,7 @@ interface RouterContextProviderWrapperProps {
 export function RouterContextProviderWrapper({
   router,
 }: RouterContextProviderWrapperProps): JSX.Element {
-  const serverPayload = useOssidoContextServerPayload()
+  const serverPayload = useOssidoContextServerPayload();
 
   return (
     <RouterProvider
@@ -32,5 +32,5 @@ export function RouterContextProviderWrapper({
       // mode would be `undefined` during hydration.
       mode={serverPayload.mode}
     />
-  )
+  );
 }

@@ -1,10 +1,10 @@
-import type { UserConfig } from 'tsdown'
+import type { UserConfig } from 'tsdown';
 
 interface BuildOptions {
   /** Entry file, e.g. `./src/index.ts` */
-  entry: string | Array<string>
+  entry: string | Array<string>;
   /** Optional build target, e.g. `es2022` */
-  target?: UserConfig['target']
+  target?: UserConfig['target'];
 }
 
 /**
@@ -32,5 +32,5 @@ export function defineBuildConfig({ entry, target }: BuildOptions): UserConfig {
     sourcemap: true,
     minify: false,
     target,
-  }
+  };
 }

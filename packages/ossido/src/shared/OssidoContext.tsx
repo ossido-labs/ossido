@@ -1,18 +1,18 @@
-import type { JSX, ReactNode } from 'react'
-import { useMemo } from 'react'
+import type { JSX, ReactNode } from 'react';
+import { useMemo } from 'react';
 
-import type { ServerPayload } from '../types'
-import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants'
+import type { ServerPayload } from '../types';
+import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants';
 
-import { OssidoContext, type OssidoContextValue } from './ossido-context'
+import { OssidoContext, type OssidoContextValue } from './ossido-context';
 
-const isServerSide = typeof window === 'undefined'
+const isServerSide = typeof window === 'undefined';
 
 interface OssidoContextProviderProps {
-  serverPayload?: ServerPayload
-  rawServerPayload?: string
+  serverPayload?: ServerPayload;
+  rawServerPayload?: string;
 
-  children: ReactNode
+  children: ReactNode;
 }
 
 /**
@@ -29,14 +29,14 @@ export function OssidoContextProvider({
     // At least one of these two should be defined
     const _serverPayload = (
       isServerSide ? serverPayload : window[SERVER_PAYLOAD_VARIABLE_NAME]
-    ) as ServerPayload
+    ) as ServerPayload;
 
     return {
       // Maybe this logic should be integrated using defaults
       serverPayload: _serverPayload,
       rawServerPayload,
-    }
-  }, [serverPayload, rawServerPayload])
+    };
+  }, [serverPayload, rawServerPayload]);
 
-  return <OssidoContext value={contextValue}>{children}</OssidoContext>
+  return <OssidoContext value={contextValue}>{children}</OssidoContext>;
 }

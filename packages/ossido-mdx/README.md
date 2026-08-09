@@ -16,14 +16,14 @@ Add the plugin to your ossido config:
 
 ```ts
 // ossido.config.ts
-import type { OssidoConfig } from 'ossido/config'
-import { ossidoMdx } from 'ossido-mdx/vite'
+import type { OssidoConfig } from 'ossido/config';
+import { ossidoMdx } from 'ossido-mdx/vite';
 
 const config: OssidoConfig = {
   vite: { plugins: [ossidoMdx()] },
-}
+};
 
-export default config
+export default config;
 ```
 
 That's it — `.mdx` files under `src/routes` now compile and render.
@@ -36,8 +36,8 @@ so there's no provider to render):
 
 ```tsx
 // src/mdx-components.tsx
-import type { MDXComponents } from 'ossido-mdx'
-import { Link } from 'ossido'
+import type { MDXComponents } from 'ossido-mdx';
+import { Link } from 'ossido';
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
@@ -46,7 +46,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     // per-file components (passed to a rendered <MDXContent components={...} />)
     // still win:
     ...components,
-  }
+  };
 }
 ```
 
@@ -58,7 +58,7 @@ The file is optional: until it exists, MDX renders with plain HTML elements.
 ossidoMdx({
   // forwarded to @mdx-js/rollup (remark/rehype plugins, etc.)
   mdxOptions: { remarkPlugins: [], rehypePlugins: [] },
-})
+});
 ```
 
 `providerImportSource` is managed by the plugin and can't be overridden.

@@ -1,4 +1,4 @@
-import { defineBuildConfig } from 'vite-config'
+import { defineBuildConfig } from 'vite-config';
 
 /**
  * Explicit `es2022` target to avoid transpiling class properties.
@@ -15,4 +15,4 @@ export default defineBuildConfig({
     './src/hydration/index.tsx',
   ],
   target: 'es2022',
-})
+});

@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::fs;
 use std::time::{Duration, Instant, SystemTime};
 
-use ssr_rs::{Ssr, SsrError};
+use ossido_ssr::{Ssr, SsrError};
 
 use crate::mode::{GLOBAL_MODE, Mode};
 
@@ -17,7 +17,7 @@ use crate::mode::{GLOBAL_MODE, Mode};
 /// each HTML chunk through the `__ssr_write` global as React produces it.
 /// [`Js::render_to_string`] drives the former; [`Js::render_stream`] the latter.
 ///
-/// Streaming is `ssr_rs`'s opt-in [`Ssr::streaming`] helper: it installs the
+/// Streaming is `ossido_ssr`'s opt-in [`Ssr::streaming`] helper: it installs the
 /// `__ssr_write` writer global and drives the render, delivering each chunk to
 /// the sink ossido passes (see [`Js::render_stream`]). ossido owns the sink and
 /// only *lends* it to the render — `Streaming::render` borrows it as
@@ -140,7 +140,7 @@ impl ProdJs {
     ) -> Result<(), SsrError> {
         Self::with_ssr(move |ssr| {
             crate::debug::time("ssr render", || {
-                // Lend the sink to the render; `ssr_rs` borrows it for the call.
+                // Lend the sink to the render; `ossido_ssr` borrows it for the call.
                 ssr.streaming(STREAM_WRITE_FN)?
                     .render(RENDER_STREAM_FN, params, &mut on_chunk)
             })
@@ -242,7 +242,7 @@ impl DevJs {
     ) -> Result<(), SsrError> {
         let result = Self::with_ssr(move |ssr| match ssr {
             Some(ssr) => crate::debug::time("ssr render", || {
-                // Lend the sink to the render; `ssr_rs` borrows it for the call.
+                // Lend the sink to the render; `ossido_ssr` borrows it for the call.
                 ssr.streaming(STREAM_WRITE_FN)?
                     .render(RENDER_STREAM_FN, params, &mut on_chunk)
             }),

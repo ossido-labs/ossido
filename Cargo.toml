@@ -6,7 +6,8 @@ members = [
   "crates/ossido_cli",
   "crates/ossido_internal",
   "crates/ossido",
-  "crates/ossido_macros"
+  "crates/ossido_macros",
+  "crates/ossido_ssr"
 ]
 exclude = [
   "examples/with-mdx",

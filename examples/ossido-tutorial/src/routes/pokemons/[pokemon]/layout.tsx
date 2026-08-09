@@ -1,5 +1,5 @@
-import * as React from 'react'
-import { Link } from 'ossido'
+import * as React from 'react';
+import { Link } from 'ossido';
 
 export default function PokemonPageLayout({
   children,
@@ -11,5 +11,5 @@ export default function PokemonPageLayout({
       </Link>
       {children}
     </>
-  )
+  );
 }

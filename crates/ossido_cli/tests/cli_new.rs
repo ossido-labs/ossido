@@ -165,7 +165,7 @@ async fn it_reports_an_actionable_error_when_the_version_tag_is_missing() {
     // Emulate an unpublished version: the tag ref lookup 404s.
     Mock::given(method("GET"))
         .and(path(format!(
-            "repos/ChildishForces/ossido/git/ref/tags/v{version}"
+            "repos/ossido-labs/ossido/git/ref/tags/v{version}"
         )))
         .respond_with(
             ResponseTemplate::new(404)

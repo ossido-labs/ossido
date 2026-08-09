@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect } from 'react';
 
-import { useRouter } from '../hooks/useRouter'
+import { useRouter } from '../hooks/useRouter';
 
 interface RedirectProps {
-  to: string
+  to: string;
 }
 
 /**
@@ -13,11 +13,11 @@ interface RedirectProps {
  * become a back-button trap.
  */
 export function Redirect({ to }: RedirectProps): null {
-  const { replace } = useRouter()
+  const { replace } = useRouter();
 
   useEffect(() => {
-    replace(to)
-  }, [replace, to])
+    replace(to);
+  }, [replace, to]);
 
-  return null
+  return null;
 }

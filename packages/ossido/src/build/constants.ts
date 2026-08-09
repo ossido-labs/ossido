@@ -1,5 +1,5 @@
-export const DOT_OSSIDO_FOLDER_NAME = '.ossido'
-export const CONFIG_FOLDER_NAME = 'config'
-export const CONFIG_FILE_NAME = 'config.mjs'
-export const SERVER_CONFIG_NAME = 'config.json'
-export const ENV_PREFIX = 'OSSIDO_PUBLIC_'
+export const DOT_OSSIDO_FOLDER_NAME = '.ossido';
+export const CONFIG_FOLDER_NAME = 'config';
+export const CONFIG_FILE_NAME = 'config.mjs';
+export const SERVER_CONFIG_NAME = 'config.json';
+export const ENV_PREFIX = 'OSSIDO_PUBLIC_';

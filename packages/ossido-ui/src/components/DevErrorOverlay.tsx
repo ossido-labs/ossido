@@ -1,10 +1,10 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import type { OssidoErrorProps } from '../types'
+import type { OssidoErrorProps } from '../types';
 
-import { BaseStyles } from './BaseStyles'
-import { DevErrorContent } from './DevErrorContent'
-import { DEV_ERROR_STYLES } from './devErrorStyles'
+import { BaseStyles } from './BaseStyles';
+import { DevErrorContent } from './DevErrorContent';
+import { DEV_ERROR_STYLES } from './devErrorStyles';
 
 /**
  * Standalone single-error overlay window, presented as a floating window over a
@@ -38,5 +38,5 @@ export function DevErrorOverlay({
         </div>
       </div>
     </div>
-  )
+  );
 }

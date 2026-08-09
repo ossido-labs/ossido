@@ -24,7 +24,7 @@
     "check-examples": "bun run examples:format && bun run examples:typecheck",
     "check-all": "bun run check-packages && bun run check-examples && bun run repo:root:format",
     "registry:start": "bunx verdaccio@6 --config scripts/local-registry/config.yaml",
-    "registry:publish": "node scripts/local-registry/publish.mjs"
+    "registry:publish": "bun scripts/local-registry/publish.ts"
   },
   "workspaces": {
     "packages": [
@@ -37,7 +37,7 @@
   "overrides": {
     "@types/node": "22.16.5"
   },
-  "author": "Valerio Ageno",
+  "author": "Chris Schofield <chris@childishforces.com>",
   "license": "MIT",
   "devDependencies": {
     "@oxlint/plugins": "1.76.0",

@@ -1,16 +1,16 @@
-import type { JSX, ReactNode } from 'react'
+import type { JSX, ReactNode } from 'react';
 
-import { BaseStyles } from './BaseStyles'
+import { BaseStyles } from './BaseStyles';
 
 interface DefaultScreenProps {
   /** ARIA role for the container (e.g. `alert` for the error fallback). */
-  role?: string
+  role?: string;
   /** Small uppercase pill above the title (e.g. `Error`, `404`). */
-  badge: string
+  badge: string;
   /** The screen heading. */
-  title: string
+  title: string;
   /** Message paragraph(s) and action(s) — use `ossido-screen-*` classes. */
-  children: ReactNode
+  children: ReactNode;
 }
 
 // Matches the DevErrorOverlay's visual language (dark canvas, accent badge and
@@ -74,7 +74,7 @@ const STYLES = `
   text-decoration: none;
 }
 .ossido-screen-action:hover { background: var(--ossido-color-surface-hover); }
-`
+`;
 
 /**
  * Shared shell for the framework's full-page default screens — the production
@@ -98,5 +98,5 @@ export function DefaultScreen({
         {children}
       </div>
     </div>
-  )
+  );
 }

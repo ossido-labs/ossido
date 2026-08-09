@@ -1,6 +1,6 @@
-import { defineRule, eslintCompatPlugin } from '@oxlint/plugins'
-import type { Context, RuleMeta } from '@oxlint/plugins'
-import reactRefresh from 'eslint-plugin-react-refresh'
+import { defineRule, eslintCompatPlugin } from '@oxlint/plugins';
+import type { Context, RuleMeta } from '@oxlint/plugins';
+import reactRefresh from 'eslint-plugin-react-refresh';
 
 // eslint-plugin-react-refresh authors the rule with ESLint's per-file
 // `create(context)` API, doing all its work in a single `Program` visitor. We
@@ -10,24 +10,24 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 // source) at `create` time, so a fresh instance is created for each `Program`
 // (i.e. per file) — reusing one instance across files reports nothing.
 interface EslintRuleModule {
-  meta?: RuleMeta
-  create: (context: unknown) => { Program?: (node: unknown) => void }
+  meta?: RuleMeta;
+  create: (context: unknown) => { Program?: (node: unknown) => void };
 }
 
 const eslintRule = reactRefresh.rules[
   'only-export-components'
-] as unknown as EslintRuleModule
+] as unknown as EslintRuleModule;
 
 const rule = defineRule({
   meta: eslintRule.meta,
   createOnce(context: Context) {
     return {
       Program(node): void {
-        eslintRule.create(context).Program?.(node)
+        eslintRule.create(context).Program?.(node);
       },
-    }
+    };
   },
-})
+});
 
 /**
  * Oxlint (and ESLint) plugin for ossido projects.
@@ -64,6 +64,6 @@ const rule = defineRule({
 const plugin = eslintCompatPlugin({
   meta: { name: 'react-refresh' },
   rules: { 'only-export-components': rule },
-})
+});
 
-export default plugin
+export default plugin;

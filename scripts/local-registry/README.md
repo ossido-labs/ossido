@@ -22,7 +22,7 @@ bun run registry:publish
 
 Re-runnable any time you change a package — it rebuilds, unpublishes the prior
 version, and republishes. It uses `bun publish`, which rewrites each
-`workspace:*` dependency to the concrete version (e.g. `ossido-router: 0.20.0`)
+`workspace:*` dependency to the concrete version (e.g. `ossido-router: 0.1.0`)
 so the interlinks resolve from the registry. (`npm publish` does **not** do this
 rewrite in this workspace — hence bun.)
 
@@ -34,16 +34,16 @@ registry=http://localhost:4873/
 
 then install as usual (`npm install` / `bun install`). The Ossido packages come
 from the local registry; everything else is proxied from npmjs. A project made
-with `ossido new` already pins `"ossido": "0.20.0"`, so it just works.
+with `ossido new` already pins `"ossido": "0.1.0"`, so it just works.
 
 ## How it works
 
 - **`config.yaml`** — the `ossido` / `ossido-*` package rules have **no** uplink,
-  so those names are served *only* from local storage (an unpublished one fails
+  so those names are served _only_ from local storage (an unpublished one fails
   fast rather than silently resolving some unrelated package on npmjs). The
   catch-all `**` rule proxies to the `npmjs` uplink. `publish: $all` allows
   anonymous publish, so no login is needed for local dev.
-- **`publish.mjs`** — builds all packages, then for each publishes with `bun`.
+- **`publish.ts`** — builds all packages, then for each publishes with `bun`.
   It writes a throwaway `.npmrc` at the repo root for the registry URL + a dummy
   auth token (Verdaccio treats an unknown token as anonymous), backing up and
   restoring any pre-existing root `.npmrc`.

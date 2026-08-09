@@ -1,17 +1,17 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import type { JSX } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { JSX } from 'react';
+import { createPortal } from 'react-dom';
 
-import { BaseStyles } from './BaseStyles'
-import { DevErrorContent } from './DevErrorContent'
-import { DevBuildErrorContent } from './DevBuildErrorContent'
-import { DEV_ERROR_STYLES } from './devErrorStyles'
+import { BaseStyles } from './BaseStyles';
+import { DevErrorContent } from './DevErrorContent';
+import { DevBuildErrorContent } from './DevBuildErrorContent';
+import { DEV_ERROR_STYLES } from './devErrorStyles';
 import type {
   DevErrorEntry,
   DevErrorKind,
   DevOverlayCorner,
-} from './devErrorStore'
-import { DEV_OVERLAY_CORNERS, devErrorStore } from './devErrorStore'
+} from './devErrorStore';
+import { DEV_OVERLAY_CORNERS, devErrorStore } from './devErrorStore';
 
 /**
  * Development-only host for the unified error overlay and its persistent dev
@@ -33,14 +33,14 @@ const KIND_LABEL: Record<DevErrorKind, string> = {
   uncaught: 'Uncaught error',
   unhandledrejection: 'Unhandled rejection',
   build: 'Build error',
-}
+};
 
 const CORNER_LABEL: Record<DevOverlayCorner, string> = {
   'top-left': 'Top left',
   'top-right': 'Top right',
   'bottom-left': 'Bottom left',
   'bottom-right': 'Bottom right',
-}
+};
 
 /**
  * React dispatches these to `window` when server rendering fails and it recovers
@@ -53,22 +53,22 @@ const IGNORED_UNCAUGHT_MESSAGES = [
   'Switched to client rendering',
   'error during server rendering',
   'hydrating but received',
-]
+];
 
 function isIgnorableUncaught(error: Error): boolean {
   return IGNORED_UNCAUGHT_MESSAGES.some((needle) =>
     error.message.includes(needle),
-  )
+  );
 }
 
 /** Normalize an unhandled rejection reason into an `Error`. */
 function toError(reason: unknown): Error {
-  if (reason instanceof Error) return reason
+  if (reason instanceof Error) return reason;
   const error = new Error(
     typeof reason === 'string' ? reason : JSON.stringify(reason),
-  )
-  error.name = 'UnhandledRejection'
-  return error
+  );
+  error.name = 'UnhandledRejection';
+  return error;
 }
 
 function Styles(): JSX.Element {
@@ -77,19 +77,19 @@ function Styles(): JSX.Element {
       <BaseStyles />
       <style>{DEV_ERROR_STYLES}</style>
     </>
-  )
+  );
 }
 
 function EntryBody({ entry }: { entry: DevErrorEntry }): JSX.Element | null {
   if (entry.kind === 'build' && entry.build) {
-    return <DevBuildErrorContent build={entry.build} />
+    return <DevBuildErrorContent build={entry.build} />;
   }
   if (entry.error) {
     // Keyed by entry id so paging to a different error remounts with fresh
     // resolution state (but a re-render of the same entry does not).
-    return <DevErrorContent key={entry.id} error={entry.error} />
+    return <DevErrorContent key={entry.id} error={entry.error} />;
   }
-  return null
+  return null;
 }
 
 function ChevronLeftIcon(): JSX.Element {
@@ -105,7 +105,7 @@ function ChevronLeftIcon(): JSX.Element {
     >
       <path d="M15 18l-6-6 6-6" />
     </svg>
-  )
+  );
 }
 
 function ChevronRightIcon(): JSX.Element {
@@ -121,7 +121,7 @@ function ChevronRightIcon(): JSX.Element {
     >
       <path d="M9 6l6 6-6 6" />
     </svg>
-  )
+  );
 }
 
 /** The same lightning bolt Ossido prints in the console. */
@@ -130,13 +130,13 @@ function BoltIcon(): JSX.Element {
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" />
     </svg>
-  )
+  );
 }
 
 function DevErrorOverlay({ count }: { count: number }): JSX.Element {
-  const state = devErrorStore.getSnapshot()
-  const activeIndex = Math.min(state.activeIndex, count - 1)
-  const entry = state.entries[activeIndex] as DevErrorEntry
+  const state = devErrorStore.getSnapshot();
+  const activeIndex = Math.min(state.activeIndex, count - 1);
+  const entry = state.entries[activeIndex] as DevErrorEntry;
 
   return (
     <div
@@ -173,7 +173,9 @@ function DevErrorOverlay({ count }: { count: number }): JSX.Element {
           <span className="ossido-err-pager-count">
             {activeIndex + 1} of {count}
           </span>
-          <span className="ossido-err-pager-kind">{KIND_LABEL[entry.kind]}</span>
+          <span className="ossido-err-pager-kind">
+            {KIND_LABEL[entry.kind]}
+          </span>
           {entry.occurrences > 1 && (
             <span
               className="ossido-err-pager-occurrences"
@@ -214,7 +216,7 @@ function DevErrorOverlay({ count }: { count: number }): JSX.Element {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function DevIndicator({
@@ -222,9 +224,9 @@ function DevIndicator({
   menuOpen,
   position,
 }: {
-  count: number
-  menuOpen: boolean
-  position: DevOverlayCorner
+  count: number;
+  menuOpen: boolean;
+  position: DevOverlayCorner;
 }): JSX.Element {
   return (
     <>
@@ -307,7 +309,7 @@ function DevIndicator({
         </button>
       </div>
     </>
-  )
+  );
 }
 
 export function DevErrorOverlayHost(): JSX.Element | null {
@@ -315,16 +317,16 @@ export function DevErrorOverlayHost(): JSX.Element | null {
     devErrorStore.subscribe,
     devErrorStore.getSnapshot,
     devErrorStore.getServerSnapshot,
-  )
+  );
 
   // The indicator is a client-only portal, so it renders nothing until after
   // mount. This keeps the hydration render identical to the server (which
   // renders nothing), avoiding a hydration mismatch now that the badge is shown
   // even with zero errors.
-  const [mounted, setMounted] = useState(false)
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   // Collect uncaught errors and unhandled rejections (React render errors and
   // build errors arrive through their own channels). The source-highlighting
@@ -332,38 +334,38 @@ export function DevErrorOverlayHost(): JSX.Element | null {
   useEffect(() => {
     const onError = (event: ErrorEvent): void => {
       const error =
-        event.error instanceof Error ? event.error : new Error(event.message)
-      if (isIgnorableUncaught(error)) return
-      devErrorStore.addJsError('uncaught', error)
-    }
+        event.error instanceof Error ? event.error : new Error(event.message);
+      if (isIgnorableUncaught(error)) return;
+      devErrorStore.addJsError('uncaught', error);
+    };
     const onRejection = (event: PromiseRejectionEvent): void => {
-      devErrorStore.addJsError('unhandledrejection', toError(event.reason))
-    }
-    window.addEventListener('error', onError)
-    window.addEventListener('unhandledrejection', onRejection)
+      devErrorStore.addJsError('unhandledrejection', toError(event.reason));
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
     return (): void => {
-      window.removeEventListener('error', onError)
-      window.removeEventListener('unhandledrejection', onRejection)
-    }
-  }, [])
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
 
   // Esc closes the overlay (or the indicator menu).
   useEffect(() => {
-    if (!state.overlayOpen && !state.menuOpen) return
+    if (!state.overlayOpen && !state.menuOpen) return;
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      if (state.overlayOpen) devErrorStore.closeOverlay()
-      else devErrorStore.closeMenu()
-    }
-    document.addEventListener('keydown', onKeyDown)
+      if (event.key !== 'Escape') return;
+      if (state.overlayOpen) devErrorStore.closeOverlay();
+      else devErrorStore.closeMenu();
+    };
+    document.addEventListener('keydown', onKeyDown);
     return (): void => {
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [state.overlayOpen, state.menuOpen])
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [state.overlayOpen, state.menuOpen]);
 
-  if (typeof document === 'undefined' || !mounted) return null
+  if (typeof document === 'undefined' || !mounted) return null;
 
-  const count = state.entries.length
+  const count = state.entries.length;
 
   // A new error auto-opens the full overlay.
   if (state.overlayOpen && count > 0) {
@@ -373,12 +375,12 @@ export function DevErrorOverlayHost(): JSX.Element | null {
         <DevErrorOverlay count={count} />
       </>,
       document.body,
-    )
+    );
   }
 
   // Otherwise the persistent indicator — hidden only when the user hid it for
   // this session AND there are no errors to surface.
-  if (state.badgeHidden && count === 0) return null
+  if (state.badgeHidden && count === 0) return null;
 
   return createPortal(
     <>
@@ -390,5 +392,5 @@ export function DevErrorOverlayHost(): JSX.Element | null {
       />
     </>,
     document.body,
-  )
+  );
 }

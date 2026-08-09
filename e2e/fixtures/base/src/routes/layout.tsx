@@ -1,8 +1,8 @@
-import type { ReactNode, JSX } from 'react'
-import { OssidoScripts } from 'ossido'
+import type { ReactNode, JSX } from 'react';
+import { OssidoScripts } from 'ossido';
 
 interface RootLayoutProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
@@ -13,5 +13,5 @@ export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
         <OssidoScripts />
       </body>
     </html>
-  )
+  );
 }

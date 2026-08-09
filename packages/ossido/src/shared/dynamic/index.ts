@@ -1,2 +1,2 @@
-export { dynamic } from './dynamic'
-export { RouteLazyLoading } from './RouteLazyLoading'
+export { dynamic } from './dynamic';
+export { RouteLazyLoading } from './RouteLazyLoading';

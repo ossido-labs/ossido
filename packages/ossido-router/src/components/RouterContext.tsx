@@ -1,27 +1,32 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext } from 'react';
 
-import type { Router } from '../router'
-import type { ServerInitialLocation } from '../types'
+import type { Router } from '../router';
+import type { ServerInitialLocation } from '../types';
 
 /** How to reflect a committed navigation in the browser (history + scroll). */
 export interface NavigationCommitOptions {
-  history?: { type: 'pushState' | 'replaceState'; path: string }
-  scroll?: boolean
+  history?: { type: 'pushState' | 'replaceState'; path: string };
+  scroll?: boolean;
+  /**
+   * Override the app's `viewTransitions` config for this navigation: `true`
+   * forces a view transition, `false` skips it. Defaults to the config value.
+   */
+  viewTransition?: boolean;
 }
 
-const isServerSide = typeof window === 'undefined'
+const isServerSide = typeof window === 'undefined';
 
 export interface ParsedLocation {
-  href: string
-  pathname: string
-  search: Record<string, string>
-  searchStr: string
-  hash: string
+  href: string;
+  pathname: string;
+  search: Record<string, string>;
+  searchStr: string;
+  hash: string;
 }
 
 export interface RouterContextValue {
-  router: Router
-  location: ParsedLocation
+  router: Router;
+  location: ParsedLocation;
   /**
    * Incremented on every navigation (and on error retry / a manual
    * `refetchProps`). Combined with the
@@ -32,7 +37,7 @@ export interface RouterContextValue {
    * during the initial mount — otherwise the boundary would remount and flash
    * the loading fallback over server-rendered content (hydration mismatch).
    */
-  navigationId: number
+  navigationId: number;
   /**
    * Start a navigation to `loc`. Unless the destination has a `loading.tsx`,
    * its data is prefetched first and the navigation is only committed once the
@@ -43,15 +48,15 @@ export interface RouterContextValue {
   updateLocation: (
     loc: ParsedLocation,
     options?: NavigationCommitOptions,
-  ) => void
+  ) => void;
   /**
    * Re-run the current route's data load (a refetch). Used by the error
    * boundary `reset` and by `useRouter().refetchProps`.
    */
-  retry: () => void
+  retry: () => void;
 }
 
-export const RouterContext = createContext({} as RouterContextValue)
+export const RouterContext = createContext({} as RouterContextValue);
 
 export function getInitialLocation(
   serverPayloadLocation: ServerInitialLocation,
@@ -65,22 +70,22 @@ export function getInitialLocation(
       search: Object.fromEntries(
         new URLSearchParams(serverPayloadLocation.searchStr),
       ),
-    }
+    };
   }
 
-  const { pathname, hash, href, search } = window.location
+  const { pathname, hash, href, search } = window.location;
   return {
     pathname,
     hash,
     href,
     searchStr: search,
     search: Object.fromEntries(new URLSearchParams(search)),
-  }
+  };
 }
 
 /**
  * @warning THIS SHOULD NOT BE EXPOSED TO USERLAND
  */
 export function useRouterContext(): RouterContextValue {
-  return useContext(RouterContext)
+  return useContext(RouterContext);
 }

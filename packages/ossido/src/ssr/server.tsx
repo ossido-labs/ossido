@@ -24,51 +24,51 @@
  * (best for speed and code quality).
  *
  * This function might be a good entry point for adding such polyfills
- * https://docs.rs/ssr_rs/latest/ssr_rs/struct.Ssr.html#method.add_global_fn
+ * (see `Ssr::add_global_fn` in crates/ossido_ssr/src/ssr.rs)
  */
 // Must run before the polyfills below: aliases `global` to `globalThis` so
 // their UMD init IIFEs find a valid scope in the `window`/`global`-less
-// ssr_rs V8 runtime instead of dereferencing `undefined`.
-import './polyfills/globalScope'
-import 'fast-text-encoding'
-import 'url-search-params-polyfill'
+// ossido_ssr V8 runtime instead of dereferencing `undefined`.
+import './polyfills/globalScope';
+import 'fast-text-encoding';
+import 'url-search-params-polyfill';
 
 /* eslint-disable import/order, import/newline-after-import */
-import { MessageChannelPolyfill } from './polyfills/MessageChannel'
-;(function (
+import { MessageChannelPolyfill } from './polyfills/MessageChannel';
+(function (
   scope: Partial<Pick<typeof globalThis, 'MessageChannel'>> = {},
 ): void {
-  scope['MessageChannel'] = scope['MessageChannel'] ?? MessageChannelPolyfill
-})(this)
+  scope['MessageChannel'] = scope['MessageChannel'] ?? MessageChannelPolyfill;
+})(this);
 /* eslint-enable import/order, import/newline-after-import */
 // #endregion POLYFILLS
 
-import type { ReadableStream } from 'node:stream/web'
+import type { ReadableStream } from 'node:stream/web';
 
-import type { JSX } from 'react'
-import { renderToReadableStream } from 'react-dom/server'
-import { createRouter, preloadRouteChain } from 'ossido-router'
-import type { createRoute } from 'ossido-router'
+import type { JSX } from 'react';
+import { renderToReadableStream } from 'react-dom/server';
+import { createRouter, preloadRouteChain } from 'ossido-router';
+import type { createRoute } from 'ossido-router';
 
-import { OssidoEntryPoint } from '../shared/OssidoEntryPoint'
-import type { ServerPayload } from '../types'
+import { OssidoEntryPoint } from '../shared/OssidoEntryPoint';
+import type { ServerPayload } from '../types';
 
-import { streamToString, createUtf8Streamer } from './utils'
+import { streamToString, createUtf8Streamer } from './utils';
 
-type RouteTree = ReturnType<typeof createRoute>
+type RouteTree = ReturnType<typeof createRoute>;
 
 /**
- * Chunk sink injected by the Rust `ssr_rs` runtime for streaming renders (see
+ * Chunk sink injected by the Rust `ossido_ssr` runtime for streaming renders (see
  * `Ssr::render_to_stream`). Each call hands one HTML fragment to Rust, which
  * forwards it to the client immediately instead of buffering the whole page.
  */
-declare const __ssr_write: ((chunk: string) => void) | undefined
+declare const __ssr_write: ((chunk: string) => void) | undefined;
 
 interface ServerSideRenderer {
   /** Buffered render — resolves the whole page to a single HTML string. */
-  renderFn: (payload: string | undefined) => Promise<string>
+  renderFn: (payload: string | undefined) => Promise<string>;
   /** Streaming render — flushes each HTML chunk via `__ssr_write`. */
-  renderStream: (payload: string | undefined) => Promise<void>
+  renderStream: (payload: string | undefined) => Promise<void>;
 }
 
 export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
@@ -82,9 +82,9 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
   // every cold load). In the bundled SSR output the dynamic imports are
   // inlined, so this resolves in a microtask.
   const element = async (payload: string | undefined): Promise<JSX.Element> => {
-    const serverPayload = (payload ? JSON.parse(payload) : {}) as ServerPayload
-    const router = createRouter({ routeTree })
-    await preloadRouteChain(router, serverPayload.location?.pathname)
+    const serverPayload = (payload ? JSON.parse(payload) : {}) as ServerPayload;
+    const router = createRouter({ routeTree });
+    await preloadRouteChain(router, serverPayload.location?.pathname);
     return (
       // `rawServerPayload` is the exact JSON Rust already produced; passing it
       // lets `OssidoScripts` embed it verbatim instead of re-stringifying the
@@ -94,8 +94,8 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
         serverPayload={serverPayload}
         rawServerPayload={payload}
       />
-    )
-  }
+    );
+  };
 
   return {
     /**
@@ -104,12 +104,12 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
      * anywhere the caller needs the complete HTML up front.
      */
     async renderFn(payload: string | undefined): Promise<string> {
-      const stream = await renderToReadableStream(await element(payload))
-      await stream.allReady
+      const stream = await renderToReadableStream(await element(payload));
+      await stream.allReady;
       return await streamToString(
         // ReadableStream should be implemented in node)
         stream as unknown as ReadableStream<Uint8Array>,
-      )
+      );
     },
 
     /**
@@ -120,20 +120,20 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
      * send a 500 instead of a partial 200 in that case.
      */
     async renderStream(payload: string | undefined): Promise<void> {
-      const write = __ssr_write
+      const write = __ssr_write;
       if (typeof write !== 'function') {
-        throw new Error('__ssr_write is not registered by the runtime')
+        throw new Error('__ssr_write is not registered by the runtime');
       }
 
-      const stream = await renderToReadableStream(await element(payload))
+      const stream = await renderToReadableStream(await element(payload));
 
-      const streamer = createUtf8Streamer()
+      const streamer = createUtf8Streamer();
       for await (const chunk of stream as unknown as ReadableStream<Uint8Array>) {
-        const text = streamer.push(chunk)
-        if (text) write(text)
+        const text = streamer.push(chunk);
+        if (text) write(text);
       }
-      const tail = streamer.flush()
-      if (tail) write(tail)
+      const tail = streamer.flush();
+      if (tail) write(tail);
     },
-  }
+  };
 }

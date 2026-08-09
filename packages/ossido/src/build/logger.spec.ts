@@ -1,77 +1,77 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createOssidoViteLogger, feLog } from './logger'
+import { createOssidoViteLogger, feLog } from './logger';
 
 describe('feLog', () => {
   afterEach(() => {
-    vi.restoreAllMocks()
-  })
+    vi.restoreAllMocks();
+  });
 
   it('prints a single `[FE]`-tagged line containing the level and message', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    feLog('INFO', 'hello world')
+    feLog('INFO', 'hello world');
 
-    expect(spy).toHaveBeenCalledTimes(1)
-    const line = spy.mock.calls[0]?.[0] as string
-    expect(line).toContain('[FE]')
-    expect(line).toContain('INFO')
-    expect(line).toContain('- hello world')
-  })
-})
+    expect(spy).toHaveBeenCalledTimes(1);
+    const line = spy.mock.calls[0]?.[0] as string;
+    expect(line).toContain('[FE]');
+    expect(line).toContain('INFO');
+    expect(line).toContain('- hello world');
+  });
+});
 
 describe('createOssidoViteLogger', () => {
   afterEach(() => {
-    vi.restoreAllMocks()
-  })
+    vi.restoreAllMocks();
+  });
 
   it('emits all levels at the default `info` threshold', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const logger = createOssidoViteLogger('info')
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const logger = createOssidoViteLogger('info');
 
-    logger.info('an info')
-    logger.warn('a warn')
-    logger.error('an error')
+    logger.info('an info');
+    logger.warn('a warn');
+    logger.error('an error');
 
-    expect(spy).toHaveBeenCalledTimes(3)
-  })
+    expect(spy).toHaveBeenCalledTimes(3);
+  });
 
   it('suppresses info and warn at the `error` threshold', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const logger = createOssidoViteLogger('error')
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const logger = createOssidoViteLogger('error');
 
-    logger.info('dropped')
-    logger.warn('dropped')
-    logger.error('kept')
+    logger.info('dropped');
+    logger.warn('dropped');
+    logger.error('kept');
 
-    expect(spy).toHaveBeenCalledTimes(1)
-    expect(spy.mock.calls[0]?.[0]).toContain('- kept')
-  })
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0]?.[0]).toContain('- kept');
+  });
 
   it('suppresses everything at the `silent` threshold', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const logger = createOssidoViteLogger('silent')
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const logger = createOssidoViteLogger('silent');
 
-    logger.info('x')
-    logger.warn('x')
-    logger.error('x')
+    logger.info('x');
+    logger.warn('x');
+    logger.error('x');
 
-    expect(spy).not.toHaveBeenCalled()
-  })
+    expect(spy).not.toHaveBeenCalled();
+  });
 
   it('sets `hasWarned` when a warning or error is logged', () => {
-    vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const logger = createOssidoViteLogger('info')
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const logger = createOssidoViteLogger('info');
 
-    expect(logger.hasWarned).toBe(false)
-    logger.warn('careful')
-    expect(logger.hasWarned).toBe(true)
-  })
+    expect(logger.hasWarned).toBe(false);
+    logger.warn('careful');
+    expect(logger.hasWarned).toBe(true);
+  });
 
   it('never clears the screen and reports no error logged', () => {
-    const logger = createOssidoViteLogger('info')
+    const logger = createOssidoViteLogger('info');
     // Ossido owns the console, so `clearScreen` is a no-op and does not throw.
-    expect(() => logger.clearScreen('info')).not.toThrow()
-    expect(logger.hasErrorLogged(new Error('boom'))).toBe(false)
-  })
-})
+    expect(() => logger.clearScreen('info')).not.toThrow();
+    expect(logger.hasErrorLogged(new Error('boom'))).toBe(false);
+  });
+});

@@ -1,6 +1,6 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import baseCss from './base.css'
+import baseCss from './base.css';
 
 /**
  * Injects the shared design tokens ({@link file://./base.css}) — colours,
@@ -9,5 +9,5 @@ import baseCss from './base.css'
  * screen so it is self-contained (no dependency on the app's stylesheet).
  */
 export function BaseStyles(): JSX.Element {
-  return <style>{baseCss}</style>
+  return <style>{baseCss}</style>;
 }

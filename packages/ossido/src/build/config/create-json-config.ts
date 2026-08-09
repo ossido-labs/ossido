@@ -1,19 +1,19 @@
-import fs from 'fs/promises'
-import path from 'path'
+import fs from 'fs/promises';
+import path from 'path';
 
-import type { InternalOssidoConfig } from '../types'
+import type { InternalOssidoConfig } from '../types';
 
 import {
   DOT_OSSIDO_FOLDER_NAME,
   CONFIG_FOLDER_NAME,
   SERVER_CONFIG_NAME,
-} from '../constants'
+} from '../constants';
 
 const CONFIG_PATH = path.join(
   DOT_OSSIDO_FOLDER_NAME,
   CONFIG_FOLDER_NAME,
   SERVER_CONFIG_NAME,
-)
+);
 /**
  * Strip the build-time-only, non-serializable properties before the config is
  * written to JSON for the Rust server/client: `vite` (plugins are functions) and
@@ -42,8 +42,8 @@ function removeNonSerializableProperties(
    * @see https://github.com/tuono-labs/tuono/issues/414
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { vite, build, ...configRest } = config
-  return structuredClone(configRest)
+  const { vite, build, ...configRest } = config;
+  return structuredClone(configRest);
 }
 
 /**
@@ -57,11 +57,11 @@ function removeNonSerializableProperties(
 export async function createJsonConfig(
   config: InternalOssidoConfig,
 ): Promise<void> {
-  const jsonConfig = removeNonSerializableProperties(config)
+  const jsonConfig = removeNonSerializableProperties(config);
 
-  const fullPath = path.resolve(CONFIG_PATH)
-  const jsonContent = JSON.stringify(jsonConfig)
+  const fullPath = path.resolve(CONFIG_PATH);
+  const jsonContent = JSON.stringify(jsonConfig);
 
   // No need to manage error state. Ossido CLI will manage it.
-  await fs.writeFile(fullPath, jsonContent, 'utf-8')
+  await fs.writeFile(fullPath, jsonContent, 'utf-8');
 }

@@ -1,13 +1,13 @@
-import type { JSX } from 'react'
+import type { JSX } from 'react';
 
-import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants'
+import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants';
 
-import { DevResources } from './DevResources'
-import { ProdResources } from './ProdResources'
+import { DevResources } from './DevResources';
+import { ProdResources } from './ProdResources';
 import {
   useOssidoContextRawServerPayload,
   useOssidoContextServerPayload,
-} from './ossido-context'
+} from './ossido-context';
 
 /**
  * The payload is embedded as a JS expression inside a `<script>`, so a string
@@ -15,12 +15,12 @@ import {
  * Escaping `<` to its unicode form neutralises that while remaining valid JSON.
  */
 function escapeForScript(json: string): string {
-  return json.replace(/</g, '\\u003c')
+  return json.replace(/</g, '\\u003c');
 }
 
 export function OssidoScripts(): JSX.Element {
-  const serverPayload = useOssidoContextServerPayload()
-  const rawServerPayload = useOssidoContextRawServerPayload()
+  const serverPayload = useOssidoContextServerPayload();
+  const rawServerPayload = useOssidoContextRawServerPayload();
 
   // On the server, reuse the exact JSON the Rust runtime already produced —
   // avoiding a second full `JSON.stringify` of the payload inside V8. On the
@@ -28,7 +28,7 @@ export function OssidoScripts(): JSX.Element {
   // parsed payload; that output is discarded during hydration
   // (`suppressHydrationWarning` keeps the server-rendered script, which has
   // already executed and set `window[...]`).
-  const payloadJson = rawServerPayload ?? JSON.stringify(serverPayload)
+  const payloadJson = rawServerPayload ?? JSON.stringify(serverPayload);
 
   return (
     <>
@@ -48,5 +48,5 @@ export function OssidoScripts(): JSX.Element {
         />
       )}
     </>
-  )
+  );
 }

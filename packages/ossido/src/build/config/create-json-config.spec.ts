@@ -1,16 +1,16 @@
-import fs from 'node:fs/promises'
+import fs from 'node:fs/promises';
 
-import { beforeEach, describe, expect, it, vitest } from 'vitest'
-import react from '@vitejs/plugin-react-swc'
+import { beforeEach, describe, expect, it, vitest } from 'vitest';
+import react from '@vitejs/plugin-react-swc';
 
-import { createJsonConfig } from './create-json-config'
+import { createJsonConfig } from './create-json-config';
 
-const writeFileSpy = vitest.spyOn(fs, 'writeFile').mockResolvedValue(void 0)
+const writeFileSpy = vitest.spyOn(fs, 'writeFile').mockResolvedValue(void 0);
 
 describe('createJsonConfig', () => {
   beforeEach(() => {
-    writeFileSpy.mockClear()
-  })
+    writeFileSpy.mockClear();
+  });
 
   it('should process config with only server property', async () => {
     const sampleConfig = {
@@ -23,16 +23,17 @@ describe('createJsonConfig', () => {
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
       output: 'server' as const,
-    }
+      viewTransitions: false,
+    };
 
-    await createJsonConfig(sampleConfig)
+    await createJsonConfig(sampleConfig);
 
     expect(writeFileSpy).toHaveBeenCalledWith(
       expect.any(String),
       expect.stringContaining(JSON.stringify(sampleConfig)),
       expect.any(String),
-    )
-  })
+    );
+  });
 
   it('should process config with plugins', async () => {
     const sampleConfig = {
@@ -45,16 +46,17 @@ describe('createJsonConfig', () => {
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
       output: 'server' as const,
-    }
+      viewTransitions: false,
+    };
 
-    await createJsonConfig({ ...sampleConfig, vite: { plugins: [react()] } })
+    await createJsonConfig({ ...sampleConfig, vite: { plugins: [react()] } });
 
     expect(writeFileSpy).toHaveBeenCalledWith(
       expect.any(String),
       expect.stringContaining(JSON.stringify(sampleConfig)),
       expect.any(String),
-    )
-  })
+    );
+  });
 
   it('should process config with only server property including origin', async () => {
     const sampleConfig = {
@@ -67,14 +69,15 @@ describe('createJsonConfig', () => {
       dev: { criticalCss: true },
       ssr: { renderThreads: null },
       output: 'server' as const,
-    }
+      viewTransitions: false,
+    };
 
-    await createJsonConfig(sampleConfig)
+    await createJsonConfig(sampleConfig);
 
     expect(writeFileSpy).toHaveBeenCalledWith(
       expect.any(String),
       expect.stringContaining(JSON.stringify(sampleConfig)),
       expect.any(String),
-    )
-  })
-})
+    );
+  });
+});

@@ -1,6 +1,6 @@
-import { Wordmark } from '@/components/Wordmark'
-import PokemonLink from '@/components/PokemonLink'
-import type { OssidoPage } from 'ossido/types'
+import { Wordmark } from '@/components/Wordmark';
+import PokemonLink from '@/components/PokemonLink';
+import type { OssidoPage } from 'ossido/types';
 
 const IndexPage: OssidoPage<'/'> = ({ results }) => {
   return (
@@ -41,7 +41,7 @@ const IndexPage: OssidoPage<'/'> = ({ results }) => {
         ))}
       </ul>
     </>
-  )
-}
+  );
+};
 
 export default IndexPage;

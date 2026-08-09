@@ -1,5 +1,5 @@
-import PokemonSkeleton from '@/components/PokemonSkeleton'
+import PokemonSkeleton from '@/components/PokemonSkeleton';
 
 export default function PokemonViewLoading() {
-  return <PokemonSkeleton />
+  return <PokemonSkeleton />;
 }

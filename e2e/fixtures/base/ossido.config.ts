@@ -1,5 +1,5 @@
-import type { OssidoConfig } from 'ossido/config'
+import type { OssidoConfig } from 'ossido/config';
 
-const config: OssidoConfig = {}
+const config: OssidoConfig = {};
 
-export default config
+export default config;

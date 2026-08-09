@@ -1,4 +1,4 @@
-import type { OssidoConfig } from 'ossido/config'
+import type { OssidoConfig } from 'ossido/config';
 
 const config: OssidoConfig = {
   vite: {
@@ -8,7 +8,7 @@ const config: OssidoConfig = {
   },
   ssr: {
     renderThreads: 1,
-  }
-}
+  },
+};
 
-export default config
+export default config;

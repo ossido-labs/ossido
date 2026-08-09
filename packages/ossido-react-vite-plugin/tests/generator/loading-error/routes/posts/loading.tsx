@@ -1,3 +1,3 @@
 export default function PostsLoading() {
-  return <p>Loading post…</p>
+  return <p>Loading post…</p>;
 }

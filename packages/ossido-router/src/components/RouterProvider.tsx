@@ -1,30 +1,30 @@
-import { useState } from 'react'
-import type { JSX } from 'react'
-import { DevErrorOverlayHost } from 'ossido-ui'
+import { useState } from 'react';
+import type { JSX } from 'react';
+import { DevErrorOverlayHost } from 'ossido-ui';
 
-import type { ServerInitialLocation, Mode, ServerErrorPayload } from '../types'
-import type { Router } from '../router'
+import type { ServerInitialLocation, Mode, ServerErrorPayload } from '../types';
+import type { Router } from '../router';
 import {
   buildResourceKey,
   seedResource,
   seedErrorResource,
   seedLayoutData,
   toDataResult,
-} from '../data/resourceCache'
+} from '../data/resourceCache';
 
-import { getInitialLocation } from './RouterContext'
-import { RouterContextProvider } from './RouterContextProvider'
-import { Matches } from './Matches'
+import { getInitialLocation } from './RouterContext';
+import { RouterContextProvider } from './RouterContextProvider';
+import { Matches } from './Matches';
 
 interface RouterProviderProps {
-  router: Router
-  serverInitialLocation: ServerInitialLocation
-  serverInitialData: unknown
+  router: Router;
+  serverInitialLocation: ServerInitialLocation;
+  serverInitialData: unknown;
   /** Wrapping layouts' server data, keyed by each layout's `dataKey`. */
-  serverInitialLayoutData?: Record<string, unknown>
+  serverInitialLayoutData?: Record<string, unknown>;
   /** Set when the initial route's Rust handler panicked (dev mode). */
-  serverInitialError?: ServerErrorPayload
-  mode?: Mode
+  serverInitialError?: ServerErrorPayload;
+  mode?: Mode;
 }
 
 export function RouterProvider({
@@ -40,22 +40,22 @@ export function RouterProvider({
   // would run too late and make the first render suspend → hydration mismatch).
   // navigationId starts at 0, matching the key RouteMatch builds on first render.
   useState(() => {
-    const initialLocation = getInitialLocation(serverInitialLocation)
-    const resourceKey = buildResourceKey(0, initialLocation)
+    const initialLocation = getInitialLocation(serverInitialLocation);
+    const resourceKey = buildResourceKey(0, initialLocation);
     // A handler panic seeds a rejected resource so the boundary/overlay render;
     // otherwise seed the fulfilled server data.
     if (serverInitialError) {
-      seedErrorResource(resourceKey, serverInitialError)
+      seedErrorResource(resourceKey, serverInitialError);
     } else {
-      seedResource(resourceKey, toDataResult(serverInitialData))
+      seedResource(resourceKey, toDataResult(serverInitialData));
     }
     // Seed the wrapping layouts' data so they render synchronously (SSR + first
     // client render) without a fetch.
     if (serverInitialLayoutData) {
-      seedLayoutData(serverInitialLayoutData)
+      seedLayoutData(serverInitialLayoutData);
     }
-    return null
-  })
+    return null;
+  });
 
   return (
     <RouterContextProvider
@@ -76,5 +76,5 @@ export function RouterProvider({
           the overlay working in the dev bundle. */}
       {import.meta.env.DEV && mode === 'Dev' && <DevErrorOverlayHost />}
     </RouterContextProvider>
-  )
+  );
 }

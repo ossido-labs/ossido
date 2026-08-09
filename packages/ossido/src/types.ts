@@ -1,46 +1,46 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from 'react';
 
-import type { ServerErrorPayload } from 'ossido-router'
+import type { ServerErrorPayload } from 'ossido-router';
 
-import type { OssidoConfigServer } from './config'
+import type { OssidoConfigServer } from './config';
 
-export type Mode = 'Dev' | 'Prod'
+export type Mode = 'Dev' | 'Prod';
 
 /**
  * Provided by the rust server and used in the ssr env
  * @see ossido-router {@link ServerInitialLocation}
  */
 export interface ServerPayloadLocation {
-  href: string
-  pathname: string
-  searchStr: string
+  href: string;
+  pathname: string;
+  searchStr: string;
 }
 
 /**
  * @see crates/ossido/src/payload.rs
  */
 export type ServerPayload<TData = unknown> = {
-  location: ServerPayloadLocation
+  location: ServerPayloadLocation;
 
-  data: TData
+  data: TData;
 
   /** Wrapping `layout.rs` handlers' data, keyed by each layout's `dataKey`. */
-  layoutData?: Record<string, unknown>
+  layoutData?: Record<string, unknown>;
 
   /** Present (dev only) when the route's Rust handler panicked. */
-  serverError?: ServerErrorPayload
+  serverError?: ServerErrorPayload;
 } & (
   | {
-      mode: 'Prod'
-      jsBundles: Array<string>
-      cssBundles: Array<string>
+      mode: 'Prod';
+      jsBundles: Array<string>;
+      cssBundles: Array<string>;
     }
   | {
-      mode: 'Dev'
-      devServerConfig?: OssidoConfigServer
+      mode: 'Dev';
+      devServerConfig?: OssidoConfigServer;
     }
-)
+);
 
 export interface OssidoLayoutProps {
-  children: ReactNode
+  children: ReactNode;
 }

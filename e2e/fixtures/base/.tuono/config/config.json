@@ -1,1 +1,11 @@
-{"server":{"host":"localhost","origin":null,"port":3000},"logging":{"format":"pretty","routeTree":false,"browser":{"enabled":true,"level":"info"}},"dev":{"criticalCss":true},"ssr":{"renderThreads":null},"output":"server"}
+{
+  "server": { "host": "localhost", "origin": null, "port": 3000 },
+  "logging": {
+    "format": "pretty",
+    "routeTree": false,
+    "browser": { "enabled": true, "level": "info" }
+  },
+  "dev": { "criticalCss": true },
+  "ssr": { "renderThreads": null },
+  "output": "server"
+}

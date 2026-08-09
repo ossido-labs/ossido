@@ -1,10 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
-import { createRoute, createRouter } from '../index'
-import { RouterProvider } from '../components/RouterProvider'
+import { createRoute, createRouter } from '../index';
+import { RouterProvider } from '../components/RouterProvider';
 
-import { useRouter } from './useRouter'
+import { useRouter } from './useRouter';
 
 /**
  * `useRouter().refetchProps()` re-runs the current route's server handler and
@@ -13,15 +20,15 @@ import { useRouter } from './useRouter'
  */
 
 interface PageData {
-  name: string
+  name: string;
 }
 
 // The value the (mocked) server returns on the next data fetch — flipped by the
 // test to prove a real refetch happened.
-let serverName = 'FIRST'
+let serverName = 'FIRST';
 
 function HomePage(props: Partial<PageData>): React.JSX.Element {
-  const { refetchProps, isRefetching } = useRouter()
+  const { refetchProps, isRefetching } = useRouter();
   return (
     <div>
       <div data-testid="content">{props.name ?? 'MISSING'}</div>
@@ -30,7 +37,7 @@ function HomePage(props: Partial<PageData>): React.JSX.Element {
         refetch
       </button>
     </div>
-  )
+  );
 }
 
 function makeRouter(): ReturnType<typeof createRouter> {
@@ -38,7 +45,7 @@ function makeRouter(): ReturnType<typeof createRouter> {
     component: (({ children }: { children: React.ReactNode }) => (
       <>{children}</>
     )) as never,
-  })
+  });
   const homeRoute = createRoute({
     component: HomePage as never,
   }).update({
@@ -46,46 +53,55 @@ function makeRouter(): ReturnType<typeof createRouter> {
     getParentRoute: () => rootRoute,
     hasHandler: true,
     filePath: '/',
-  })
-  rootRoute.addChildren([homeRoute])
-  return createRouter({ routeTree: rootRoute })
+  });
+  rootRoute.addChildren([homeRoute]);
+  return createRouter({ routeTree: rootRoute });
 }
 
 describe('useRouter().refetchProps', () => {
   beforeEach(() => {
-    serverName = 'FIRST'
-    window.scroll = vi.fn()
-    window.history.pushState({}, '', '/')
+    serverName = 'FIRST';
+    window.scroll = vi.fn();
+    window.history.pushState({}, '', '/');
     global.fetch = vi.fn(
       async () =>
         ({
           ok: true,
-          json: async (): Promise<unknown> => ({ data: { name: serverName }, info: {} }),
+          json: async (): Promise<unknown> => ({
+            data: { name: serverName },
+            info: {},
+          }),
         }) as Response,
-    ) as never
-  })
+    ) as never;
+  });
 
-  afterEach(cleanup)
+  afterEach(cleanup);
 
   it('refetches the current route and renders the fresh props', async () => {
     render(
       <RouterProvider
         router={makeRouter()}
-        serverInitialLocation={{ pathname: '/', href: 'http://localhost/', searchStr: '' }}
+        serverInitialLocation={{
+          pathname: '/',
+          href: 'http://localhost/',
+          searchStr: '',
+        }}
         serverInitialData={{ name: 'SSR' }}
       />,
-    )
+    );
 
     // Initial render reads the seeded SSR data synchronously.
-    expect(screen.getByTestId('content').textContent).toBe('SSR')
+    expect(screen.getByTestId('content').textContent).toBe('SSR');
 
     // The server data has since changed; refetch pulls the fresh value in.
-    serverName = 'UPDATED'
+    serverName = 'UPDATED';
     await act(async () => {
-      fireEvent.click(screen.getByTestId('refetch'))
-    })
+      fireEvent.click(screen.getByTestId('refetch'));
+    });
 
-    await waitFor(() => expect(screen.getByTestId('content').textContent).toBe('UPDATED'))
-    expect(global.fetch).toHaveBeenCalled()
-  })
-})
+    await waitFor(() =>
+      expect(screen.getByTestId('content').textContent).toBe('UPDATED'),
+    );
+    expect(global.fetch).toHaveBeenCalled();
+  });
+});

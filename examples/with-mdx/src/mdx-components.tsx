@@ -1,4 +1,4 @@
-import type { MDXComponents } from 'ossido-mdx'
+import type { MDXComponents } from 'ossido-mdx';
 
 /**
  * Global components every `.mdx` file renders with — the ossido equivalent of
@@ -12,5 +12,5 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     // Per-file overrides (passed to a rendered `<Content components={...} />`)
     // still take precedence.
     ...components,
-  }
+  };
 }

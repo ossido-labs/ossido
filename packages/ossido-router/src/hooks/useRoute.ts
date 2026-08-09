@@ -1,9 +1,9 @@
-import type { Route } from '../route'
+import type { Route } from '../route';
 
-import { useRouterContext } from '../components/RouterContext'
-import { matchRoute, sanitizePathname } from '../utils/match-route'
+import { useRouterContext } from '../components/RouterContext';
+import { matchRoute, sanitizePathname } from '../utils/match-route';
 
-export { sanitizePathname }
+export { sanitizePathname };
 
 /**
  * Returns the route that matches the given pathname.
@@ -18,7 +18,7 @@ export { sanitizePathname }
 export function useRoute(pathname?: string): Route | undefined {
   const {
     router: { routesById },
-  } = useRouterContext()
+  } = useRouterContext();
 
-  return matchRoute(routesById, pathname)
+  return matchRoute(routesById, pathname);
 }
