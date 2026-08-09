@@ -1,27 +1,32 @@
-@keyframes rotate {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+.wordmark {
+  display: flex;
+  align-items: center;
+  color: #fafafa;
+  gap: 16px;
+  transform: translateZ(0);
 }
 
-.logo {
-  height: 0.9em;
-  width: 0.9em;
+.icon {
+  width: 6rem;
+  height: 6rem;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
-.cog {
-  transform-origin: center;
-  animation: rotate 6s linear infinite;
+.word {
+  height: 3rem;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
-.cogBackground {
-  fill: #1b1b1f55;
-}
-
-.orbit {
-  transform-origin: center;
-  animation: rotate 12s linear infinite reverse;
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
 }

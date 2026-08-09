@@ -21,7 +21,7 @@ const LINKS: ReadonlyArray<NavLink> = [
     desc: 'The Rust crate',
   },
   {
-    href: 'https://www.npmjs.com/package/ossido',
+    href: 'https://www.npmjs.com/package/@ossido-labs/ossido',
     label: 'npm',
     desc: 'The npm package',
   },
@@ -50,15 +50,9 @@ function NavCard({ href, label, desc }: NavLink): JSX.Element {
 const IndexPage: OssidoPage<'/'> = ({ subtitle }) => {
   return (
     <>
-      <img src="/lightning.webp" className="background" />
       <div className="hero">
         <h1 className="title">
-          <span>TU</span>
-          {/* The logo stands in for the "O" visually; keep a hidden "O" so the
-              heading still reads "OSSIDO" to screen readers, and hide the SVG. */}
-          <span className="visually-hidden">O</span>
           <Wordmark aria-hidden />
-          <span>NO</span>
         </h1>
         <p className="subtitle">{subtitle}</p>
       </div>

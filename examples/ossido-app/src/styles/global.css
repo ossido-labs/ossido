@@ -20,60 +20,11 @@ body {
   min-height: 100vh;
 }
 
-img.background {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  object-fit: cover;
-  object-position: center center;
-  z-index: -10;
-  width: 100%;
-  height: 100%;
-  opacity: 0.2;
-  mix-blend-mode: screen;
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 body {
   font-family: 'Poppins', sans-serif;
   font-weight: 400;
   color: var(--ossido-text);
   background: #0a0a0e;
-}
-
-.brand {
-  position: fixed;
-  top: 22px;
-  left: 26px;
-  z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ossido-text);
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  opacity: 0.55;
-  transition: opacity 0.2s ease;
-}
-
-.brand:hover {
-  opacity: 1;
 }
 
 main {
@@ -93,7 +44,7 @@ main {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 14px;
+  gap: 3rem;
 }
 
 .title {

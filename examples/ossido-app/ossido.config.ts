@@ -6,7 +6,8 @@ import type { OssidoConfig } from '@ossido-labs/ossido/config';
 const config: OssidoConfig = {
   server: { port: 3101 },
   // Animate client-side navigations with the browser View Transitions API.
-  viewTransitions: true,
+  dev: { criticalCss: true },
+  viewTransitions: false,
   build: {
     prebuild: (ctx) => {
       console.log(`[prebuild] mode=${ctx.mode} output=${ctx.outputDirectory}`);
