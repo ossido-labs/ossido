@@ -4,6 +4,9 @@ export type {
   OssidoConfigLogging,
   OssidoConfigSsr,
   OssidoConfigOutput,
+  OssidoConfigBuild,
+  OssidoBuildContext,
+  OssidoBuildHook,
   OssidoLogFormat,
   OssidoLogLevel,
 } from './types'

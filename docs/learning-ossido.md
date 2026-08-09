@@ -34,6 +34,7 @@ tells you what it covers.
 - **`OssidoConfig` type** — imported from `ossido/config`.
 - **`server`** — `port`, `host`.
 - **`output`** — `static` vs `server`.
+- **`build` hooks** — `build.prebuild` / `build.postbuild` async functions run around `ossido build` (both modes). Each gets a context: `mode`, `outputDirectory` (`out/static` for static, `out` for server), `publicDirectory`, `manifest` (emitted file list), and the resolved `config` — e.g. to write a `.nojekyll`/`CNAME` or push the output to a static host.
 - **`render_threads`** — SSR render-pool sizing.
 - **`logging`** — format, level, browser forwarding, prod JSON.
 - **Vite passthrough / plugins** — adding Vite plugins and config.
@@ -131,6 +132,7 @@ tells you what it covers.
 - **Build outputs** — the static site vs. the standalone server binary.
 - **Running the production server** — serving `ossido build --server` output.
 - **Static hosting** — deploying `ossido build --static` output.
+- **`.ossidoignore`** — a project-root file of glob patterns (gitignore-style: one per line, `#` comments); matching files are removed from the build output (`out/client`, `out/server`, `out/static`) — e.g. keep a draft asset or a `.map` out of the deploy.
 - **Production config & env** — port/host, logging (JSON), render threads in prod.
 
 ## 15. Internals (nice to understand, not required day-to-day)

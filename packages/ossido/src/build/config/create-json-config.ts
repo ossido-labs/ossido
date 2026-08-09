@@ -15,12 +15,16 @@ const CONFIG_PATH = path.join(
   SERVER_CONFIG_NAME,
 )
 /**
- * This function is used to remove the `vite` property from the config object.
- * The `vite` property is only used at build time, so it is not needed by either the server or the client.
+ * Strip the build-time-only, non-serializable properties before the config is
+ * written to JSON for the Rust server/client: `vite` (plugins are functions) and
+ * `build` (the `prebuild`/`postbuild` hooks are functions). Both would otherwise
+ * fail `structuredClone`, and neither is needed by the server/client — the hooks
+ * are invoked from the JS build via `loadConfig` (which reads the transpiled
+ * config, keeping the functions).
  */
-function removeViteProperties(
+function removeNonSerializableProperties(
   config: InternalOssidoConfig,
-): Omit<InternalOssidoConfig, 'vite'> {
+): Omit<InternalOssidoConfig, 'vite' | 'build'> {
   /**
    * Using {@link structuredClone} cause the following errors based on runtime env:
    * ```text
@@ -38,7 +42,7 @@ function removeViteProperties(
    * @see https://github.com/tuono-labs/tuono/issues/414
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { vite, ...configRest } = config
+  const { vite, build, ...configRest } = config
   return structuredClone(configRest)
 }
 
@@ -53,7 +57,7 @@ function removeViteProperties(
 export async function createJsonConfig(
   config: InternalOssidoConfig,
 ): Promise<void> {
-  const jsonConfig = removeViteProperties(config)
+  const jsonConfig = removeNonSerializableProperties(config)
 
   const fullPath = path.resolve(CONFIG_PATH)
   const jsonContent = JSON.stringify(jsonConfig)

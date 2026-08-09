@@ -10,8 +10,10 @@ import inject from '@rollup/plugin-inject'
 import { OssidoReactPlugin, routeGenerator } from 'ossido-react-vite-plugin'
 import { ErrorOverlayVitePlugin } from 'ossido-ui/vite-plugin'
 
+import type { OssidoConfig } from '../config'
+
 import type { InternalOssidoConfig } from './types'
-import { blockingAsync } from './utils'
+import { blockingAsync, listFilesRecursive } from './utils'
 import { createJsonConfig, loadConfig } from './config'
 import { ENV_PREFIX } from './constants'
 import { createOssidoViteLogger } from './logger'
@@ -348,4 +350,41 @@ const buildConfig = (): void => {
   })
 }
 
-export { buildProd, buildConfig, developmentCSRWatch, developmentSSRBundle }
+/**
+ * Run a user-defined build lifecycle hook (`prebuild` / `postbuild`) from
+ * `ossido.config.ts`. Invoked by the Rust CLI (`ossido-run-build-hook <name>`)
+ * at the matching point of `ossido build`. No-ops when the hook is undefined.
+ *
+ * The output/public dirs and mode mirror what the build produces: static builds
+ * deploy `out/static`, server builds `out`. `postbuild` gets the emitted-file
+ * manifest; `prebuild` runs before anything is emitted, so its manifest is empty.
+ */
+const runBuildHook = (name: 'prebuild' | 'postbuild'): void =>
+  blockingAsync(async () => {
+    const config = await loadConfig()
+    const hook = config.build?.[name]
+    if (typeof hook !== 'function') return
+
+    const mode = process.env.OSSIDO_STATIC === 'true' ? 'static' : 'server'
+    const outputDirectory = resolve(mode === 'static' ? 'out/static' : 'out')
+    const publicDirectory = resolve('public')
+    const manifest = name === 'postbuild' ? listFilesRecursive(outputDirectory) : []
+
+    // `loadConfig` returns the resolved `InternalOssidoConfig` (a structural
+    // superset of the public `OssidoConfig` the hook context exposes).
+    await hook({
+      mode,
+      outputDirectory,
+      publicDirectory,
+      manifest,
+      config: config as OssidoConfig,
+    })
+  })
+
+export {
+  buildProd,
+  buildConfig,
+  developmentCSRWatch,
+  developmentSSRBundle,
+  runBuildHook,
+}

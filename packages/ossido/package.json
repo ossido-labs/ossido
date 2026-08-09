@@ -56,7 +56,8 @@
     "ossido-dev-ssr": "./bin/dev-ssr.js",
     "ossido-dev-watch": "./bin/watch.js",
     "ossido-build-prod": "./bin/build-prod.js",
-    "ossido-build-config": "./bin/build-config.js"
+    "ossido-build-config": "./bin/build-config.js",
+    "ossido-run-build-hook": "./bin/run-build-hook.js"
   },
   "files": [
     "dist",

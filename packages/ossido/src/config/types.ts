@@ -62,10 +62,48 @@ export interface OssidoConfig {
    * The `--static` / `--server` CLI flags override this per invocation.
    */
   output?: OssidoConfigOutput
+  /** Build lifecycle hooks (`ossido build`, both output modes; not `dev`). */
+  build?: OssidoConfigBuild
 }
 
 /** Build output mode. */
 export type OssidoConfigOutput = 'static' | 'server'
+
+/**
+ * Everything a build hook is given about the current `ossido build`.
+ */
+export interface OssidoBuildContext {
+  /** The resolved output mode for this build. */
+  mode: OssidoConfigOutput
+  /**
+   * Absolute path to the deployable output directory: `out/static` for a static
+   * build, `out` for a server build. The directory you'd upload/deploy.
+   */
+  outputDirectory: string
+  /** Absolute path to the project's source `public/` folder. */
+  publicDirectory: string
+  /**
+   * Emitted file paths, relative to `outputDirectory`. Populated for
+   * `postbuild` (after all artifacts exist); empty for `prebuild`.
+   */
+  manifest: Array<string>
+  /** The resolved Ossido config, so hooks can branch on build settings. */
+  config: OssidoConfig
+}
+
+/**
+ * A build lifecycle hook. May be async — the build awaits it, and a thrown
+ * error fails the build.
+ */
+export type OssidoBuildHook = (ctx: OssidoBuildContext) => void | Promise<void>
+
+/** `prebuild` / `postbuild` hooks, defined under `build` in the config. */
+export interface OssidoConfigBuild {
+  /** Runs before the build starts (its `ctx.manifest` is empty). */
+  prebuild?: OssidoBuildHook
+  /** Runs after all build artifacts have been produced. */
+  postbuild?: OssidoBuildHook
+}
 
 /** Server-side rendering options. */
 export interface OssidoConfigSsr {

@@ -89,6 +89,9 @@ const BUILD_JS_SCRIPT: &str = ".\\node_modules\\.bin\\ossido-build-prod.cmd";
 #[cfg(target_os = "windows")]
 const BUILD_OSSIDO_CONFIG: &str = ".\\node_modules\\.bin\\ossido-build-config.cmd";
 
+#[cfg(target_os = "windows")]
+const RUN_BUILD_HOOK_SCRIPT: &str = ".\\node_modules\\.bin\\ossido-run-build-hook.cmd";
+
 #[cfg(not(target_os = "windows"))]
 pub const ROUTES_FOLDER_PATH: &str = "/src/routes";
 #[cfg(not(target_os = "windows"))]
@@ -96,6 +99,9 @@ const BUILD_JS_SCRIPT: &str = "./node_modules/.bin/ossido-build-prod";
 
 #[cfg(not(target_os = "windows"))]
 const BUILD_OSSIDO_CONFIG: &str = "./node_modules/.bin/ossido-build-config";
+
+#[cfg(not(target_os = "windows"))]
+const RUN_BUILD_HOOK_SCRIPT: &str = "./node_modules/.bin/ossido-run-build-hook";
 
 #[derive(Debug, Clone)]
 pub struct App {
@@ -289,6 +295,26 @@ impl App {
         }
 
         String::from_utf8_lossy(&output.stdout).into_owned()
+    }
+
+    /// Run a build lifecycle hook (`prebuild` / `postbuild`) defined in
+    /// `ossido.config.ts`, via the `ossido-run-build-hook` bin. Inherits stdio so
+    /// the hook's own logs stream through, and passes `OSSIDO_STATIC` so the hook
+    /// context reports the right mode/output dir. Returns whether it succeeded —
+    /// a hook that throws exits non-zero. The bin no-ops fast when the hook is
+    /// undefined, so this is cheap even for projects with no hooks.
+    pub fn run_build_hook(&self, name: &str, static_export: bool) -> bool {
+        if !Path::new(RUN_BUILD_HOOK_SCRIPT).exists() {
+            error!("Failed to find the build-hook script. Please run `npm install`");
+            std::process::exit(1);
+        }
+
+        Command::new(RUN_BUILD_HOOK_SCRIPT)
+            .arg(name)
+            .env("OSSIDO_STATIC", if static_export { "true" } else { "false" })
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
     }
 
     pub fn run_rust_server(&self) -> Child {

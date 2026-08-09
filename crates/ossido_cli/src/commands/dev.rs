@@ -48,10 +48,12 @@ fn ssr_reload_needed(path: &Path) -> bool {
 )]
 async unsafe fn start_all_processes(
     process_manager: Arc<Mutex<ProcessManager>>,
+    host: &str,
+    port: u16,
     report: impl FnMut(&str),
 ) {
     if let Ok(mut pm) = process_manager.lock() {
-        pm.start_dev_processes(report).await
+        pm.start_dev_processes(report, host, port).await
     }
 }
 
@@ -83,13 +85,23 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
     let mut current: Option<Spinner> = None;
     let mut current_label = String::new();
 
+    // The address the dev server will bind — used to wait for it to actually
+    // accept connections before reporting "ready".
+    let server_config = source_builder
+        .read()
+        .ok()
+        .and_then(|builder| builder.app.config.clone())
+        .unwrap_or_default();
+    let host = server_config.server.host.clone();
+    let port = server_config.server.port;
+
     // Time the build/bundle work so the intro can report how long it took.
     let build_started = Instant::now();
     unsafe {
         // It is safe to call this function because here
         // only one thread is running and the lock is not
         // needed by any other thread.
-        start_all_processes(process_manager.clone(), |label: &str| {
+        start_all_processes(process_manager.clone(), &host, port, |label: &str| {
             if let Some(mut sp) = current.take() {
                 sp.stop_and_persist(&tick, current_label.clone());
             }

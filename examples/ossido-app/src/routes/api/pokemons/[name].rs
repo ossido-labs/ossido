@@ -1,8 +1,9 @@
 use ossido::axum::Json;
 use ossido::{api, Request, Type};
 
+// `pub` because the generated `#[api]` wrapper is `pub` and returns `Json<Pokemon>`.
 #[Type]
-struct Pokemon {
+pub struct Pokemon {
     name: String,
     level: u32,
 }

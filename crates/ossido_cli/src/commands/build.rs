@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -50,6 +50,13 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
             );
             std::process::exit(1);
         }
+    }
+
+    // `prebuild` hook, before any build work. Runs for both output modes; the
+    // config is already transpiled (by `build_ossido_config` above) so the hook
+    // is reachable via `loadConfig`.
+    if !app.run_build_hook("prebuild", ssg) {
+        exit_gracefully_with_error("prebuild hook failed");
     }
 
     let build_started = Instant::now();
@@ -157,7 +164,7 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
 
         trace!("Server is ready, starting static site generation");
 
-        for (_, route) in app.route_map {
+        for (_, route) in &app.route_map {
             if let Err(msg) = route.save_ssg_file(&reqwest_client) {
                 exit_and_shut_server(&msg);
             }
@@ -176,5 +183,22 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
             .bold()
             .to_string(),
         );
+    }
+
+    // Apply `.ossidoignore`: remove any emitted files matching its globs from the
+    // build output. Done before the postbuild hook so the hook's `manifest`
+    // reflects the final, filtered file set.
+    let ignore_patterns = crate::ossidoignore::load_patterns();
+    if !ignore_patterns.is_empty() {
+        for dir in ["out/client", "out/server", "out/static"] {
+            crate::ossidoignore::apply(Path::new(dir), &ignore_patterns);
+        }
+    }
+
+    // `postbuild` hook, after all artifacts exist (the static export in
+    // `out/static`, or the client + server bundles in `out`). Its `manifest` is
+    // the emitted-file list of the output directory.
+    if !app.run_build_hook("postbuild", ssg) {
+        exit_gracefully_with_error("postbuild hook failed");
     }
 }

@@ -97,5 +97,9 @@ export const normalizeConfig = (config: OssidoConfig): InternalOssidoConfig => {
       renderThreads: config.ssr?.renderThreads ?? null,
     },
     output: config.output ?? 'server',
+    // Carried through as-is (its `prebuild`/`postbuild` are functions, so they
+    // are only reachable via `loadConfig`, never the JSON config). Spread
+    // conditionally so an absent `build` isn't materialised as `undefined`.
+    ...(config.build ? { build: config.build } : {}),
   }
 }

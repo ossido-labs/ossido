@@ -2,9 +2,13 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use std::time::{Duration, Instant};
+
 use clap::crate_version;
 use colored::Colorize;
+use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tracing::trace;
 use ossido_internal::config::Config;
 use watchexec_supervisor::command::{Command, Program};
@@ -28,6 +32,33 @@ fn local_ip() -> Option<std::net::IpAddr> {
     let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
     socket.connect("8.8.8.8:80").ok()?;
     socket.local_addr().ok().map(|addr| addr.ip())
+}
+
+/// Poll until the dev server is actually accepting TCP connections, so we don't
+/// report "ready" while `cargo run` is still starting up and binding the port.
+/// Bounded: gives up after a while and lets startup proceed rather than hang.
+async fn wait_for_server_ready(host: &str, port: u16) {
+    // `0.0.0.0` (bind-all) isn't reliably connectable; probe the loopback.
+    let connect_host = if host == "0.0.0.0" { "127.0.0.1" } else { host };
+    let addr = format!("{connect_host}:{port}");
+
+    let started = Instant::now();
+    let timeout = Duration::from_secs(30);
+    let mut interval = Duration::from_millis(50);
+
+    loop {
+        if TcpStream::connect(&addr).await.is_ok() {
+            trace!("Dev server is accepting connections at {addr}");
+            return;
+        }
+        if started.elapsed() >= timeout {
+            trace!("Dev server not reachable at {addr} after {timeout:?}; proceeding anyway");
+            return;
+        }
+        sleep(interval).await;
+        // Back off, but stay responsive so "ready" fires promptly once it binds.
+        interval = (interval * 2).min(Duration::from_millis(500));
+    }
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -87,7 +118,7 @@ impl ProcessManager {
     // the label of each phase as it begins, so the caller can render a checklist
     // (tick the previous item, start the next) instead of one silent, often
     // multi-minute, spinner.
-    pub async fn start_dev_processes(&mut self, mut report: impl FnMut(&str)) {
+    pub async fn start_dev_processes(&mut self, mut report: impl FnMut(&str), host: &str, port: u16) {
         trace!("Starting dev processes");
         self.start_process(ProcessId::WatchReactSrc);
         self.start_process(ProcessId::BuildRustSrc);
@@ -102,9 +133,14 @@ impl ProcessManager {
         report("Building the frontend bundle");
         self.wait_for_process(ProcessId::BuildReactSSRSrc).await;
 
-        // This needs to start after having built the rust and react sources
+        // This needs to start after having built the rust and react sources.
         report("Starting the dev server");
         self.start_process(ProcessId::RunRustDevServer);
+
+        // `cargo run` binds the port a beat after it's spawned — wait until the
+        // server actually accepts connections so the caller only reports "ready"
+        // once requests will succeed.
+        wait_for_server_ready(host, port).await;
     }
 
     pub fn log_server_address(&self, config: &Config, ready_in: std::time::Duration) {

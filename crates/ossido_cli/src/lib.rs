@@ -7,6 +7,7 @@ pub mod cli;
 mod commands;
 mod macro_attr;
 mod mode;
+mod ossidoignore;
 mod process_manager;
 mod route;
 mod route_directory_info;
