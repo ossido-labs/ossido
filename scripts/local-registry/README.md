@@ -22,7 +22,7 @@ bun run registry:publish
 
 Re-runnable any time you change a package — it rebuilds, unpublishes the prior
 version, and republishes. It uses `bun publish`, which rewrites each
-`workspace:*` dependency to the concrete version (e.g. `ossido-router: 0.1.0`)
+`workspace:*` dependency to the concrete version (e.g. `ossido-router: 0.1.1`)
 so the interlinks resolve from the registry. (`npm publish` does **not** do this
 rewrite in this workspace — hence bun.)
 
@@ -34,7 +34,7 @@ registry=http://localhost:4873/
 
 then install as usual (`npm install` / `bun install`). The Ossido packages come
 from the local registry; everything else is proxied from npmjs. A project made
-with `ossido new` already pins `"@ossido-labs/ossido": "0.1.0"`, so it just works.
+with `ossido new` already pins `"@ossido-labs/ossido": "0.1.1"`, so it just works.
 
 ## How it works
 

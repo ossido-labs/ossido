@@ -10,5 +10,8 @@ path = ".ossido/main.rs"
 [dependencies]
 ossido = { path = "../../crates/ossido/" }
 serde = { version = "1.0.202", features = ["derive"] }
-reqwest = "0.12.9"
+# Matches the `ossido` crate's reqwest 0.13: `json` for `Response::json()` in the
+# pokemon routes, and native-tls (not the 0.13 default rustls, which pulls
+# aws-lc-sys/cmake) so the unified feature set stays light.
+reqwest = { version = "0.13.4", default-features = false, features = ["native-tls", "charset", "http2", "system-proxy", "json"] }
 
