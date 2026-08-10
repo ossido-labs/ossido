@@ -56,22 +56,8 @@ jobs:
           npm publish "./$TARBALL" --dry-run --access public
 
   publish_crates_dry_run:
-    name: Crates publish (dry run) - ${{ matrix.crate }}
+    name: Crates publish (dry run)
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: true
-      matrix:
-        # Safe to run in parallel: `--no-verify` skips the isolated compile step,
-        # which would otherwise try to resolve workspace-internal deps (e.g.
-        # ossido_ssr) from crates.io before they are published. Compilation is
-        # already covered by Rust CI; this dry run validates packaging/manifest.
-        crate:
-          - ossido_macros
-          - ossido_internal
-          - ossido_ssr
-          - ossido
-          - ossido_cli
 
     steps:
       - name: Checkout code
@@ -88,16 +74,19 @@ jobs:
           bun-version: 1.3.14
 
       # Stamp every crate manifest (package version + internal dep requirements)
-      # with the release tag version before publishing.
+      # with the release tag version before packaging.
       - name: Set version from release tag
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: bun scripts/set-version.ts "${TAG#v}"
 
-      # `--allow-dirty`: the version-stamp step above edits Cargo.toml in the
-      # working tree without committing, which cargo otherwise refuses to package.
+      # `--workspace` (not per-crate `-p`) so cargo resolves the bumped
+      # interdependency versions from the local workspace — a per-crate dry run
+      # would fail to resolve e.g. `ossido_internal = "<new>"` from crates.io
+      # before it is published. `--no-verify` skips the compile (covered by Rust
+      # CI); `--allow-dirty` includes the uncommitted version stamp.
       - name: Publish (dry run)
-        run: cargo publish -p ${{ matrix.crate }} --dry-run --no-verify --allow-dirty
+        run: cargo publish --workspace --dry-run --no-verify --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
