@@ -3,7 +3,11 @@
   "globalDependencies": [".oxlintrc.json", ".oxfmtrc.json"],
   "tasks": {
     "lint": {
-      "dependsOn": ["^build"]
+      // `oxlint` loads `@ossido-labs/ossido-eslint-plugin` as a JS plugin (see
+      // `.oxlintrc.json` jsPlugins). It is not a dependency of the linted
+      // packages, so `^build` never builds it — depend on its build explicitly
+      // so its `dist` exists before any package is linted.
+      "dependsOn": ["^build", "@ossido-labs/ossido-eslint-plugin#build"]
     },
     "format": {},
     "format:fix": {},
