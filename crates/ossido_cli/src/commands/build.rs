@@ -116,6 +116,13 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
             exit_gracefully_with_error("Failed to clone assets into static output folder")
         });
 
+        // Compile the server first so the readiness poll below waits only for
+        // the built binary to boot — not for a cold compile, which on Windows/CI
+        // can exceed SERVER_READY_TIMEOUT and get the process killed mid-build.
+        if !app.build_rust_server() {
+            exit_gracefully_with_error("Failed to build the server for static generation");
+        }
+
         // Start the server
         #[allow(clippy::zombie_processes)]
         let mut rust_server = app.run_rust_server();

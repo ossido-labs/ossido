@@ -49,6 +49,16 @@ jobs:
       - name: Run cargo test
         run: docker exec ossido-source-container cargo test
 
+      # The compose bind-mount (`..:/ossido`) hides the per-package node_modules
+      # that `bun install` created during the image build — only the root
+      # node_modules is kept as an anonymous volume. bun's isolated linker puts
+      # each package's deps in `<pkg>/node_modules` (e.g.
+      # `devtools/vite-config/node_modules/tsdown`), so re-link them here before
+      # running turbo. The root node_modules (with bun's store) is preserved, so
+      # this is a fast relink rather than a fresh download.
+      - name: Re-link workspace dependencies inside the container
+        run: docker exec ossido-source-container bun install --frozen-lockfile
+
       - name: Run bun test
         run: docker exec ossido-source-container bun run test
 

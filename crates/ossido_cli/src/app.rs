@@ -323,6 +323,19 @@ impl App {
             .unwrap_or(false)
     }
 
+    /// Compile the Rust server up front (blocking, stdio inherited). Callers can
+    /// then wait only for the already-built binary to boot rather than racing a
+    /// cold compile against a readiness timeout (a cold `cargo run` on
+    /// Windows/CI can exceed it), and a compile error surfaces here instead of
+    /// as an opaque "server did not become ready". Returns whether it built.
+    pub fn build_rust_server(&self) -> bool {
+        Command::new("cargo")
+            .arg("build")
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    }
+
     pub fn run_rust_server(&self) -> Child {
         Command::new("cargo")
             .arg("run")
