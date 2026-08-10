@@ -6,9 +6,10 @@
   "printWidth": 80,
   "sortPackageJson": false,
   "ignorePatterns": [
-    "pnpm-lock.yaml",
+    "bun.lock",
     "dist",
     ".ossido",
+    ".tuono",
     "out",
     "vite.config.ts.timestamp-*",
     "packages/ossido-lazy-fn-vite-plugin/tests/sources/*",

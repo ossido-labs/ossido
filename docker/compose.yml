@@ -12,11 +12,10 @@ services:
     image: ossido-source-image
     ports:
       - '3000:3000' # expose default port used by ossido server
-    volumes: # mount the project into a volume but node_modules / .pnpm-store / target / ... directories won't by sync from container to host
+    volumes: # mount the project into a volume but node_modules / target / ... directories won't by sync from container to host
       - ..:/ossido
       - /ossido/node_modules
       - /ossido/target
-      - /ossido/.pnpm-store
       - /ossido/.turbo
       - /ossido/examples/ossido-app/node_modules
       - /ossido/examples/ossido-app/target

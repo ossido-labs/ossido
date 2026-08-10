@@ -7,7 +7,7 @@ storybook-static/
 
 */**/routeTree.gen.ts
 
-examples/*/pnpm-lock.yaml
+examples/*/bun.lock
 
 vite.config.ts.timestamp*
 

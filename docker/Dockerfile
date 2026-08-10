@@ -36,13 +36,17 @@ RUN ["cargo", "install", "cargo-watch"]
 WORKDIR /ossido
 COPY . .
 
-# pnpm installation based on version found in package.json
+# Bun installation (matches the `packageManager` field in package.json)
+## The official install script needs curl + unzip (the image ships wget only).
 
-RUN ["corepack", "enable"]
-RUN ["corepack", "install"]
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.14"
+ENV BUN_INSTALL=/root/.bun
+ENV PATH=$BUN_INSTALL/bin:$PATH
 
 ## Install Node.js dependencies (defined in package.json)
-RUN ["pnpm", "install", "--frozen-lockfile", "--config.confirmModulesPurge=false"]
+RUN ["bun", "install", "--frozen-lockfile"]
 
 ## Compile and add the directory with compiled binaries to the PATH for direct access
 

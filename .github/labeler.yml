@@ -11,7 +11,7 @@ typescript:
             'devtools/**',
             'packages/**',
             'package.json',
-            'pnpm-*.yaml',
+            'bun.lock',
             '.oxlintrc.json',
             'tsconfig.json',
           ]

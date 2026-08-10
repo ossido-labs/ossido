@@ -1,2 +1,0 @@
-[install.scopes]
-ossido-labs = { url = "https://registry.npmjs.org", token = "$NPM_TOKEN" }

@@ -1,6 +1,6 @@
 # project
 node_modules
-.pnpm-store
+.bun
 target
 .turbo
 

@@ -6,8 +6,22 @@ on:
 
 jobs:
   publish_npm_dry_run:
-    name: NPM publish (dry run)
+    name: NPM publish (dry run) - ${{ matrix.package }}
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        # Order does not matter: `bun pm pack` rewrites each `workspace:*`
+        # interlink to its concrete version in the tarball, and npm does not
+        # verify that dependencies already exist on the registry at publish time.
+        package:
+          - ossido-ui
+          - ossido-eslint-plugin
+          - ossido-mdx
+          - ossido-react-vite-plugin
+          - ossido-router
+          - ossido
 
     steps:
       - name: Checkout code
@@ -15,20 +29,36 @@ jobs:
 
       - name: Install NodeJS Dependencies
         uses: ./.github/actions/install-node-dependencies
-        with:
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Build
-        run: pnpm build
+        run: bun run build
 
-      - name: Publish
-        run: pnpm publish -r --no-git-checks --dry-run
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Pack with bun (rewrites `workspace:*` -> concrete versions, which npm
+      # cannot do), then validate the tarball with `npm publish --dry-run`. The
+      # dry run also fails fast if the version already exists on the registry.
+      - name: Pack and validate
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          TARBALL=$(bun pm pack --quiet --ignore-scripts | tail -1)
+          npm publish "./$TARBALL" --dry-run --access public
 
   publish_crates_dry_run:
-    name: Crates publish (dry run)
+    name: Crates publish (dry run) - ${{ matrix.crate }}
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        # Safe to run in parallel: `--no-verify` skips the isolated compile step,
+        # which would otherwise try to resolve workspace-internal deps (e.g.
+        # ossido_ssr) from crates.io before they are published. Compilation is
+        # already covered by Rust CI; this dry run validates packaging/manifest.
+        crate:
+          - ossido_macros
+          - ossido_internal
+          - ossido_ssr
+          - ossido
+          - ossido_cli
 
     steps:
       - name: Checkout code
@@ -39,20 +69,34 @@ jobs:
         with:
           toolchain: 'stable'
 
-      - uses: katyo/publish-crates@v2
-        with:
-          # Workspace root: publishes all crates in dependency order — the `ossido`
-          # library, `ossido_macros`, `ossido_internal`, and the `ossido_cli`
-          # binary crate.
-          path: '.'
-          dry-run: true
-          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          check-repo: true
+      - name: Publish (dry run)
+        run: cargo publish -p ${{ matrix.crate }} --dry-run --no-verify
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   publish_npm:
-    name: NPM publish
+    name: NPM publish - ${{ matrix.package }}
     needs: [publish_npm_dry_run, publish_crates_dry_run]
     runs-on: ubuntu-latest
+
+    # npm trusted publishing (OIDC): npm authenticates to the registry with a
+    # short-lived GitHub OIDC token instead of a long-lived NPM_TOKEN, and emits
+    # provenance automatically. A trusted publisher must be configured on
+    # npmjs.com for each package (org=ossido-labs, repo=ossido, workflow=release.yml).
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      fail-fast: true
+      matrix:
+        package:
+          - ossido-ui
+          - ossido-eslint-plugin
+          - ossido-mdx
+          - ossido-react-vite-plugin
+          - ossido-router
+          - ossido
 
     steps:
       - name: Checkout code
@@ -60,24 +104,50 @@ jobs:
 
       - name: Install NodeJS Dependencies
         uses: ./.github/actions/install-node-dependencies
-        with:
-          registry-url: 'https://registry.npmjs.org'
+
+      # Node 22 ships npm 10; trusted publishing (OIDC) needs npm >= 11.5.1.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@^11.5.1
 
       - name: Clone root README.md on ossido package
+        if: matrix.package == 'ossido'
         run: cp README.md packages/ossido/README.md
 
       - name: Build
-        run: pnpm build
+        run: bun run build
 
-      - name: Publish
-        run: pnpm publish -r --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Pack with bun so `workspace:*` interlinks become concrete versions (npm
+      # cannot rewrite them); dist is already built above so skip prepack scripts.
+      - name: Pack
+        id: pack
+        working-directory: packages/${{ matrix.package }}
+        run: echo "tarball=$(bun pm pack --quiet --ignore-scripts | tail -1)" >> "$GITHUB_OUTPUT"
+
+      # No NODE_AUTH_TOKEN: npm uses the OIDC trusted publisher. Provenance is
+      # generated automatically on GitHub Actions.
+      - name: Publish to npm
+        working-directory: packages/${{ matrix.package }}
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
 
   publish_crates:
-    name: Crates publish
+    name: Crates publish - ${{ matrix.crate }}
     needs: [publish_npm_dry_run, publish_crates_dry_run]
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      # crates.io enforces that a crate's dependencies already exist on the
+      # registry, so crates must publish sequentially in dependency order
+      # (leaves first). `cargo publish` waits for the index to update before
+      # returning, so a later crate sees its just-published dependency.
+      max-parallel: 1
+      matrix:
+        crate:
+          - ossido_macros
+          - ossido_internal
+          - ossido_ssr
+          - ossido
+          - ossido_cli
 
     steps:
       - name: Checkout code
@@ -88,11 +158,7 @@ jobs:
         with:
           toolchain: 'stable'
 
-      - uses: katyo/publish-crates@v2
-        with:
-          # Workspace root: publishes all crates in dependency order — the `ossido`
-          # library, `ossido_macros`, `ossido_internal`, and the `ossido_cli`
-          # binary crate.
-          path: '.'
-          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          check-repo: true
+      - name: Publish
+        run: cargo publish -p ${{ matrix.crate }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

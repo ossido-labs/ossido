@@ -88,10 +88,10 @@ jobs:
         run: ../../target/debug/ossido build
 
       - name: Check formatting
-        run: bun run format
+        run: bunx oxfmt --check ./examples/${{ matrix.example_name }}
 
       - name: Typecheck
-        run: bun run typecheck
+        run: bun run --filter "./examples/${{ matrix.example_name }}" typecheck
 
   ci_ok:
     name: Examples CI OK

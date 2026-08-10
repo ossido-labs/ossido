@@ -26,6 +26,8 @@
 Ossido is a full-stack web framework for building React applications with a Rust backend. If you have
 experience with [Next.js](https://nextjs.org/), you will feel right at home.
 
+> ### **🚨 This project is still in early development. Please report any issues you find. 🚨**
+
 > **Ossido is the successor to [Tuono](https://github.com/tuono-labs/tuono).** It began as a fork of
 > the (now unmaintained) Tuono framework and carries its development forward.
 >
