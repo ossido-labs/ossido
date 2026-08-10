@@ -88,7 +88,12 @@ pub fn install_dev_panic_hook() {
         let _ = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
             let location = info.location().map(|loc| PanicLocation {
-                file: loc.file().to_string(),
+                // Normalise to `/`: on Windows `Location::file()` joins the
+                // generated main.rs dir with the module `#[path]` using `\`
+                // (e.g. `.ossido\..\src\routes\...`). Forward slashes still read
+                // fine via `fs` on Windows and give a portable path in the
+                // overlay / `[BE]` log.
+                file: loc.file().replace('\\', "/"),
                 line: loc.line(),
                 column: loc.column(),
             });
@@ -171,7 +176,10 @@ impl ServerError {
                         .ok()
                         .map(|rel| rel.to_string_lossy().into_owned())
                 })
-                .unwrap_or_else(|| source.file.trim_start_matches("../").to_string());
+                .unwrap_or_else(|| source.file.trim_start_matches("../").to_string())
+                // Portable separators in the overlay regardless of which branch
+                // produced the path (Windows `to_string_lossy` yields `\`).
+                .replace('\\', "/");
 
             CodeLocation {
                 file: display,
