@@ -1,9 +1,9 @@
 use axum::routing::{Router, get, post};
+use ossido_internal::config::Config;
+use ossido_internal::log::{self, Level};
 use ossido_ssr::Ssr;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
-use ossido_internal::config::Config;
-use ossido_internal::log::{self, Level};
 
 use crate::catch_all::catch_all;
 use crate::config::GLOBAL_CONFIG;

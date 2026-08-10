@@ -90,7 +90,10 @@ mod tests {
     #[test]
     fn import_main_application_state_emits_the_use_when_state_is_used() {
         let stmt = import_main_application_state(args(&["db"])).expect("a use statement");
-        assert_eq!(norm(&stmt), "usecrate::ossido_main_state::ApplicationState;");
+        assert_eq!(
+            norm(&stmt),
+            "usecrate::ossido_main_state::ApplicationState;"
+        );
     }
 
     #[test]

@@ -10,7 +10,8 @@ use utils::temp_ossido_project::TempOssidoProject;
 
 const POST_API_FILE: &str = "#[ossido::api(POST)]\nasync fn post_handler() {}\n";
 const GET_API_FILE: &str = "#[ossido::api(GET)]\nasync fn get_handler() {}\n";
-const HANDLER_FILE: &str = "#[ossido::handler]\nasync fn handler(_req: ossido::Request) -> ossido::Response { todo!() }";
+const HANDLER_FILE: &str =
+    "#[ossido::handler]\nasync fn handler(_req: ossido::Request) -> ossido::Response { todo!() }";
 
 fn tracing_message(level: Level, module: &str, message: &str) -> String {
     format!("\x1b[31m{level}\x1b[0m \x1b[2mossido_cli::{module}\x1b[0m\x1b[2m:\x1b[0m {message}\n")
@@ -470,8 +471,9 @@ fn it_wires_the_static_paths_endpoint_for_a_dynamic_route() {
         .assert()
         .success();
 
-    let temp_main_rs_content = fs::read_to_string(temp_ossido_project.path().join(".ossido/main.rs"))
-        .expect("Failed to read '.ossido/main.rs' content.");
+    let temp_main_rs_content =
+        fs::read_to_string(temp_ossido_project.path().join(".ossido/main.rs"))
+            .expect("Failed to read '.ossido/main.rs' content.");
 
     // The usual dynamic SSR route…
     assert_contains_ignoring_whitespace(
@@ -500,8 +502,9 @@ fn it_omits_the_static_paths_endpoint_without_the_macro() {
         .assert()
         .success();
 
-    let temp_main_rs_content = fs::read_to_string(temp_ossido_project.path().join(".ossido/main.rs"))
-        .expect("Failed to read '.ossido/main.rs' content.");
+    let temp_main_rs_content =
+        fs::read_to_string(temp_ossido_project.path().join(".ossido/main.rs"))
+            .expect("Failed to read '.ossido/main.rs' content.");
 
     // The dynamic SSR route is present, but no enumeration endpoint is wired.
     assert_contains_ignoring_whitespace(

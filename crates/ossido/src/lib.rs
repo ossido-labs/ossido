@@ -26,15 +26,15 @@ mod vite_websocket_proxy;
 // Re-exports
 pub use axum;
 pub use axum_extra::extract::cookie;
-// `tower` is re-exported (like `axum`) because middleware is a standard part of
-// Ossido — a `#[middleware]` returns a `tower::Layer`. `tower_http` is left out
-// on purpose: it's an opt-in dependency users add themselves when needed.
-pub use tower;
+pub use error_handler::{ErrorContext, set_error_handler};
 pub use logger::Logger;
 pub use mode::Mode;
+// `Props` is re-exported both as the struct (from `response`) and as the
+// attribute macro — the same name in two namespaces, like `serde::Serialize`.
+pub use ossido_macros::{Props, Type, api, handler, middleware, static_paths};
+pub use ossido_ssr::Ssr;
 pub use payload::Payload;
 pub use request::Request;
-pub use error_handler::{ErrorContext, set_error_handler};
 pub use response::{
     HandlerData, Props, RenderJob, Response, chain_json, error_json, error_render_job,
     finish_render, render_chain, render_error_to_string, resolve_handler, respond_to_api_error,
@@ -45,9 +45,9 @@ pub use response::{
 pub use serde;
 pub use server::{Server, ossido_internal_init_v8_platform};
 pub use server_error::{ErrorSource, ServerError, catch_handler};
-pub use ossido_ssr::Ssr;
 pub use static_paths::{SegmentValue, StaticParams, StaticPaths};
 pub use tokio;
-// `Props` is re-exported both as the struct (from `response`) and as the
-// attribute macro — the same name in two namespaces, like `serde::Serialize`.
-pub use ossido_macros::{Props, Type, api, handler, middleware, static_paths};
+// `tower` is re-exported (like `axum`) because middleware is a standard part of
+// Ossido — a `#[middleware]` returns a `tower::Layer`. `tower_http` is left out
+// on purpose: it's an opt-in dependency users add themselves when needed.
+pub use tower;

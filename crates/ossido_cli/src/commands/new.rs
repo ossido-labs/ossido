@@ -245,12 +245,8 @@ fn apply_overlays(folder_path: &Path, selection: &Selection) {
     // even though it drives the base template, so the generated config stays the
     // single source of truth (it reproduces the base's own plugin setup).
     let alias = selection.path_alias.as_deref();
-    if !selection.features.is_empty()
-        || selection.output != OutputMode::Server
-        || alias.is_some()
-    {
-        let config =
-            scaffold::generate_ossido_config(&selection.features, selection.output, alias);
+    if !selection.features.is_empty() || selection.output != OutputMode::Server || alias.is_some() {
+        let config = scaffold::generate_ossido_config(&selection.features, selection.output, alias);
         if let Err(err) = fs::write(folder_path.join("ossido.config.ts"), config) {
             eprintln!("Warning: failed to write ossido.config.ts: {err}");
         }
@@ -632,10 +628,7 @@ fn update_cargo_toml_version(folder_path: &Path) -> io::Result<()> {
     let cargo_toml_path = folder_path.join(PathBuf::from("Cargo.toml"));
     let cargo_toml = fs::read_to_string(&cargo_toml_path)
         .unwrap_or_else(|err| exit_with_error(&format!("Failed to read Cargo.toml: {err}")));
-    let cargo_toml = cargo_toml.replace(
-        "{ path = \"../../crates/ossido/\" }",
-        &format!("\"{v}\""),
-    );
+    let cargo_toml = cargo_toml.replace("{ path = \"../../crates/ossido/\" }", &format!("\"{v}\""));
 
     let mut file = OpenOptions::new()
         .write(true)

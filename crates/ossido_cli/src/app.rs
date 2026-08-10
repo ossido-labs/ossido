@@ -7,9 +7,9 @@ use std::process::{Child, Command, Stdio};
 
 use glob::{GlobError, glob};
 use http::Method;
-use tracing::error;
 use ossido_internal::config::Config;
 use ossido_internal::log::{self, Level};
+use tracing::error;
 
 use crate::mode::Mode;
 use crate::route::Route;
@@ -281,7 +281,10 @@ impl App {
             // (via the vite `define`) so the router fetches the pre-rendered
             // `.json` data files — there is no server to resolve the
             // extensionless `/__ossido/data{path}` route at serve time.
-            .env("OSSIDO_STATIC", if static_export { "true" } else { "false" })
+            .env(
+                "OSSIDO_STATIC",
+                if static_export { "true" } else { "false" },
+            )
             .output()
             .unwrap_or_else(|_| {
                 error!("Failed to build the react source");
@@ -311,7 +314,10 @@ impl App {
 
         Command::new(RUN_BUILD_HOOK_SCRIPT)
             .arg(name)
-            .env("OSSIDO_STATIC", if static_export { "true" } else { "false" })
+            .env(
+                "OSSIDO_STATIC",
+                if static_export { "true" } else { "false" },
+            )
             .status()
             .map(|status| status.success())
             .unwrap_or(false)

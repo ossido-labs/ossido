@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
+use ossido_internal::config::OutputMode;
 use spinners::{Spinner, Spinners};
 use tracing::{Level, span};
-use ossido_internal::config::OutputMode;
 
 use crate::commands::new::NewOptions;
 use crate::commands::{build, dev, new};
@@ -75,7 +75,11 @@ enum Actions {
 #[derive(Parser, Debug)]
 // The crate is `ossido_cli`, but the installed command is `ossido` — pin the
 // program name so `--help`/`--version` show `ossido`, not the crate name.
-#[command(name = "ossido", version, about = "The React/Rust full-stack framework")]
+#[command(
+    name = "ossido",
+    version,
+    about = "The React/Rust full-stack framework"
+)]
 struct Args {
     #[command(subcommand)]
     action: Actions,

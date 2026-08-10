@@ -561,9 +561,15 @@ mod tests {
     #[test]
     fn should_find_dynamic_paths() {
         let routes = [
-            ("/home/user/Documents/ossido/src/routes/about/page.rs", false),
+            (
+                "/home/user/Documents/ossido/src/routes/about/page.rs",
+                false,
+            ),
             ("/home/user/Documents/ossido/src/routes/page.rs", false),
-            ("/home/user/Documents/ossido/src/routes/posts/page.rs", false),
+            (
+                "/home/user/Documents/ossido/src/routes/posts/page.rs",
+                false,
+            ),
             (
                 "/home/user/Documents/ossido/src/routes/posts/[post]/page.rs",
                 true,

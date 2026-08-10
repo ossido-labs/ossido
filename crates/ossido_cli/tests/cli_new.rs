@@ -108,8 +108,8 @@ async fn it_patches_mdx_onto_the_base_template() {
     // MDX is a patch, not a base swap — no Tailwind deps leak in.
     assert!(!package_json.contains("tailwindcss"));
 
-    let config =
-        fs::read_to_string(project_path.join("ossido.config.ts")).expect("ossido.config.ts missing");
+    let config = fs::read_to_string(project_path.join("ossido.config.ts"))
+        .expect("ossido.config.ts missing");
     assert!(config.contains("output: 'static'"));
     assert!(config.contains("import { ossidoMdx } from '@ossido-labs/ossido-mdx/vite'"));
     assert!(config.contains("ossidoMdx()"));

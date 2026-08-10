@@ -134,10 +134,7 @@ impl ProdJs {
         Self::with_ssr(|ssr| crate::debug::time("ssr render", || ssr.render(RENDER_FN, params)))
     }
 
-    fn render_stream(
-        params: Option<&str>,
-        mut on_chunk: impl FnMut(&str),
-    ) -> Result<(), SsrError> {
+    fn render_stream(params: Option<&str>, mut on_chunk: impl FnMut(&str)) -> Result<(), SsrError> {
         Self::with_ssr(move |ssr| {
             crate::debug::time("ssr render", || {
                 // Lend the sink to the render; `ossido_ssr` borrows it for the call.
@@ -236,10 +233,7 @@ impl DevJs {
         result
     }
 
-    fn render_stream(
-        params: Option<&str>,
-        mut on_chunk: impl FnMut(&str),
-    ) -> Result<(), SsrError> {
+    fn render_stream(params: Option<&str>, mut on_chunk: impl FnMut(&str)) -> Result<(), SsrError> {
         let result = Self::with_ssr(move |ssr| match ssr {
             Some(ssr) => crate::debug::time("ssr render", || {
                 // Lend the sink to the render; `ossido_ssr` borrows it for the call.

@@ -326,11 +326,9 @@ where
     /// Named function exports become callable entry points, looked up by name in
     /// [`Ssr::render`] exactly like the script path.
     pub fn from_module(source: String) -> Result<Self, SsrError> {
-        let isolate =
-            Box::into_raw(Box::new(v8::Isolate::new(v8::CreateParams::default())));
+        let isolate = Box::into_raw(Box::new(v8::Isolate::new(v8::CreateParams::default())));
 
-        let handle_scope =
-            unsafe { Box::into_raw(Box::new(v8::HandleScope::new(&mut *isolate))) };
+        let handle_scope = unsafe { Box::into_raw(Box::new(v8::HandleScope::new(&mut *isolate))) };
 
         let context = unsafe { v8::Context::new(&mut *handle_scope, Default::default()) };
 
@@ -405,9 +403,7 @@ where
         let namespace = module.get_module_namespace();
         let object = match namespace.to_object(scope) {
             Some(val) => val,
-            None => {
-                return Err(SsrError::InvalidJs("The module namespace is not an object"))
-            }
+            None => return Err(SsrError::InvalidJs("The module namespace is not an object")),
         };
 
         let mut fn_map: HashMap<String, v8::Local<v8::Function>> = HashMap::new();
@@ -600,8 +596,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::Once;
+
+    use super::*;
 
     /// A [`StreamSink`] that collects chunks into a `Vec` for assertions. Since
     /// `Streaming::render` only borrows the sink, tests instantiate one locally

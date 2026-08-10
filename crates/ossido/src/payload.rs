@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use erased_serde::Serialize;
+use ossido_internal::config::ServerConfig;
 use serde::Serialize as SerdeSerialize;
 use serde_json::value::RawValue;
-use ossido_internal::config::ServerConfig;
 
 use crate::config::GLOBAL_CONFIG;
 use crate::manifest::MANIFEST;

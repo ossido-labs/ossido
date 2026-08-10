@@ -15,9 +15,9 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use ossido_internal::log::{self, Level, TraceSpan};
 use tokio::task::futures::TaskLocalFuture;
 use tokio::task_local;
-use ossido_internal::log::{self, Level, TraceSpan};
 
 /// Accumulates the timed sub-tasks of a single request. Shared (via `Arc`) with
 /// the task-local so concurrently-polled handlers on the request task can all

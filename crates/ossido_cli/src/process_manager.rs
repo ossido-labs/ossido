@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-
 use std::time::{Duration, Instant};
 
 use clap::crate_version;
 use colored::Colorize;
+use ossido_internal::config::Config;
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tracing::trace;
-use ossido_internal::config::Config;
 use watchexec_supervisor::command::{Command, Program};
 use watchexec_supervisor::job::{Job, start_job};
 
@@ -118,7 +117,12 @@ impl ProcessManager {
     // the label of each phase as it begins, so the caller can render a checklist
     // (tick the previous item, start the next) instead of one silent, often
     // multi-minute, spinner.
-    pub async fn start_dev_processes(&mut self, mut report: impl FnMut(&str), host: &str, port: u16) {
+    pub async fn start_dev_processes(
+        &mut self,
+        mut report: impl FnMut(&str),
+        host: &str,
+        port: u16,
+    ) {
         trace!("Starting dev processes");
         self.start_process(ProcessId::WatchReactSrc);
         self.start_process(ProcessId::BuildRustSrc);

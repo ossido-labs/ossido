@@ -1,5 +1,6 @@
-use ossido_ssr::Ssr;
 use std::sync::Once;
+
+use ossido_ssr::Ssr;
 
 static INIT: Once = Once::new();
 

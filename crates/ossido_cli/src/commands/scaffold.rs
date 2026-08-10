@@ -8,8 +8,8 @@
 //! selected set rather than string-patched, which keeps composition unambiguous.
 
 use clap::crate_version;
-use serde_json::Value;
 pub use ossido_internal::config::OutputMode;
+use serde_json::Value;
 
 /// A composable scaffolding feature.
 ///
@@ -275,7 +275,10 @@ mod tests {
         assert!(merged.contains("\"@tailwindcss/vite\": \"^4.3.3\""));
         assert!(merged.contains("\"tailwindcss\": \"^4.3.3\""));
         // MDX contributes `@ossido-labs/ossido-mdx`, pinned to this CLI's version.
-        assert!(merged.contains(&format!("\"@ossido-labs/ossido-mdx\": \"{}\"", crate_version!())));
+        assert!(merged.contains(&format!(
+            "\"@ossido-labs/ossido-mdx\": \"{}\"",
+            crate_version!()
+        )));
         // Existing deps untouched.
         assert!(merged.contains("\"react\": \"^19.0.0\""));
     }

@@ -1,8 +1,8 @@
 mod utils;
 use std::io::ErrorKind;
 
-use serial_test::serial;
 use ossido_internal::config::Config;
+use serial_test::serial;
 use utils::TempOssidoProject;
 
 #[test]

@@ -141,7 +141,9 @@ pub fn render_api_routes(routes: &[ApiRoute]) -> String {
         return String::new();
     }
 
-    let mut ts = String::from("declare module \"@ossido-labs/ossido/client\" {\n  interface Register {\n    apiRoutes: {\n");
+    let mut ts = String::from(
+        "declare module \"@ossido-labs/ossido/client\" {\n  interface Register {\n    apiRoutes: {\n",
+    );
 
     for route in routes {
         let params = params_from_path(&route.path);
@@ -213,10 +215,9 @@ mod tests {
 
     #[test]
     fn method_is_read_from_the_api_attribute() {
-        let func: ItemFn = syn::parse_str(
-            "#[api(POST)] async fn create(req: Request) -> Json<User> { todo!() }",
-        )
-        .unwrap();
+        let func: ItemFn =
+            syn::parse_str("#[api(POST)] async fn create(req: Request) -> Json<User> { todo!() }")
+                .unwrap();
         let method = api_method(&func).unwrap();
         assert_eq!(method.method, "POST");
         assert_eq!(method.response, Some("User".to_string()));

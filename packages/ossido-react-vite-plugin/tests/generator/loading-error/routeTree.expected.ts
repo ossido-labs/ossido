@@ -4,37 +4,37 @@ import {
   createRoute,
   __ossido__internal__lazyLoadRoute,
   __ossido__internal__applyRouteHot,
-} from '@ossido-labs/ossido';
+} from '@ossido-labs/ossido'
 
-import RootLayoutImport from './routes/layout';
+import RootLayoutImport from './routes/layout'
 
-import ErrorImport from './routes/error';
-import LoadingImport from './routes/loading';
-import PostsLoadingImport from './routes/posts/loading';
+import ErrorImport from './routes/error'
+import LoadingImport from './routes/loading'
+import PostsLoadingImport from './routes/posts/loading'
 
 const PageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/page'),
-);
+)
 const PostsPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/page'),
-);
+)
 const AboutPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/about/page'),
-);
+)
 const PostspostPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/[post]/page'),
-);
+)
 
 const rootRoute = createRoute({
   isRoot: true,
   component: RootLayoutImport,
   dataKey: '/layout',
-});
+})
 
-const Page = createRoute({ component: PageImport });
-const PostsPage = createRoute({ component: PostsPageImport });
-const AboutPage = createRoute({ component: AboutPageImport });
-const PostspostPage = createRoute({ component: PostspostPageImport });
+const Page = createRoute({ component: PageImport })
+const PostsPage = createRoute({ component: PostsPageImport })
+const AboutPage = createRoute({ component: AboutPageImport })
+const PostspostPage = createRoute({ component: PostspostPageImport })
 
 // Create/Update Routes
 
@@ -45,7 +45,7 @@ const PageRoute = Page.update({
   dataKey: '/page',
   loadingComponent: LoadingImport,
   errorComponent: ErrorImport,
-});
+})
 
 const PostsPageRoute = PostsPage.update({
   path: '/posts',
@@ -54,7 +54,7 @@ const PostsPageRoute = PostsPage.update({
   dataKey: '/posts/page',
   loadingComponent: PostsLoadingImport,
   errorComponent: ErrorImport,
-});
+})
 
 const AboutPageRoute = AboutPage.update({
   path: '/about',
@@ -63,7 +63,7 @@ const AboutPageRoute = AboutPage.update({
   dataKey: '/about/page',
   loadingComponent: LoadingImport,
   errorComponent: ErrorImport,
-});
+})
 
 const PostspostPageRoute = PostspostPage.update({
   path: '/posts/[post]',
@@ -72,7 +72,7 @@ const PostspostPageRoute = PostspostPage.update({
   dataKey: '/posts/[post]/page',
   loadingComponent: PostsLoadingImport,
   errorComponent: ErrorImport,
-});
+})
 
 // Create and export the route tree
 
@@ -81,7 +81,7 @@ export const routeTree = rootRoute.addChildren([
   AboutPageRoute,
   PostsPageRoute,
   PostspostPageRoute,
-]);
+])
 
 if (import.meta.hot) {
   import.meta.hot.accept(
@@ -98,35 +98,35 @@ if (import.meta.hot) {
     ([m0, m1, m2, m3, m4, m5, m6, m7]) => {
       __ossido__internal__applyRouteHot(() => {
         if (m0) {
-          rootRoute.component = m0.default;
+          rootRoute.component = m0.default
         }
         if (m1) {
-          PageImport.update(m1.default);
+          PageImport.update(m1.default)
         }
         if (m2) {
-          PageRoute.options.loadingComponent = m2.default;
-          AboutPageRoute.options.loadingComponent = m2.default;
+          PageRoute.options.loadingComponent = m2.default
+          AboutPageRoute.options.loadingComponent = m2.default
         }
         if (m3) {
-          PageRoute.options.errorComponent = m3.default;
-          PostsPageRoute.options.errorComponent = m3.default;
-          AboutPageRoute.options.errorComponent = m3.default;
-          PostspostPageRoute.options.errorComponent = m3.default;
+          PageRoute.options.errorComponent = m3.default
+          PostsPageRoute.options.errorComponent = m3.default
+          AboutPageRoute.options.errorComponent = m3.default
+          PostspostPageRoute.options.errorComponent = m3.default
         }
         if (m4) {
-          PostsPageImport.update(m4.default);
+          PostsPageImport.update(m4.default)
         }
         if (m5) {
-          PostsPageRoute.options.loadingComponent = m5.default;
-          PostspostPageRoute.options.loadingComponent = m5.default;
+          PostsPageRoute.options.loadingComponent = m5.default
+          PostspostPageRoute.options.loadingComponent = m5.default
         }
         if (m6) {
-          AboutPageImport.update(m6.default);
+          AboutPageImport.update(m6.default)
         }
         if (m7) {
-          PostspostPageImport.update(m7.default);
+          PostspostPageImport.update(m7.default)
         }
-      });
+      })
     },
-  );
+  )
 }

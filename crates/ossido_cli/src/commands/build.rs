@@ -4,9 +4,9 @@ use std::time::{Duration, Instant};
 
 use colored::Colorize;
 use fs_extra::dir::{CopyOptions, copy};
+use ossido_internal::config::OutputMode;
 use spinners::{Spinner, Spinners};
 use tracing::{error, trace};
-use ossido_internal::config::OutputMode;
 
 use crate::app::App;
 use crate::mode::Mode;

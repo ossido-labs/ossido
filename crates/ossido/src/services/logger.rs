@@ -6,9 +6,9 @@ use std::task::{Context, Poll};
 use colored::Colorize;
 use http::method::Method;
 use http::{Request, Response};
+use ossido_internal::log::{self, Level};
 use tokio::time::Instant;
 use tower::{Layer, Service};
-use ossido_internal::log::{self, Level};
 
 /// Colour an HTTP method by verb (GET green, POST blue, DELETE red, …) so the
 /// request log scans at a glance. Uncommon methods keep the default colour.

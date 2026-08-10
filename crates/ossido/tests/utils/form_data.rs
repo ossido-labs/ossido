@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use ossido::Request;
+use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct Payload {

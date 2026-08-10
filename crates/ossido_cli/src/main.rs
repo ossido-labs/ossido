@@ -1,6 +1,6 @@
+use ossido_cli::cli::app;
 use tracing::error;
 use tracing_subscriber::EnvFilter;
-use ossido_cli::cli::app;
 
 fn main() {
     // Respect `NO_COLOR` before any coloured output is produced.

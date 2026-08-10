@@ -6,8 +6,8 @@ use axum::body::Body;
 use axum::extract::{Path, Query};
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
-use reqwest::Client;
 use ossido_internal::log::{self, Level};
+use reqwest::Client;
 
 use crate::config::GLOBAL_CONFIG;
 

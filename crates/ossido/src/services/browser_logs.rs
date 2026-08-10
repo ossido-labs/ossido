@@ -6,8 +6,8 @@
 
 use colored::Colorize;
 use http::method::Method;
-use serde::Deserialize;
 use ossido_internal::log::{self, ErrorReport, Level, Source};
+use serde::Deserialize;
 
 use crate::config::GLOBAL_CONFIG;
 

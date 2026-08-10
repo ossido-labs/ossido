@@ -4,8 +4,8 @@ use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
 use glob::glob;
-use tracing::{error, trace};
 use ossido_internal::ossido_println;
+use tracing::{error, trace};
 
 use crate::symbols::{PROPS_TRAIT, TYPE_TRAIT};
 use crate::typescript::FileTypes;
