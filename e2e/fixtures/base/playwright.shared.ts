@@ -8,7 +8,9 @@ export const ossidoBin = path.join(
   '../../../',
   'target',
   'debug',
-  '@ossido-labs/ossido',
+  // The CLI crate `ossido_cli` builds an unscoped `ossido` binary (see its
+  // `[[bin]]`); only the npm packages are scoped `@ossido-labs/*`.
+  'ossido',
 );
 
 /** Shared e2e setup script (linking the workspace packages, etc.). */
