@@ -105,8 +105,9 @@ jobs:
       - name: Install NodeJS Dependencies
         uses: ./.github/actions/install-node-dependencies
 
-      # Node 22 ships npm 10; trusted publishing (OIDC) needs npm >= 11.5.1.
-      - name: Upgrade npm for trusted publishing
+      # Trusted publishing (OIDC) needs npm >= 11.5.1. Node 24 already ships
+      # npm 11.x; this guarantees the minimum regardless of the bundled version.
+      - name: Ensure npm supports trusted publishing
         run: npm install -g npm@^11.5.1
 
       - name: Clone root README.md on ossido package
