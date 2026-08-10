@@ -59,12 +59,15 @@ pub fn is_collectible_route(entry: &Path, base_path: &Path) -> bool {
 /// Whether an entry sits under the top-level `api` directory (API handlers keep
 /// arbitrary filenames rather than the `page` convention).
 pub fn is_api_path(entry: &Path, base_path: &Path) -> bool {
-    let base_path_str = base_path.to_string_lossy();
+    // Normalise separators to `/` first so this is correct regardless of the
+    // platform separator (Windows `read_dir`/glob yields `\`) — then strip the
+    // always-`/` routes prefix and test the logical route path.
+    let base_path_str = base_path.to_string_lossy().replace('\\', "/");
     entry
         .to_str()
         .unwrap_or_default()
-        .replace(&format!("{base_path_str}{ROUTES_FOLDER_PATH}"), "")
         .replace('\\', "/")
+        .replace(&format!("{base_path_str}/src/routes"), "")
         .starts_with("/api/")
 }
 
@@ -192,13 +195,16 @@ impl App {
         let base_path_str = self
             .base_path
             .to_str()
-            .expect("Failed to read as str base_path");
+            .expect("Failed to read as str base_path")
+            // Normalise the base separators to `/` up front so the strip below
+            // works regardless of the platform separator.
+            .replace('\\', "/");
         let path = entry
             .to_str()
             .expect("Failed to read entry as str")
-            .replace(&format!("{base_path_str}{ROUTES_FOLDER_PATH}"), "")
-            // Cleanup windows paths
-            .replace("\\", "/")
+            // Cleanup windows paths first, then strip the always-`/` prefix.
+            .replace('\\', "/")
+            .replace(&format!("{base_path_str}/src/routes"), "")
             .replace(".rs", "")
             .replace(".mdx", "")
             .replace(".tsx", "");
