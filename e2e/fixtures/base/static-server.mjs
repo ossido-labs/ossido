@@ -5,7 +5,7 @@
 // (no rewrites). Usage: `node static-server.mjs <root-dir> <port>`.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { join, normalize, extname } from 'node:path';
+import { join, normalize, extname, sep } from 'node:path';
 
 const [, , rootArg, portArg] = process.argv;
 const root = normalize(join(process.cwd(), rootArg ?? 'out/static'));
@@ -34,8 +34,9 @@ const CONTENT_TYPES = {
 async function resolveFile(url) {
   const decoded = decodeURIComponent(url.split('?')[0]);
   const filePath = normalize(join(root, decoded));
-  // Prevent path traversal outside the served root.
-  if (filePath !== root && !filePath.startsWith(root + '/')) return null;
+  // Prevent path traversal outside the served root. Use the platform separator
+  // (`\` on Windows) since `normalize`/`join` produce native-separator paths.
+  if (filePath !== root && !filePath.startsWith(root + sep)) return null;
 
   try {
     const info = await stat(filePath);
