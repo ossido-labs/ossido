@@ -13,15 +13,11 @@ use tracing::trace;
 use watchexec_supervisor::command::{Command, Program};
 use watchexec_supervisor::job::{Job, start_job};
 
-#[cfg(target_os = "windows")]
-const DEV_WATCH_BIN_SRC: &str = "node_modules\\.bin\\ossido-dev-watch.cmd";
-#[cfg(target_os = "windows")]
-const DEV_SSR_BIN_SRC: &str = "node_modules\\.bin\\ossido-dev-ssr.cmd";
-
-#[cfg(not(target_os = "windows"))]
-const DEV_WATCH_BIN_SRC: &str = "node_modules/.bin/ossido-dev-watch";
-#[cfg(not(target_os = "windows"))]
-const DEV_SSR_BIN_SRC: &str = "node_modules/.bin/ossido-dev-ssr";
+// Node helpers from the `@ossido-labs/ossido` package's `bin/` dir, run via
+// `node <path>` (see the note in `app.rs`): bun's Windows shims are `.bunx`,
+// not `.cmd`, so invoking node on the script directly is portable.
+const DEV_WATCH_BIN_SRC: &str = "node_modules/@ossido-labs/ossido/bin/watch.js";
+const DEV_SSR_BIN_SRC: &str = "node_modules/@ossido-labs/ossido/bin/dev-ssr.js";
 
 /// Best-effort local network IP (e.g. `192.168.x.x`) for the "Network" URL.
 /// Opens a UDP socket and inspects which local interface would route to a
@@ -85,7 +81,7 @@ impl ProcessManager {
         let mut processes = HashMap::new();
         processes.insert(
             ProcessId::WatchReactSrc,
-            start_supervisor_job(DEV_WATCH_BIN_SRC, Vec::new()),
+            start_supervisor_job("node", vec![DEV_WATCH_BIN_SRC]),
         );
 
         processes.insert(
@@ -100,7 +96,7 @@ impl ProcessManager {
 
         processes.insert(
             ProcessId::BuildReactSSRSrc,
-            start_supervisor_job(DEV_SSR_BIN_SRC, Vec::new()),
+            start_supervisor_job("node", vec![DEV_SSR_BIN_SRC]),
         );
 
         Self { processes }
@@ -212,7 +208,7 @@ impl ProcessManager {
 
     pub fn abort_all(&mut self) {
         trace!("Aborting all processes");
-        for (_, (job, handle)) in self.processes.iter() {
+        for (job, handle) in self.processes.values() {
             job.stop();
             handle.abort();
         }

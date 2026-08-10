@@ -164,7 +164,7 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
 
         trace!("Server is ready, starting static site generation");
 
-        for (_, route) in &app.route_map {
+        for route in app.route_map.values() {
             if let Err(msg) = route.save_ssg_file(&reqwest_client) {
                 exit_and_shut_server(&msg);
             }

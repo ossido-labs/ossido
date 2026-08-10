@@ -17,11 +17,9 @@ fn tracing_message(level: Level, module: &str, message: &str) -> String {
     format!("\x1b[31m{level}\x1b[0m \x1b[2mossido_cli::{module}\x1b[0m\x1b[2m:\x1b[0m {message}\n")
 }
 
-#[cfg(target_os = "windows")]
-const BUILD_OSSIDO_CONFIG: &str = ".\\node_modules\\.bin\\ossido-build-config.cmd";
-
-#[cfg(not(target_os = "windows"))]
-const BUILD_OSSIDO_CONFIG: &str = "./node_modules/.bin/ossido-build-config";
+// Must match the path the CLI probes in `build_ossido_config` (app.rs): the
+// node build helper shipped by the `@ossido-labs/ossido` package.
+const BUILD_OSSIDO_CONFIG: &str = "node_modules/@ossido-labs/ossido/bin/build-config.js";
 
 #[test]
 #[serial]

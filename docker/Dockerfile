@@ -26,8 +26,11 @@ RUN ["/bin/sh", "-c", "NODE_VERSION=$(cat /tmp/.nvmrc | tr -d '\r') && \
 ENV PATH /usr/local/node/bin:$PATH
 
 # cargo-watch installation (for Rust live-reloading during dev')
+## `--locked` uses cargo-watch's pinned Cargo.lock so a transitive dep does not
+## pull in a newer version with a higher MSRV than this image's rustc (e.g.
+## notify-rust 4.18 requires rustc 1.89 while the image ships 1.88).
 
-RUN ["cargo", "install", "cargo-watch"]
+RUN ["cargo", "install", "cargo-watch", "--locked"]
 
 # global configuration done ! let's focus on the project itself
 

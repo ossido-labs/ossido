@@ -21,7 +21,7 @@ async fn api_endpoint_work() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .get(format!("{server_url}/health_check"))
@@ -44,7 +44,7 @@ async fn not_found_route() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .get(format!("{server_url}/not-found"))
@@ -71,7 +71,7 @@ async fn index_html_route() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .get(format!("{server_url}/"))
@@ -101,7 +101,7 @@ async fn api_route_route() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .get(format!("{server_url}/ossido/data"))
@@ -127,7 +127,7 @@ async fn it_reads_the_catch_all_path_parameter() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .get(format!("{server_url}/catch_all/url_parameter"))
@@ -149,7 +149,7 @@ async fn it_reads_the_path_parameter() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .get(format!("{server_url}/dynamic/url_parameter"))
@@ -171,7 +171,7 @@ async fn it_reads_an_env_var() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .get(format!("{server_url}/env"))
@@ -193,7 +193,7 @@ async fn it_parses_the_http_body() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let response = client
         .post(format!("{server_url}/api/post"))
@@ -216,7 +216,7 @@ async fn it_parses_the_form_encoded_url() {
         .build()
         .unwrap();
 
-    let server_url = format!("http://{}:{}", &app.address, &app.port);
+    let server_url = format!("http://{}:{}", app.address, app.port);
 
     let mut form_params = HashMap::new();
     form_params.insert("data", "payload");

@@ -26,17 +26,15 @@
 //! use ossido_ssr::Ssr;
 //! use std::fs::read_to_string;
 //!
-//! fn main() {
-//!     Ssr::create_platform();
+//! Ssr::create_platform();
 //!
-//!     let source = read_to_string("./path/to/build.js").unwrap();
+//! let source = read_to_string("./path/to/build.js").unwrap();
 //!
-//!     let mut js = Ssr::from(source, "entryPoint").unwrap();
+//! let mut js = Ssr::from(source, "entryPoint").unwrap();
 //!
-//!     let html = js.render_to_string(None).unwrap();
-//!    
-//!     assert_eq!(html, "<!doctype html><html>...</html>".to_string());
-//! }
+//! let html = js.render_to_string(None).unwrap();
+//!
+//! assert_eq!(html, "<!doctype html><html>...</html>".to_string());
 //! ```
 //! ## What is the "entryPoint"?
 //!
@@ -74,25 +72,23 @@
 //! use ossido_ssr::Ssr;
 //! use std::fs::read_to_string;
 //!
-//! fn main() {
-//!     Ssr::create_platform();
+//! Ssr::create_platform();
 //!
-//!     let props = r##"{
-//!       "params": [
-//!            "hello",
-//!            "ciao",
-//!            "こんにちは"
-//!        ]
-//!     }"##;
+//! let props = r##"{
+//!   "params": [
+//!        "hello",
+//!        "ciao",
+//!        "こんにちは"
+//!    ]
+//! }"##;
 //!
-//!     let source = read_to_string("./path/to/build.js").unwrap();
+//! let source = read_to_string("./path/to/build.js").unwrap();
 //!
-//!     let mut js = Ssr::from(source, "entryPoint").unwrap();
+//! let mut js = Ssr::from(source, "entryPoint").unwrap();
 //!
-//!     let html = js.render_to_string(Some(&props)).unwrap();
-//!    
-//!     assert_eq!(html, "<!doctype html><html>...</html>".to_string());
-//! }
+//! let html = js.render_to_string(Some(&props)).unwrap();
+//!
+//! assert_eq!(html, "<!doctype html><html>...</html>".to_string());
 //!```
 //!
 //! # Example with actix-web

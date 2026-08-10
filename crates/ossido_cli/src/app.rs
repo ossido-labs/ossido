@@ -83,25 +83,17 @@ fn port_is_available(host: &str, port: u16) -> bool {
 
 #[cfg(target_os = "windows")]
 pub const ROUTES_FOLDER_PATH: &str = "\\src\\routes";
-#[cfg(target_os = "windows")]
-const BUILD_JS_SCRIPT: &str = ".\\node_modules\\.bin\\ossido-build-prod.cmd";
-
-#[cfg(target_os = "windows")]
-const BUILD_OSSIDO_CONFIG: &str = ".\\node_modules\\.bin\\ossido-build-config.cmd";
-
-#[cfg(target_os = "windows")]
-const RUN_BUILD_HOOK_SCRIPT: &str = ".\\node_modules\\.bin\\ossido-run-build-hook.cmd";
-
 #[cfg(not(target_os = "windows"))]
 pub const ROUTES_FOLDER_PATH: &str = "/src/routes";
-#[cfg(not(target_os = "windows"))]
-const BUILD_JS_SCRIPT: &str = "./node_modules/.bin/ossido-build-prod";
 
-#[cfg(not(target_os = "windows"))]
-const BUILD_OSSIDO_CONFIG: &str = "./node_modules/.bin/ossido-build-config";
-
-#[cfg(not(target_os = "windows"))]
-const RUN_BUILD_HOOK_SCRIPT: &str = "./node_modules/.bin/ossido-run-build-hook";
+// These node helpers ship in the `@ossido-labs/ossido` package's `bin/` dir.
+// Invoke them with `node <path>` rather than the `node_modules/.bin` shim: bun's
+// Windows shims are `.bunx`/`.exe` (not the `.cmd` that npm/pnpm produced), so
+// running node on the script directly is portable across platforms and package
+// managers. Forward slashes are valid on Windows for both `Path` and node.
+const BUILD_JS_SCRIPT: &str = "node_modules/@ossido-labs/ossido/bin/build-prod.js";
+const BUILD_OSSIDO_CONFIG: &str = "node_modules/@ossido-labs/ossido/bin/build-config.js";
+const RUN_BUILD_HOOK_SCRIPT: &str = "node_modules/@ossido-labs/ossido/bin/run-build-hook.js";
 
 #[derive(Debug, Clone)]
 pub struct App {
@@ -276,7 +268,8 @@ impl App {
             std::process::exit(1);
         }
 
-        let output = Command::new(BUILD_JS_SCRIPT)
+        let output = Command::new("node")
+            .arg(BUILD_JS_SCRIPT)
             // For a static export, bake `__OSSIDO_STATIC__` into the client bundle
             // (via the vite `define`) so the router fetches the pre-rendered
             // `.json` data files — there is no server to resolve the
@@ -312,7 +305,8 @@ impl App {
             std::process::exit(1);
         }
 
-        Command::new(RUN_BUILD_HOOK_SCRIPT)
+        Command::new("node")
+            .arg(RUN_BUILD_HOOK_SCRIPT)
             .arg(name)
             .env(
                 "OSSIDO_STATIC",
@@ -339,7 +333,8 @@ impl App {
             std::process::exit(1);
         }
 
-        let config_build_command = Command::new(BUILD_OSSIDO_CONFIG)
+        let config_build_command = Command::new("node")
+            .arg(BUILD_OSSIDO_CONFIG)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

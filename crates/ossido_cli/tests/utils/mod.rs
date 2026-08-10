@@ -1,3 +1,7 @@
+// Shared across integration-test binaries; each `tests/*.rs` is its own crate
+// and only uses a subset of these helpers, so unused ones are expected here.
+#![allow(dead_code)]
+
 pub mod mock_github_endpoint;
 pub mod temp_ossido_project;
 

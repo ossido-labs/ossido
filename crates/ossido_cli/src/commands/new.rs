@@ -274,15 +274,13 @@ fn apply_tsconfig_paths(folder_path: &Path, prefix: &str) {
         }
     };
 
-    match insert_tsconfig_paths(&content, prefix) {
-        Some(updated) => {
-            if let Err(err) = fs::write(&tsconfig_path, updated) {
-                eprintln!("Warning: failed to write the tsconfig.json path alias: {err}");
-            }
-        }
-        // A paths mapping already exists, or compilerOptions couldn't be found —
-        // leave the file untouched (best-effort, like the other overlays).
-        None => {}
+    // A missing `Some` means a paths mapping already exists, or compilerOptions
+    // couldn't be found — leave the file untouched (best-effort, like the other
+    // overlays).
+    if let Some(updated) = insert_tsconfig_paths(&content, prefix)
+        && let Err(err) = fs::write(&tsconfig_path, updated)
+    {
+        eprintln!("Warning: failed to write the tsconfig.json path alias: {err}");
     }
 }
 
@@ -688,9 +686,9 @@ mod tests {
     #[test]
     fn generate_valid_content_url_from_cli_version() {
         let expected = format!(
-            "{}/{}/{}",
+            "{}/ossido-labs/ossido/v{}/{}",
             "http://localhost:3000",
-            &format!("ossido-labs/ossido/v{}", crate_version!()),
+            crate_version!(),
             "examples/ossido-app"
         );
         let generated = generate_raw_content_url(
