@@ -7,7 +7,7 @@ services:
       context: ../
       dockerfile: ./docker/Dockerfile
       args:
-        RUST_VERSION: 1.88 # if change, think to update the default ARGs in Dockerfile
+        RUST_VERSION: 1.97.1 # if change, think to update the default ARGs in Dockerfile
         BASE_OS: bookworm # if change, think to update the default ARGs in Dockerfile
     image: ossido-source-image
     ports:

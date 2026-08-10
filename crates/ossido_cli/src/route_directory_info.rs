@@ -84,11 +84,14 @@ impl RouteDirectoryInfo {
     pub fn get_middleware_module_import(&self) -> String {
         let base_path = RouteDirectoryInfo::get_base_path();
         let base_path_str = base_path.to_string_lossy();
-        let routes_path_str = format!("{base_path_str}{ROUTES_FOLDER_PATH}");
+        // Normalise separators to `/` on both sides so the strip and the
+        // `/`-based module-name mangling work on Windows (`\`) too.
+        let routes_path_str =
+            format!("{base_path_str}{ROUTES_FOLDER_PATH}").replace('\\', "/");
         let mut module_import = self
             .path
             .as_str()
-            .to_string()
+            .replace('\\', "/")
             .replace(&routes_path_str, "")
             .replacen('/', "", 1)
             .replace('/', "_")

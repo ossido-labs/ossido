@@ -352,9 +352,13 @@ impl SourceBuilder {
             let path = &route_directory_info.path;
             let base_path = RouteDirectoryInfo::get_base_path();
             let base_path_str = base_path.to_string_lossy();
-            let routes_path_str = format!("{base_path_str}{ROUTES_FOLDER_PATH}");
+            // Normalise separators to `/` on both sides: the middleware dir path
+            // uses the platform separator (`\` on Windows), but `#[path]` values
+            // and module names must use `/`.
+            let routes_path_str =
+                format!("{base_path_str}{ROUTES_FOLDER_PATH}").replace('\\', "/");
 
-            let replaced_path = path.replace(&routes_path_str, "");
+            let replaced_path = path.replace('\\', "/").replace(&routes_path_str, "");
             let module_path: String = format!("{replaced_path}/{MIDDLEWARE_FILENAME}");
             let module_import = route_directory_info.get_middleware_module_import();
 
