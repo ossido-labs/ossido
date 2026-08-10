@@ -60,6 +60,8 @@ describe('ossidoMdx', () => {
     call(p.configResolved, { root: viteRoot });
     const code = call(p.load, RESOLVED_ID) as string;
     expect(code).toContain('export { useMDXComponents } from');
-    expect(code).toContain(path.join('src', 'mdx-components.tsx'));
+    // The emitted specifier is always POSIX-style (forward slashes), even on
+    // Windows — see `ossidoMdx`'s `load`.
+    expect(code).toContain('src/mdx-components.tsx');
   });
 });

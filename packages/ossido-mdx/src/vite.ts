@@ -77,8 +77,12 @@ export function ossidoMdx(options: OssidoMdxOptions = {}): Array<Plugin> {
 
       const file = findComponentsFile(viteRoot);
       if (file) {
+        // Emit a POSIX-style specifier: module import paths use forward slashes
+        // on every platform. Windows backslashes are invalid escapes in a JS
+        // string and are not valid Vite/Rollup module ids.
+        const specifier = file.replaceAll('\\', '/');
         // Re-export the user's hook; the dependency on `file` also gives HMR.
-        return `export { useMDXComponents } from ${JSON.stringify(file)}`;
+        return `export { useMDXComponents } from ${JSON.stringify(specifier)}`;
       }
       // Passthrough default: MDX works before a mdx-components file is created.
       return `export function useMDXComponents(components) {\n  return components ?? {}\n}`;
