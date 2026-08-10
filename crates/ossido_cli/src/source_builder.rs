@@ -355,8 +355,7 @@ impl SourceBuilder {
             // Normalise separators to `/` on both sides: the middleware dir path
             // uses the platform separator (`\` on Windows), but `#[path]` values
             // and module names must use `/`.
-            let routes_path_str =
-                format!("{base_path_str}{ROUTES_FOLDER_PATH}").replace('\\', "/");
+            let routes_path_str = format!("{base_path_str}{ROUTES_FOLDER_PATH}").replace('\\', "/");
 
             let replaced_path = path.replace('\\', "/").replace(&routes_path_str, "");
             let module_path: String = format!("{replaced_path}/{MIDDLEWARE_FILENAME}");

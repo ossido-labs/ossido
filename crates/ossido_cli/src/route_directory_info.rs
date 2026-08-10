@@ -86,8 +86,7 @@ impl RouteDirectoryInfo {
         let base_path_str = base_path.to_string_lossy();
         // Normalise separators to `/` on both sides so the strip and the
         // `/`-based module-name mangling work on Windows (`\`) too.
-        let routes_path_str =
-            format!("{base_path_str}{ROUTES_FOLDER_PATH}").replace('\\', "/");
+        let routes_path_str = format!("{base_path_str}{ROUTES_FOLDER_PATH}").replace('\\', "/");
         let mut module_import = self
             .path
             .as_str()
