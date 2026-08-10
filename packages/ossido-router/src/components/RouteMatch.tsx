@@ -1,7 +1,11 @@
 import type { JSX } from 'react';
 import { memo, Suspense, useMemo } from 'react';
 
-import { DefaultLoading, DefaultError, DevErrorReporter } from '@ossido-labs/ossido-ui';
+import {
+  DefaultLoading,
+  DefaultError,
+  DevErrorReporter,
+} from '@ossido-labs/ossido-ui';
 
 import type { Mode } from '../types';
 import type { Route } from '../route';

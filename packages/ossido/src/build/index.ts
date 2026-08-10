@@ -7,7 +7,10 @@ import type { InlineConfig, Plugin } from 'vite';
 import { build, createServer, mergeConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import inject from '@rollup/plugin-inject';
-import { OssidoReactPlugin, routeGenerator } from '@ossido-labs/ossido-react-vite-plugin';
+import {
+  OssidoReactPlugin,
+  routeGenerator,
+} from '@ossido-labs/ossido-react-vite-plugin';
 import { ErrorOverlayVitePlugin } from '@ossido-labs/ossido-ui/vite-plugin';
 
 import type { OssidoConfig } from '../config';

@@ -1,5 +1,5 @@
-(function(exports) {
-  "use strict";
+(function (exports) {
+  'use strict';
   function run(fn) {
     return fn();
   }
@@ -19,12 +19,14 @@
       const parent_component = current_component;
       const $$ = {
         on_destroy,
-        context: new Map(context || (parent_component ? parent_component.$$.context : [])),
+        context: new Map(
+          context || (parent_component ? parent_component.$$.context : []),
+        ),
         // these will be immediately discarded
         on_mount: [],
         before_update: [],
         after_update: [],
-        callbacks: blank_object()
+        callbacks: blank_object(),
       };
       set_current_component({ $$ });
       const html = fn(result, props, bindings, slots);
@@ -32,22 +34,27 @@
       return html;
     }
     return {
-      render: (props = {}, { $$slots = {}, context = /* @__PURE__ */ new Map() } = {}) => {
+      render: (
+        props = {},
+        { $$slots = {}, context = /* @__PURE__ */ new Map() } = {},
+      ) => {
         on_destroy = [];
-        const result = { title: "", head: "", css: /* @__PURE__ */ new Set() };
+        const result = { title: '', head: '', css: /* @__PURE__ */ new Set() };
         const html = $$render(result, props, {}, $$slots, context);
         run_all(on_destroy);
         return {
           html,
           css: {
-            code: Array.from(result.css).map((css) => css.code).join("\n"),
-            map: null
+            code: Array.from(result.css)
+              .map((css) => css.code)
+              .join('\n'),
+            map: null,
             // TODO
           },
-          head: result.title + result.head
+          head: result.title + result.head,
         };
       },
-      $$render
+      $$render,
     };
   }
   const App = create_ssr_component(($$result, $$props, $$bindings, slots) => {
@@ -58,6 +65,6 @@
     return html;
   }
   exports.render = render;
-  Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+  Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
   return exports;
 })({});

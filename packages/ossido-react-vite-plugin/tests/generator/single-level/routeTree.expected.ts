@@ -4,25 +4,25 @@ import {
   createRoute,
   __ossido__internal__lazyLoadRoute,
   __ossido__internal__applyRouteHot,
-} from '@ossido-labs/ossido'
+} from '@ossido-labs/ossido';
 
-import RootLayoutImport from './routes/layout'
+import RootLayoutImport from './routes/layout';
 
 const PageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/page'),
-)
+);
 const AboutPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/about/page'),
-)
+);
 
 const rootRoute = createRoute({
   isRoot: true,
   component: RootLayoutImport,
   dataKey: '/layout',
-})
+});
 
-const Page = createRoute({ component: PageImport })
-const AboutPage = createRoute({ component: AboutPageImport })
+const Page = createRoute({ component: PageImport });
+const AboutPage = createRoute({ component: AboutPageImport });
 
 // Create/Update Routes
 
@@ -31,18 +31,18 @@ const PageRoute = Page.update({
   getParentRoute: () => rootRoute,
   filePath: '/',
   dataKey: '/page',
-})
+});
 
 const AboutPageRoute = AboutPage.update({
   path: '/about',
   getParentRoute: () => rootRoute,
   filePath: '/about/',
   dataKey: '/about/page',
-})
+});
 
 // Create and export the route tree
 
-export const routeTree = rootRoute.addChildren([PageRoute, AboutPageRoute])
+export const routeTree = rootRoute.addChildren([PageRoute, AboutPageRoute]);
 
 if (import.meta.hot) {
   import.meta.hot.accept(
@@ -50,15 +50,15 @@ if (import.meta.hot) {
     ([m0, m1, m2]) => {
       __ossido__internal__applyRouteHot(() => {
         if (m0) {
-          rootRoute.component = m0.default
+          rootRoute.component = m0.default;
         }
         if (m1) {
-          PageImport.update(m1.default)
+          PageImport.update(m1.default);
         }
         if (m2) {
-          AboutPageImport.update(m2.default)
+          AboutPageImport.update(m2.default);
         }
-      })
+      });
     },
-  )
+  );
 }

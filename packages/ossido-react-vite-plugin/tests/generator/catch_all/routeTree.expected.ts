@@ -4,25 +4,25 @@ import {
   createRoute,
   __ossido__internal__lazyLoadRoute,
   __ossido__internal__applyRouteHot,
-} from '@ossido-labs/ossido'
+} from '@ossido-labs/ossido';
 
-import RootLayoutImport from './routes/layout'
+import RootLayoutImport from './routes/layout';
 
 const PageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/page'),
-)
+);
 const PostscatchallPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/posts/[...catch_all]/page'),
-)
+);
 
 const rootRoute = createRoute({
   isRoot: true,
   component: RootLayoutImport,
   dataKey: '/layout',
-})
+});
 
-const Page = createRoute({ component: PageImport })
-const PostscatchallPage = createRoute({ component: PostscatchallPageImport })
+const Page = createRoute({ component: PageImport });
+const PostscatchallPage = createRoute({ component: PostscatchallPageImport });
 
 // Create/Update Routes
 
@@ -31,7 +31,7 @@ const PageRoute = Page.update({
   getParentRoute: () => rootRoute,
   filePath: '/',
   dataKey: '/page',
-})
+});
 
 const PostscatchallPageRoute = PostscatchallPage.update({
   path: '/posts/[...catch_all]',
@@ -39,14 +39,14 @@ const PostscatchallPageRoute = PostscatchallPage.update({
   hasHandler: true,
   filePath: '/posts/[...catch_all]/',
   dataKey: '/posts/[...catch_all]/page',
-})
+});
 
 // Create and export the route tree
 
 export const routeTree = rootRoute.addChildren([
   PageRoute,
   PostscatchallPageRoute,
-])
+]);
 
 if (import.meta.hot) {
   import.meta.hot.accept(
@@ -54,15 +54,15 @@ if (import.meta.hot) {
     ([m0, m1, m2]) => {
       __ossido__internal__applyRouteHot(() => {
         if (m0) {
-          rootRoute.component = m0.default
+          rootRoute.component = m0.default;
         }
         if (m1) {
-          PageImport.update(m1.default)
+          PageImport.update(m1.default);
         }
         if (m2) {
-          PostscatchallPageImport.update(m2.default)
+          PostscatchallPageImport.update(m2.default);
         }
-      })
+      });
     },
-  )
+  );
 }

@@ -1,4 +1,3 @@
-
 import { execFileSync } from 'node:child_process';
 import type { ExecFileSyncOptions } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

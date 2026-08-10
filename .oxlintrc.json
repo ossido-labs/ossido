@@ -24,7 +24,6 @@
     "typescript/no-inferrable-types": ["error", { "ignoreParameters": true }],
     "import/no-cycle": "error",
     "import/no-duplicates": "error",
-    "import/newline-after-import": "error",
     "import/no-named-as-default-member": "error",
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
@@ -45,19 +44,18 @@
     "**/dist/**",
     "**/out/**",
     "**/.ossido/**",
-    "**/.tuono/**",
     "**/vite.config.ts.timestamp**",
     "packages/ossido-react-vite-plugin/tests/generator/**",
     "packages/ossido-lazy-fn-vite-plugin/tests/sources/**",
     "packages/ossido/bin/**",
-    "examples/**"
+    "examples/**",
+    "crates/ossido_ssr/tests/assets/**"
   ],
   "overrides": [
     {
       "files": ["**/*.spec.{js,mjs,cjs,jsx,ts,tsx}"],
       "rules": {
         "vitest/consistent-test-it": "error",
-        "vitest/max-expects": "error",
         "vitest/max-nested-describe": ["error", { "max": 3 }]
       }
     }

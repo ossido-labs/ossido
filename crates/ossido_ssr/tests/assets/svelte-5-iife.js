@@ -1,16 +1,15 @@
-(function(exports) {
-  "use strict";
-  const HYDRATION_START = "[";
-  const HYDRATION_END = "]";
+(function (exports) {
+  'use strict';
+  const HYDRATION_START = '[';
+  const HYDRATION_END = ']';
   var current_component = null;
   function push(fn) {
     current_component = { p: current_component, c: null, d: null };
   }
   function pop() {
-    var component = (
+    var component =
       /** @type {Component} */
-      current_component
-    );
+      current_component;
     var ondestroy = component.d;
     if (ondestroy) {
       on_destroy.push(...ondestroy);
@@ -25,12 +24,14 @@
     return () => `${prefix}s${uid++}`;
   }
   function render$1(component, options = {}) {
-    const uid = props_id_generator(options.idPrefix ? options.idPrefix + "-" : "");
+    const uid = props_id_generator(
+      options.idPrefix ? options.idPrefix + '-' : '',
+    );
     const payload = {
-      out: "",
+      out: '',
       css: /* @__PURE__ */ new Set(),
-      head: { title: "", out: "", css: /* @__PURE__ */ new Set(), uid },
-      uid
+      head: { title: '', out: '', css: /* @__PURE__ */ new Set(), uid },
+      uid,
     };
     const prev_on_destroy = on_destroy;
     on_destroy = [];
@@ -53,7 +54,7 @@
     return {
       head,
       html: payload.out,
-      body: payload.out
+      body: payload.out,
     };
   }
   function App($$payload) {
@@ -64,6 +65,6 @@
     return JSON.stringify({ head, body });
   }
   exports.render = render;
-  Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+  Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
   return exports;
 })({});
