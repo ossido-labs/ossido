@@ -6,6 +6,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 
+mod action;
 mod api;
 mod handler;
 mod middleware;
@@ -31,6 +32,17 @@ pub fn Props(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn api(args: TokenStream, item: TokenStream) -> TokenStream {
     api::api_core(args.into(), item.into()).into()
+}
+
+/// `#[ossido::action]` — a Next.js-style server action. Marks a function whose
+/// typed TypeScript counterpart the build generates (importable, passable to
+/// `<form action={fn}>`, and usable with `useActionState`). The first
+/// non-state, non-`logger`, non-`PrevState` argument is the input (decoded from
+/// the request body); a `PrevState<T>` argument opts into the
+/// `useActionState` `(prevState, formData)` contract.
+#[proc_macro_attribute]
+pub fn action(args: TokenStream, item: TokenStream) -> TokenStream {
+    action::action_core(args.into(), item.into()).into()
 }
 
 #[proc_macro_attribute]

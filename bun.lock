@@ -4,14 +4,6 @@
   "workspaces": {
     "": {
       "name": "workspace",
-      "dependencies": {
-        "@ossido-labs/ossido": "./packages/ossido/",
-        "@ossido-labs/ossido-eslint-plugin": "./packages/ossido-eslint-plugin/",
-        "@ossido-labs/ossido-mdx": "workspace:*",
-        "@ossido-labs/ossido-react-vite-plugin": "./packages/ossido-react-vite-plugin/",
-        "@ossido-labs/ossido-router": "workspace:*",
-        "@ossido-labs/ossido-ui": "./packages/ossido-ui/",
-      },
       "devDependencies": {
         "@ossido-labs/ossido-eslint-plugin": "workspace:*",
         "@oxlint/plugins": "1.76.0",
