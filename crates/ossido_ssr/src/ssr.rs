@@ -49,6 +49,262 @@ fn no_import_resolve_callback<'a>(
     None
 }
 
+/// Consecutive no-progress rounds after which a pending render is treated as
+/// genuinely unresolvable (e.g. a live `fetch` with no polyfill) and aborted,
+/// rather than hung. A "round" is: drain microtasks, run one macrotask
+/// generation, drain microtasks again. A converging React render never has this
+/// many empty rounds in a row.
+const MAX_IDLE_ROUNDS: u32 = 16;
+/// Hard ceiling on total rounds so a pathological generator that always
+/// enqueues one more macrotask still terminates.
+const MAX_TOTAL_ROUNDS: u32 = 1_000_000;
+
+/// Isolate data slot holding the pointer to this isolate's [`TimerQueue`].
+const TIMER_SLOT: u32 = 1;
+
+/// One scheduled timer (a `setTimeout`/`setImmediate` callback).
+struct Timer {
+    id: u32,
+    /// Virtual due time (ms). Timers fire in `due` then insertion order.
+    due: f64,
+    seq: u64,
+    callback: v8::Global<v8::Function>,
+}
+
+/// A native, virtual-time macrotask queue backing `setTimeout` /`setImmediate` /
+/// `clearTimeout` (and, transitively, `MessageChannel` delivery) inside the
+/// isolate — the same shape a real embedded-V8 runtime (e.g. Deno) uses, but on
+/// a **virtual clock**: draining jumps time to the earliest pending timer so
+/// `setTimeout(fn, 500)` fires instantly and static generation stays fast.
+///
+/// Owned (boxed) by the [`Ssr`]; a raw pointer is stashed in the isolate's
+/// [`TIMER_SLOT`] so the native timer callbacks and the drain can reach it.
+#[derive(Default)]
+struct TimerQueue {
+    tasks: Vec<Timer>,
+    cleared: std::collections::HashSet<u32>,
+    virtual_now: f64,
+    next_id: u32,
+    seq: u64,
+}
+
+/// Borrow the isolate's [`TimerQueue`] via [`TIMER_SLOT`], if installed.
+fn timer_queue<'a>(scope: &mut v8::HandleScope) -> Option<&'a mut TimerQueue> {
+    let ptr = scope.get_data(TIMER_SLOT) as *mut TimerQueue;
+    if ptr.is_null() {
+        None
+    } else {
+        // Safety: the pointer is the address of the `Box<TimerQueue>` the `Ssr`
+        // owns for this isolate's lifetime; it is single-threaded and cleared in
+        // `Drop` before the isolate is freed.
+        Some(unsafe { &mut *ptr })
+    }
+}
+
+/// `setTimeout(cb, delay?)` / `setImmediate(cb)` — enqueue a callback and return
+/// its numeric id. A missing / non-finite delay is treated as `0`.
+fn set_timeout_callback(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let Ok(func) = v8::Local::<v8::Function>::try_from(args.get(0)) else {
+        return;
+    };
+    let delay = args
+        .get(1)
+        .number_value(scope)
+        .filter(|delay| delay.is_finite())
+        .map(|delay| delay.max(0.0))
+        .unwrap_or(0.0);
+    let callback = v8::Global::new(scope, func);
+
+    let Some(queue) = timer_queue(scope) else {
+        return;
+    };
+    let id = queue.next_id;
+    queue.next_id = queue.next_id.wrapping_add(1);
+    let seq = queue.seq;
+    queue.seq += 1;
+    queue.tasks.push(Timer {
+        id,
+        due: queue.virtual_now + delay,
+        seq,
+        callback,
+    });
+
+    rv.set(v8::Integer::new(scope, id as i32).into());
+}
+
+/// `clearTimeout(id)` / `clearImmediate(id)` — cancel a pending timer.
+fn clear_timeout_callback(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    _rv: v8::ReturnValue,
+) {
+    let Some(id) = args.get(0).number_value(scope) else {
+        return;
+    };
+    if id.is_finite() && id >= 0.0 {
+        if let Some(queue) = timer_queue(scope) {
+            queue.cleared.insert(id as u32);
+        }
+    }
+}
+
+/// Install the native timer globals and the isolate's [`TimerQueue`]. Must run
+/// before the bundle executes so `setTimeout` exists when it does. Returns the
+/// queue pointer for the [`Ssr`] to own and free.
+fn install_timers(scope: &mut v8::HandleScope, isolate: *mut v8::OwnedIsolate) -> *mut TimerQueue {
+    let queue = Box::into_raw(Box::new(TimerQueue::default()));
+    unsafe { (*isolate).set_data(TIMER_SLOT, queue as *mut c_void) };
+
+    // `setImmediate(cb)` is `setTimeout(cb)` with no delay (→ 0); the same
+    // callback handles both. Likewise `clearImmediate` == `clearTimeout`.
+    set_global_fn(scope, "setTimeout", set_timeout_callback);
+    set_global_fn(scope, "setImmediate", set_timeout_callback);
+    set_global_fn(scope, "clearTimeout", clear_timeout_callback);
+    set_global_fn(scope, "clearImmediate", clear_timeout_callback);
+
+    queue
+}
+
+/// Define a native function on the context's global object.
+fn set_global_fn(
+    scope: &mut v8::HandleScope,
+    name: &str,
+    callback: impl v8::MapFnTo<v8::FunctionCallback>,
+) {
+    let context = scope.get_current_context();
+    let global = context.global(scope);
+    if let (Some(name), Some(function)) =
+        (v8::String::new(scope, name), v8::Function::new(scope, callback))
+    {
+        global.set(scope, name.into(), function.into());
+    }
+}
+
+/// Run one generation of due timers (the macrotask drain): fire every timer due
+/// at the current virtual time, advancing the clock to the earliest pending
+/// timer when nothing is due yet. Returns whether any timer ran — the progress
+/// signal for [`pump_until`]'s bounded guard. A timer that enqueues more work
+/// runs on a later generation, so the host can re-pump microtasks between
+/// generations (a real event-loop turn).
+fn run_macrotasks(scope: &mut v8::HandleScope) -> bool {
+    let due: Vec<v8::Global<v8::Function>> = {
+        let Some(queue) = timer_queue(scope) else {
+            return false;
+        };
+
+        if !queue.cleared.is_empty() {
+            let TimerQueue { tasks, cleared, .. } = &mut *queue;
+            tasks.retain(|timer| !cleared.contains(&timer.id));
+            cleared.clear();
+        }
+        if queue.tasks.is_empty() {
+            return false;
+        }
+
+        queue.tasks.sort_by(|a, b| {
+            a.due
+                .partial_cmp(&b.due)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.seq.cmp(&b.seq))
+        });
+        let earliest = queue.tasks[0].due;
+        if earliest > queue.virtual_now {
+            queue.virtual_now = earliest;
+        }
+        let now = queue.virtual_now;
+
+        // Take the generation due at `now`; a fired timer may enqueue more, which
+        // stays for the next call.
+        let mut remaining = Vec::with_capacity(queue.tasks.len());
+        let mut due = Vec::new();
+        for timer in queue.tasks.drain(..) {
+            if timer.due <= now {
+                due.push(timer.callback);
+            } else {
+                remaining.push(timer);
+            }
+        }
+        queue.tasks = remaining;
+        due
+    };
+
+    if due.is_empty() {
+        return false;
+    }
+
+    for callback in &due {
+        // A `TryCatch` contains (and clears on drop) any exception a timer
+        // throws, so it can't leave a pending exception that poisons the next
+        // call — which is also what makes draining safe *during* a module's
+        // top-level-await evaluation.
+        let try_catch = &mut v8::TryCatch::new(scope);
+        let function = v8::Local::new(try_catch, callback);
+        let undefined = v8::undefined(try_catch).into();
+        let _ = function.call(try_catch, undefined, &[]);
+    }
+    true
+}
+
+/// Drop any queued timers before a render so leftover work from a prior
+/// aborted/panicked render on a pool-reused isolate can't run during this one.
+fn reset_macrotasks(scope: &mut v8::HandleScope) {
+    if let Some(queue) = timer_queue(scope) {
+        queue.tasks.clear();
+        queue.cleared.clear();
+        queue.virtual_now = 0.0;
+        queue.seq = 0;
+        // `next_id` stays monotonic — ids need not be reused across renders.
+    }
+}
+
+/// Drive an async operation to completion by alternately pumping V8 microtasks
+/// and one macrotask generation — a real event-loop turn — until `pending()`
+/// reports the work has settled. Aborts with `SsrError` if neither queue makes
+/// progress for [`MAX_IDLE_ROUNDS`] rounds (or the hard [`MAX_TOTAL_ROUNDS`]
+/// ceiling), so genuinely-unresolvable async errors instead of hanging.
+///
+/// `pending` reads render state that needs no scope (`promise.state()` /
+/// `module.get_status()`), so it never conflicts with the mutable `scope`
+/// borrowed for the pumps.
+fn pump_until(
+    scope: &mut v8::HandleScope,
+    mut pending: impl FnMut() -> bool,
+    stuck_message: &'static str,
+) -> Result<(), SsrError> {
+    let mut idle_rounds = 0u32;
+    let mut total_rounds = 0u32;
+
+    while pending() {
+        scope.perform_microtask_checkpoint();
+        if !pending() {
+            break;
+        }
+
+        let ran = run_macrotasks(scope);
+        scope.perform_microtask_checkpoint();
+        if !pending() {
+            break;
+        }
+
+        total_rounds += 1;
+        if ran {
+            idle_rounds = 0;
+        } else {
+            idle_rounds += 1;
+        }
+
+        if idle_rounds >= MAX_IDLE_ROUNDS || total_rounds >= MAX_TOTAL_ROUNDS {
+            return Err(SsrError::FailedJsExecution(stuck_message));
+        }
+    }
+
+    Ok(())
+}
+
 // Streaming support
 //
 // None of this is touched unless a caller opts into streaming; `render` /
@@ -139,9 +395,9 @@ impl<'s, 'i> Streaming<'_, 's, 'i> {
     /// not be `'static`. Nested streaming renders on one thread are supported
     /// (the borrowed sink is installed as a stack).
     ///
-    /// Note: like the other async-aware methods, completion is driven by pumping
-    /// V8 **microtasks**; JS that blocks on a *macrotask* (e.g. `setTimeout`)
-    /// will not progress.
+    /// Note: like the other async-aware methods, completion is driven by
+    /// [`pump_until`] — microtasks plus the macrotask queue (`setTimeout` /
+    /// `MessageChannel`) installed by the SSR bundle's `macrotasks` polyfill.
     pub fn render(
         &mut self,
         entry: &str,
@@ -191,12 +447,20 @@ pub struct Ssr<'s, 'i> {
     /// `streaming` calls on this isolate don't re-allocate the V8 function.
     /// `None` for isolates that never opt into streaming.
     stream_writer: Option<&'static str>,
+    /// The native timer queue (see [`install_timers`]), or null for `Ssr::from`
+    /// (classic-script) isolates, which have no timers and run microtask-only.
+    timer_queue: *mut TimerQueue,
 }
 
 impl Drop for Ssr<'_, '_> {
     fn drop(&mut self) {
         self.fn_map.clear();
         unsafe {
+            // Free the timer queue (dropping its `v8::Global` callbacks) while
+            // the isolate is still alive.
+            if !self.timer_queue.is_null() {
+                let _ = Box::from_raw(self.timer_queue);
+            }
             let _ = Box::from_raw(self.scope);
             let _ = Box::from_raw(self.handle_scope);
             let _ = Box::from_raw(self.isolate);
@@ -311,6 +575,8 @@ where
             fn_map,
             scope: scope_ptr,
             stream_writer: None,
+            // Classic-script (IIFE) bundles have no timers: microtask-only.
+            timer_queue: std::ptr::null_mut(),
         })
     }
 
@@ -376,13 +642,23 @@ where
             return Err(SsrError::InvalidJs("Failed to instantiate the module"));
         }
 
-        // For a module with top-level await, `evaluate` returns a pending
-        // promise; drive it to completion via the microtask queue (the same pump
-        // `render` uses). Blocking on a *macrotask* at the top level won't
-        // progress — the documented limitation of this runtime.
-        let _ = module.evaluate(scope);
-        while module.get_status() == v8::ModuleStatus::Evaluating {
-            scope.perform_microtask_checkpoint();
+        // Install the native timers before the module runs, so `setTimeout` (and
+        // `MessageChannel` delivery, which uses it) is available to the bundle —
+        // including at top-level-await time.
+        let timer_queue = install_timers(scope, isolate);
+
+        // For a module with top-level await, `evaluate` returns a promise that
+        // settles when the whole module (including its awaits) is done. Drive
+        // that promise with the same micro+macro pump as render — like Deno's
+        // event loop drives module evaluation — so a top-level `await` on a
+        // timer / `MessageChannel` settles too.
+        let eval_result = module.evaluate(scope);
+        if let Some(promise) = eval_result.and_then(|value| v8::Local::<v8::Promise>::try_from(value).ok()) {
+            pump_until(
+                scope,
+                || promise.state() == v8::PromiseState::Pending,
+                "Module top-level await did not settle: unresolvable async during evaluation",
+            )?;
         }
 
         match module.get_status() {
@@ -443,6 +719,7 @@ where
             fn_map,
             scope: scope_ptr,
             stream_writer: None,
+            timer_queue,
         })
     }
 
@@ -475,6 +752,10 @@ where
     pub fn render_to_string(&mut self, params: Option<&str>) -> Result<String, SsrError> {
         let scope = unsafe { &mut *self.scope };
 
+        // Clear any macrotasks left by a prior aborted render (isolates are
+        // reused across requests in the render pool).
+        reset_macrotasks(scope);
+
         let params: v8::Local<v8::Value> = match v8::String::new(scope, params.unwrap_or("")) {
             Some(s) => s.into(),
             None => v8::undefined(scope).into(),
@@ -501,9 +782,11 @@ where
                     }
                 };
 
-                while promise.state() == v8::PromiseState::Pending {
-                    scope.perform_microtask_checkpoint();
-                }
+                pump_until(
+                    scope,
+                    || promise.state() == v8::PromiseState::Pending,
+                    "SSR render did not settle: unresolvable async (e.g. a live fetch) during render",
+                )?;
 
                 result = promise.result(scope);
             }
@@ -531,6 +814,10 @@ where
     pub fn render(&mut self, entry: &str, params: Option<&str>) -> Result<String, SsrError> {
         let scope = unsafe { &mut *self.scope };
 
+        // Clear any macrotasks left by a prior aborted render (isolates are
+        // reused across requests in the render pool).
+        reset_macrotasks(scope);
+
         let func = *self
             .fn_map
             .get(entry)
@@ -551,9 +838,11 @@ where
             let promise = v8::Local::<v8::Promise>::try_from(result)
                 .map_err(|_| SsrError::FailedJsExecution("Failed to cast function to promise"))?;
 
-            while promise.state() == v8::PromiseState::Pending {
-                scope.perform_microtask_checkpoint();
-            }
+            pump_until(
+                scope,
+                || promise.state() == v8::PromiseState::Pending,
+                "SSR render did not settle: unresolvable async (e.g. a live fetch) during render",
+            )?;
 
             if promise.state() == v8::PromiseState::Rejected {
                 return Err(rejection_error(scope, promise));
@@ -734,6 +1023,114 @@ mod tests {
         let out = js.render("renderFn", None).unwrap();
 
         assert_eq!(out, "<html>hi</html>");
+    }
+
+    /// A minimal `MessageChannel` built on the **native** `setTimeout` (installed
+    /// by `install_timers`), for the one test that needs it. Timers themselves
+    /// are native now, so the other tests use `setTimeout` directly.
+    const MESSAGE_CHANNEL_PRELUDE: &str = r##"
+        class __Port {
+            postMessage(m) {
+                const other = this.other;
+                setTimeout(() => { if (other.onmessage) other.onmessage({ data: m }); }, 0);
+            }
+        }
+        globalThis.MessageChannel = class {
+            constructor() {
+                this.port1 = new __Port();
+                this.port2 = new __Port();
+                this.port1.other = this.port2;
+                this.port2.other = this.port1;
+            }
+        };
+    "##;
+
+    #[test]
+    fn render_settles_async_resolved_via_settimeout() {
+        init_test();
+        // `setTimeout` is a native global; the render pump drains it on a virtual
+        // clock (the 50ms delay does not wall-clock-block).
+        let source = r##"
+            export function renderFn() {
+                return new Promise((resolve) => setTimeout(() => resolve("<html>timer</html>"), 50));
+            }
+        "##
+        .to_string();
+        let mut js = Ssr::from_module(source).unwrap();
+        assert_eq!(js.render("renderFn", None).unwrap(), "<html>timer</html>");
+    }
+
+    #[test]
+    fn render_settles_async_resolved_via_message_channel() {
+        init_test();
+        // The MessageChannel path is exactly how React 19's Fizz renderer resumes
+        // suspended work; its delivery must be driven by the macrotask drain.
+        let source = format!(
+            r##"{MESSAGE_CHANNEL_PRELUDE}
+            export function renderFn() {{
+                return new Promise((resolve) => {{
+                    const channel = new MessageChannel();
+                    channel.port1.onmessage = () => resolve("<html>channel</html>");
+                    channel.port2.postMessage(null);
+                }});
+            }}
+        "##
+        );
+        let mut js = Ssr::from_module(source).unwrap();
+        assert_eq!(js.render("renderFn", None).unwrap(), "<html>channel</html>");
+    }
+
+    #[test]
+    fn from_module_top_level_await_settles_via_settimeout() {
+        init_test();
+        let source = r##"
+            const html = await new Promise((r) => setTimeout(() => r("<html>tla</html>"), 10));
+            export function renderFn() { return html; }
+        "##
+        .to_string();
+        let mut js = Ssr::from_module(source).unwrap();
+        assert_eq!(js.render("renderFn", None).unwrap(), "<html>tla</html>");
+    }
+
+    #[test]
+    fn render_aborts_unresolvable_async_instead_of_hanging() {
+        init_test();
+        // A promise with no timer to settle it (a real `fetch` behaves this way in
+        // the isolate). The bounded guard must abort quickly, not hang.
+        let source = r##"
+            export function renderFn() { return new Promise(() => {}); }
+        "##
+        .to_string();
+        let mut js = Ssr::from_module(source).unwrap();
+        match js.render("renderFn", None) {
+            Err(SsrError::FailedJsExecution(msg)) => assert!(msg.contains("did not settle")),
+            other => panic!("expected a settle-timeout error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn macrotasks_do_not_leak_between_renders() {
+        init_test();
+        // `first` queues a timer but returns synchronously (never pumped); the
+        // start-of-render reset must drop it so `second` sees a clean flag.
+        let source = r##"
+            globalThis.__leaked = false;
+            export function first() {
+                setTimeout(() => { globalThis.__leaked = true; }, 1);
+                return "<html>first</html>";
+            }
+            export function second() {
+                return new Promise((resolve) =>
+                    setTimeout(
+                        () => resolve("<html>" + (globalThis.__leaked ? "LEAKED" : "clean") + "</html>"),
+                        1,
+                    ));
+            }
+        "##
+        .to_string();
+        let mut js = Ssr::from_module(source).unwrap();
+        assert_eq!(js.render("first", None).unwrap(), "<html>first</html>");
+        assert_eq!(js.render("second", None).unwrap(), "<html>clean</html>");
     }
 
     #[test]

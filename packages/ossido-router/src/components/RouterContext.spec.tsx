@@ -5,7 +5,7 @@ import { Route } from '../route';
 import type { RouteComponent, RouteProps } from '../types';
 import { createRouter } from '../router';
 
-import { useRouterContext } from './RouterContext';
+import { getInitialLocation, useRouterContext } from './RouterContext';
 import { RouterContextProvider } from './RouterContextProvider';
 
 function createRootComponent(): RouteComponent {
@@ -26,6 +26,50 @@ function NavigationIdProbe(): React.JSX.Element {
   const { navigationId } = useRouterContext();
   return <div data-testid="navigation-id">{String(navigationId)}</div>;
 }
+
+describe('getInitialLocation', () => {
+  const originalLocation = window.location;
+  afterEach(() => {
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      configurable: true,
+    });
+  });
+
+  function setPathname(pathname: string): void {
+    Object.defineProperty(window, 'location', {
+      value: {
+        pathname,
+        hash: '',
+        href: `http://localhost${pathname}`,
+        search: '',
+        origin: 'http://localhost',
+      },
+      configurable: true,
+    });
+  }
+
+  const emptyPayload = { pathname: '', href: '', searchStr: '' };
+
+  it('strips a trailing slash so the client pathname matches the server payload', () => {
+    // Static export serves directory URLs (`/docs/x/`); the server payload is
+    // the sanitized `/docs/x`. Without this, hydration mismatches (React #418).
+    setPathname('/documentation/contributing/');
+    expect(getInitialLocation(emptyPayload).pathname).toBe(
+      '/documentation/contributing',
+    );
+  });
+
+  it('keeps the root path as "/"', () => {
+    setPathname('/');
+    expect(getInitialLocation(emptyPayload).pathname).toBe('/');
+  });
+
+  it('leaves a slash-free pathname unchanged', () => {
+    setPathname('/guides');
+    expect(getInitialLocation(emptyPayload).pathname).toBe('/guides');
+  });
+});
 
 describe('<RouterContextProvider /> browser navigation', () => {
   afterEach(cleanup);

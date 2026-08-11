@@ -13,6 +13,15 @@ use crate::{Payload, Request};
 
 pub(crate) const INTERNAL_SERVER_ERROR_HTML: &str = "500 Internal server error";
 
+/// Whether the server is producing a **static export** (`ossido build --static`
+/// sets `OSSIDO_STATIC_EXPORT` before starting the server). In that mode pages
+/// are rendered **buffered** via `react-dom/static` `prerender` — a fully
+/// settled, clean HTML snapshot — instead of the streaming renderer, whose
+/// `<template>`/`$RC` boundary-swap artifacts don't hydrate cleanly from a
+/// static file.
+static STATIC_EXPORT: once_cell::sync::Lazy<bool> =
+    once_cell::sync::Lazy::new(|| std::env::var("OSSIDO_STATIC_EXPORT").is_ok());
+
 /// JSON body returned by the data endpoint (`/__ossido/data/...`) when a handler
 /// panics. Mirrors the normal `{ data, info }` shape so the client parses it the
 /// same way, with the error nested under `info.serverError` (dev only).
@@ -151,6 +160,23 @@ pub async fn finish_render(job: RenderJob) -> AxumResponse {
 
     match job {
         RenderJob::Ready(response) => response,
+        RenderJob::Render {
+            payload,
+            http_code,
+            cookies,
+        } if *STATIC_EXPORT => {
+            // Buffered `prerender`: a fully-settled snapshot with no streaming
+            // artifacts, so the static file hydrates without a mismatch.
+            match crate::render_pool::render(payload).await {
+                Ok(html) => (http_code, cookies, Html(html)).into_response(),
+                Err(_) => (
+                    http_code,
+                    cookies,
+                    Html(INTERNAL_SERVER_ERROR_HTML.to_string()),
+                )
+                    .into_response(),
+            }
+        }
         RenderJob::Render {
             payload,
             http_code,

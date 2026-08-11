@@ -47,6 +47,7 @@ import type { ReadableStream } from 'node:stream/web';
 
 import type { JSX } from 'react';
 import { renderToReadableStream } from 'react-dom/server';
+import { prerender } from 'react-dom/static';
 import { createRouter, preloadRouteChain } from '@ossido-labs/ossido-router';
 import type { createRoute } from '@ossido-labs/ossido-router';
 
@@ -104,11 +105,14 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
      * anywhere the caller needs the complete HTML up front.
      */
     async renderFn(payload: string | undefined): Promise<string> {
-      const stream = await renderToReadableStream(await element(payload));
-      await stream.allReady;
+      // `prerender` (react-dom/static) is the SSG-correct API: its promise
+      // resolves from React's `onAllReady`, so `prelude` is the fully-settled
+      // tree (every Suspense boundary resolved) — no `allReady` dance and no
+      // risk of capturing a fallback. Requires the SSR event loop (macrotasks)
+      // to settle, same as `renderToReadableStream`.
+      const { prelude } = await prerender(await element(payload));
       return await streamToString(
-        // ReadableStream should be implemented in node)
-        stream as unknown as ReadableStream<Uint8Array>,
+        prelude as unknown as ReadableStream<Uint8Array>,
       );
     },
 

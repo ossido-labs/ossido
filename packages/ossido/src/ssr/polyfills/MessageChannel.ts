@@ -47,8 +47,28 @@ export class MessagePortPolyfill implements MessagePort {
   postMessage(message: unknown): void {
     if (this.isClosed || !this.otherPort) return;
 
+    const other = this.otherPort;
     const event = new MessageEvent('message', { data: message });
-    this.otherPort.dispatchEvent(event);
+
+    // Deliver on the next macrotask, matching real `MessageChannel` semantics.
+    // React 19's Fizz server renderer schedules resumed/flush work via
+    // `port.postMessage` and relies on it being asynchronous — a synchronous
+    // dispatch reorders shell emission vs. Suspense-boundary completion and
+    // prevents the render from settling. In the ossido SSR isolate `setTimeout`
+    // is a native timer whose queue the Rust SSR pump loop drains.
+    const schedule = (
+      globalThis as {
+        setTimeout?: (callback: () => void, delay?: number) => number;
+      }
+    ).setTimeout;
+
+    if (typeof schedule === 'function') {
+      schedule(() => other.dispatchEvent(event), 0);
+    } else {
+      // No timer host (should not happen in ossido SSR): fall back to the prior
+      // synchronous delivery so the polyfill still functions.
+      other.dispatchEvent(event);
+    }
   }
 
   addEventListener(

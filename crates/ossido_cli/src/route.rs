@@ -282,7 +282,7 @@ impl Route {
         self.axum_info = Some(AxumInfo::new(self))
     }
 
-    pub fn save_ssg_file(&self, reqwest: &Client) -> Result<(), String> {
+    pub fn save_ssg_file(&self, reqwest: &Client, base_url: &str) -> Result<(), String> {
         // Layouts have no standalone page; APIs return JSON, not HTML.
         if self.is_api() || self.is_layout {
             return Ok(());
@@ -290,30 +290,30 @@ impl Route {
 
         // A static route renders a single page at its own URL.
         if !self.is_dynamic {
-            return self.save_page(reqwest, &self.url_path());
+            return self.save_page(reqwest, base_url, &self.url_path());
         }
 
         // A dynamic route enumerates its pages via `#[static_paths]` (guaranteed
         // present — `ossido build --static` aborts earlier otherwise). Each param
         // set is substituted into the route pattern to form one concrete URL.
         let pattern = self.url_path();
-        for params in self.fetch_static_paths(reqwest)? {
+        for params in self.fetch_static_paths(reqwest, base_url)? {
             let concrete = concrete_path(&pattern, &params)?;
-            self.save_page(reqwest, &concrete)?;
+            self.save_page(reqwest, base_url, &concrete)?;
         }
         Ok(())
     }
 
     /// Fetch the enumerated param sets from this dynamic route's
     /// `#[static_paths]` endpoint (`/__ossido/static_paths/<module>`).
-    fn fetch_static_paths(&self, reqwest: &Client) -> Result<Vec<ParamSet>, String> {
+    fn fetch_static_paths(&self, reqwest: &Client, base_url: &str) -> Result<Vec<ParamSet>, String> {
         let module = &self
             .axum_info
             .as_ref()
             .ok_or_else(|| format!("Route {} is missing module info", self.path))?
             .module_import;
 
-        let url = format!("http://localhost:3000/__ossido/static_paths/{module}");
+        let url = format!("{base_url}/__ossido/static_paths/{module}");
         trace!("Requesting static paths: {url}");
 
         let response = reqwest
@@ -339,8 +339,8 @@ impl Route {
 
     /// Render one concrete page (`path`) and, when the route has a server
     /// handler, its data endpoint — saving both under `out/static`.
-    fn save_page(&self, reqwest: &Client, path: &str) -> Result<(), String> {
-        let url = format!("http://localhost:3000{path}");
+    fn save_page(&self, reqwest: &Client, base_url: &str, path: &str) -> Result<(), String> {
+        let url = format!("{base_url}{path}");
 
         trace!("Requesting the page: {url}");
         let mut response = reqwest
@@ -359,7 +359,7 @@ impl Route {
             // Request from the live server using the raw path so it matches the
             // codegen'd `/__ossido/data{axum_route}` route — including the root's
             // trailing slash (`/__ossido/data/`).
-            let data_url = format!("http://localhost:3000/__ossido/data{path}");
+            let data_url = format!("{base_url}/__ossido/data{path}");
             trace!("Requesting the JSON file: {data_url}");
             let mut response = reqwest
                 .get(&data_url)
