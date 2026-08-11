@@ -2,14 +2,23 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { MessageChannelPolyfill, MessagePortPolyfill } from './MessageChannel';
 
+// `postMessage` now delivers on the next macrotask (via `globalThis.setTimeout`,
+// which React's Fizz renderer relies on being asynchronous). In the SSR isolate
+// that timer is native; under vitest (Node) it's the real one, so tests flush a
+// real macrotask before asserting delivery.
+const flush = (): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, 0));
+
 describe('MessagePortPolyfill', () => {
-  it('should invoke onmessage when a message is posted', () => {
+  it('should invoke onmessage when a message is dispatched', () => {
     const port = new MessagePortPolyfill();
 
     const onmessageMock = vi.fn<EventListener>();
 
     port.onmessage = onmessageMock;
 
+    // `dispatchEvent` is the synchronous delivery primitive (used internally by
+    // the async `postMessage`).
     port.dispatchEvent({ data: 'Hello, world!' } as MessageEvent);
 
     expect(onmessageMock).toHaveBeenCalledOnce();
@@ -49,7 +58,7 @@ describe('MessagePortPolyfill', () => {
     expect(listener).toHaveBeenCalledWith({ data: 'First message' });
   });
 
-  it('should not post messages if otherPort is null', () => {
+  it('should not post messages if otherPort is null', async () => {
     const port = new MessagePortPolyfill();
 
     const listener = vi.fn<EventListener>();
@@ -57,13 +66,14 @@ describe('MessagePortPolyfill', () => {
     port.onmessage = listener;
 
     port.postMessage('Hello!');
+    await flush();
 
-    expect(listener).not.toHaveBeenCalledOnce();
+    expect(listener).not.toHaveBeenCalled();
   });
 });
 
 describe('MessageChannelPolyfill', () => {
-  it('should send and receive messages between ports', () => {
+  it('delivers posted messages on the next macrotask, in order', async () => {
     const channel = new MessageChannelPolyfill();
 
     const listener = vi.fn<EventListener>();
@@ -72,6 +82,10 @@ describe('MessageChannelPolyfill', () => {
 
     channel.port2.postMessage('Hello, port1!');
     channel.port2.postMessage('How are you?');
+
+    // Async delivery: nothing until a macrotask runs.
+    expect(listener).not.toHaveBeenCalled();
+    await flush();
 
     expect(listener).toHaveBeenCalledTimes(2);
     expect(listener).toHaveBeenNthCalledWith(
@@ -84,13 +98,14 @@ describe('MessageChannelPolyfill', () => {
     );
   });
 
-  it('should support addEventListener and removeEventListener', () => {
+  it('should support addEventListener and removeEventListener', async () => {
     const channel = new MessageChannelPolyfill();
 
     const listener = vi.fn<EventListener>();
 
     channel.port1.addEventListener('message', listener);
     channel.port2.postMessage('Hello, port1!');
+    await flush();
 
     expect(listener).toHaveBeenNthCalledWith(
       1,
@@ -99,11 +114,12 @@ describe('MessageChannelPolyfill', () => {
 
     channel.port1.removeEventListener('message', listener);
     channel.port2.postMessage('Message after removing listener');
+    await flush();
 
     expect(listener).not.toHaveBeenCalledTimes(2);
   });
 
-  it('should handle bidirectional communication between ports', () => {
+  it('should handle bidirectional communication between ports', async () => {
     const channel = new MessageChannelPolyfill();
 
     const listener1 = vi.fn<EventListener>();
@@ -114,6 +130,7 @@ describe('MessageChannelPolyfill', () => {
 
     channel.port1.postMessage('Hello, port2!');
     channel.port2.postMessage('Hello, port1!');
+    await flush();
 
     expect(listener1).toHaveBeenCalledOnce();
     expect(listener1).toHaveBeenCalledWith(
@@ -128,7 +145,7 @@ describe('MessageChannelPolyfill', () => {
 });
 
 describe('MessagePort', () => {
-  it('should not send a message on close', () => {
+  it('should not send a message on close', async () => {
     const { port1, port2 } = new MessageChannelPolyfill();
 
     const listener = vi.fn<EventListener>();
@@ -136,6 +153,7 @@ describe('MessagePort', () => {
     port1.onmessage = listener;
 
     port2.postMessage('Test message');
+    await flush();
 
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(
@@ -144,6 +162,7 @@ describe('MessagePort', () => {
 
     port1.close();
     port2.postMessage('Another message');
+    await flush();
 
     expect(listener).not.toHaveBeenCalledTimes(2);
   });

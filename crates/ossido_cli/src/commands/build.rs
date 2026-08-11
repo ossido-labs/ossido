@@ -123,6 +123,14 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
             exit_gracefully_with_error("Failed to build the server for static generation");
         }
 
+        // Tell the server to render pages buffered (react-dom/static `prerender`)
+        // rather than streamed, so each captured file is a clean, fully-settled
+        // snapshot that hydrates without a mismatch. The spawned `cargo run`
+        // inherits this env.
+        // SAFETY: single-threaded at this point in the build; no other thread is
+        // reading the environment concurrently.
+        unsafe { std::env::set_var("OSSIDO_STATIC_EXPORT", "1") };
+
         // Start the server
         #[allow(clippy::zombie_processes)]
         let mut rust_server = app.run_rust_server();
@@ -171,8 +179,11 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
 
         trace!("Server is ready, starting static site generation");
 
+        // Use the configured server URL (host/port or `origin`) rather than a
+        // hardcoded `localhost:3000`, so SSG works for any `server.port`.
+        let base_url = server_url.trim_end_matches('/');
         for route in app.route_map.values() {
-            if let Err(msg) = route.save_ssg_file(&reqwest_client) {
+            if let Err(msg) = route.save_ssg_file(&reqwest_client, base_url) {
                 exit_and_shut_server(&msg);
             }
         }
