@@ -64,6 +64,12 @@ impl Request {
         Location::from(self.uri.to_owned())
     }
 
+    /// The raw request body bytes (empty when there is no body). Used by the
+    /// server-action runtime to parse multipart / urlencoded / JSON bodies.
+    pub(crate) fn raw_body(&self) -> &[u8] {
+        self.body.as_deref().unwrap_or(&[])
+    }
+
     pub fn body<'de, T: Deserialize<'de>>(&'de self) -> Result<T, BodyParseError> {
         if let Some(body) = &self.body {
             let body = serde_json::from_slice::<T>(body)?;

@@ -3,6 +3,7 @@
 //!
 //! You can find the full documentation at [ossido.dev](https://ossido.dev/)
 
+pub mod action;
 mod catch_all;
 mod config;
 pub mod debug;
@@ -24,6 +25,7 @@ mod vite_reverse_proxy;
 mod vite_websocket_proxy;
 
 // Re-exports
+pub use action::{ActionError, ActionInputError, Files, PrevState, UploadedFile};
 pub use axum;
 pub use axum_extra::extract::cookie;
 pub use error_handler::{ErrorContext, set_error_handler};
@@ -31,10 +33,10 @@ pub use logger::Logger;
 pub use mode::Mode;
 // `Props` is re-exported both as the struct (from `response`) and as the
 // attribute macro — the same name in two namespaces, like `serde::Serialize`.
-pub use ossido_macros::{Props, Type, api, handler, middleware, static_paths};
+pub use ossido_macros::{Props, Type, action, api, handler, middleware, static_paths};
 pub use ossido_ssr::Ssr;
 pub use payload::Payload;
-pub use request::Request;
+pub use request::{BodyParseError, Request};
 pub use response::{
     HandlerData, Props, RenderJob, Response, chain_json, error_json, error_render_job,
     finish_render, render_chain, render_error_to_string, resolve_handler, respond_to_api_error,

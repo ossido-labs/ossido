@@ -7,6 +7,7 @@ import { defineBuildConfig } from 'vite-config';
 export default defineBuildConfig({
   entry: [
     './src/index.ts',
+    './src/actions/index.tsx',
     './src/build/index.ts',
     './src/build-client/index.ts',
     './src/client/index.ts',

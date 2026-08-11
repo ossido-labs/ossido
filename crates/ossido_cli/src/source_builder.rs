@@ -10,8 +10,8 @@ use crate::mode::Mode;
 use crate::route::AxumInfo;
 use crate::route_directory_info::RouteDirectoryInfo;
 use crate::typescript::{
-    TypesJar, collect_api_routes, collect_layout_props, collect_route_props, render_api_routes,
-    render_route_props,
+    ActionDef, TypesJar, collect_actions, collect_api_routes, collect_layout_props,
+    collect_route_props, render_actions_client, render_api_routes, render_route_props,
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -136,6 +136,10 @@ impl SourceBuilder {
 
     fn generate_axum_source(&self) -> String {
         let Self { app, mode, .. } = &self;
+        // Server actions live in `actions.rs` / `*.actions.rs` files under
+        // `src/routes` — discovered here so they can be module-declared, routed,
+        // and (below) pull in the `post` import.
+        let actions = collect_actions(&self.base_path);
         let mut main_file_definition: String = " let router = Router::new()".to_string();
         let mut main_file_usage: &str = ";";
         // `ApplicationState` is referenced by the handlers' data entry point
@@ -162,14 +166,19 @@ impl SourceBuilder {
             .replace("\r", "")
             .replace(
                 "// ROUTE_BUILDER\n",
-                &self.create_routes_declaration(&app.route_directory_info),
+                &format!(
+                    "{}{}",
+                    self.create_routes_declaration(&app.route_directory_info),
+                    self.create_actions_routes(&actions),
+                ),
             )
             .replace(
                 "// MODULE_IMPORTS\n",
                 &format!(
-                    "{}{}",
+                    "{}{}{}",
                     self.create_modules_declaration(&app.route_directory_info),
                     self.create_composite_handlers(),
+                    self.create_actions_modules(&actions),
                 ),
             )
             .replace("/*VERSION*/", crate_version!())
@@ -188,6 +197,12 @@ impl SourceBuilder {
         for method in used_http_methods.into_iter() {
             let method = method.to_string().to_lowercase();
             import_http_handler.push_str(&format!("use ossido::axum::routing::{method};\n"))
+        }
+
+        // Actions are always POST; ensure the handler is imported even when no
+        // `#[api(POST)]` route already pulled it in.
+        if !actions.is_empty() && !import_http_handler.contains("routing::post;") {
+            import_http_handler.push_str("use ossido::axum::routing::post;\n");
         }
 
         src.replace("// AXUM_GET_ROUTE_HANDLER", &import_http_handler)
@@ -223,6 +238,13 @@ impl SourceBuilder {
     pub fn generate_typescript_file(&mut self) -> io::Result<()> {
         let extra = self.route_props_typescript();
         let api_routes = render_api_routes(&collect_api_routes(&self.base_path));
+
+        // The importable, typed server-action functions (`.ossido/actions.ts`)
+        // — a real module (not just an ambient declaration) so user code can
+        // `import { createUser } from ".ossido/actions"`.
+        let actions_client = render_actions_client(&collect_actions(&self.base_path));
+        self.create_file(PathBuf::from(DEV_FOLDER).join("actions.ts"), &actions_client)?;
+
         self.types_jar
             .generate_typescript_file(&self.base_path, &extra, &api_routes)
     }
@@ -324,6 +346,43 @@ impl SourceBuilder {
             route_declarations.push_str(&self.add_route_layers(route_directory_info));
         }
         route_declarations
+    }
+
+    /// `#[path] mod` declarations for each distinct actions file. Actions files
+    /// are not page/api/layout route modules, so they are declared separately
+    /// here (one `mod` per file, even when it holds several actions).
+    fn create_actions_modules(&self, actions: &[ActionDef]) -> String {
+        let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut out = String::new();
+        for action in actions {
+            if seen.insert(action.module_import.as_str()) {
+                out.push_str(&format!(
+                    "#[path=\"../{ROUTE_FOLDER}/{rel_path}.rs\"]\nmod {module};\n",
+                    rel_path = action.rel_path,
+                    module = action.module_import,
+                ));
+            }
+        }
+        out
+    }
+
+    /// A `Router` merge registering every action at
+    /// `POST /__ossido/action/<module>/<fn>`. Actions are always POST.
+    fn create_actions_routes(&self, actions: &[ActionDef]) -> String {
+        if actions.is_empty() {
+            return String::new();
+        }
+        let mut out = String::from(".merge(Router::new()");
+        for action in actions {
+            out.push_str(&format!(
+                r#".route("{url}", post({module}::{fn_name}_ossido_internal_action))"#,
+                url = action.url,
+                module = action.module_import,
+                fn_name = action.fn_name,
+            ));
+        }
+        out.push_str(")\n");
+        out
     }
 
     fn create_modules_declaration(&self, route_directory_info: &RouteDirectoryInfo) -> String {
