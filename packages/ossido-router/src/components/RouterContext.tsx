@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 
 import type { Router } from '../router';
 import type { ServerInitialLocation } from '../types';
+import { sanitizePathname } from '../utils/match-route';
 
 /** How to reflect a committed navigation in the browser (history + scroll). */
 export interface NavigationCommitOptions {
@@ -75,7 +76,11 @@ export function getInitialLocation(
 
   const { pathname, hash, href, search } = window.location;
   return {
-    pathname,
+    // Match the server, which renders with the sanitized pathname. Static
+    // export serves directory URLs with a trailing slash (`/docs/x/`), so the
+    // raw `window.location.pathname` would differ from the server's `/docs/x`
+    // and break hydration for route-aware UI (e.g. active nav links).
+    pathname: sanitizePathname(pathname),
     hash,
     href,
     searchStr: search,
