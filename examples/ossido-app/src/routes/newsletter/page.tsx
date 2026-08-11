@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { Form, useActionState } from '@ossido-labs/ossido/actions';
 
-import { subscribe, submitSignup, uploadAvatar } from '../../../.ossido/actions';
+import {
+  subscribe,
+  submitSignup,
+  uploadAvatar,
+} from '../../../.ossido/actions';
 import type { FormState } from '@ossido-labs/ossido/types';
 
 const INITIAL: FormState = { ok: false, message: '', attempts: 0 };
