@@ -306,7 +306,11 @@ impl Route {
 
     /// Fetch the enumerated param sets from this dynamic route's
     /// `#[static_paths]` endpoint (`/__ossido/static_paths/<module>`).
-    fn fetch_static_paths(&self, reqwest: &Client, base_url: &str) -> Result<Vec<ParamSet>, String> {
+    fn fetch_static_paths(
+        &self,
+        reqwest: &Client,
+        base_url: &str,
+    ) -> Result<Vec<ParamSet>, String> {
         let module = &self
             .axum_info
             .as_ref()

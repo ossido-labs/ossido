@@ -177,9 +177,10 @@ fn set_global_fn(
 ) {
     let context = scope.get_current_context();
     let global = context.global(scope);
-    if let (Some(name), Some(function)) =
-        (v8::String::new(scope, name), v8::Function::new(scope, callback))
-    {
+    if let (Some(name), Some(function)) = (
+        v8::String::new(scope, name),
+        v8::Function::new(scope, callback),
+    ) {
         global.set(scope, name.into(), function.into());
     }
 }
@@ -653,7 +654,9 @@ where
         // event loop drives module evaluation — so a top-level `await` on a
         // timer / `MessageChannel` settles too.
         let eval_result = module.evaluate(scope);
-        if let Some(promise) = eval_result.and_then(|value| v8::Local::<v8::Promise>::try_from(value).ok()) {
+        if let Some(promise) =
+            eval_result.and_then(|value| v8::Local::<v8::Promise>::try_from(value).ok())
+        {
             pump_until(
                 scope,
                 || promise.state() == v8::PromiseState::Pending,
