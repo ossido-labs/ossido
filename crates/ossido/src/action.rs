@@ -328,16 +328,13 @@ fn input_form_err(err: serde_urlencoded::de::Error) -> ActionInputError {
 
 /// Parse a `multipart/form-data` body (from the already-buffered bytes) into its
 /// text fields and uploaded files.
-async fn parse_multipart(
-    req: &Request,
-) -> Result<(Vec<(String, String)>, Files), multer::Error> {
+async fn parse_multipart(req: &Request) -> Result<(Vec<(String, String)>, Files), multer::Error> {
     let content_type = content_type(req);
     let boundary = multer::parse_boundary(content_type)?;
 
     let body = Bytes::copy_from_slice(req.raw_body());
-    let stream = futures_util::stream::once(async move {
-        Ok::<Bytes, std::convert::Infallible>(body)
-    });
+    let stream =
+        futures_util::stream::once(async move { Ok::<Bytes, std::convert::Infallible>(body) });
     let mut multipart = multer::Multipart::new(stream, boundary);
 
     let mut fields: Vec<(String, String)> = Vec::new();
@@ -416,7 +413,12 @@ async fn finish<T: Serialize>(
 
 fn success_response<T: Serialize>(req: &Request, json: bool, value: &T) -> AxumResponse {
     if json {
-        (StatusCode::OK, VERSION_HEADER, Json(json!({ "data": value }))).into_response()
+        (
+            StatusCode::OK,
+            VERSION_HEADER,
+            Json(json!({ "data": value })),
+        )
+            .into_response()
     } else {
         redirect_back(req)
     }
@@ -548,15 +550,26 @@ mod tests {
 
     #[tokio::test]
     async fn decode_prev_state_reads_json_and_form() {
-        let json = json_request(r#"{"input":{"email":"a@b.c"},"__ossido_prev_state":{"attempts":3}}"#);
+        let json =
+            json_request(r#"{"input":{"email":"a@b.c"},"__ossido_prev_state":{"attempts":3}}"#);
         assert_eq!(
-            decode_form(&json).await.prev_state::<FormState>().get().unwrap().attempts,
+            decode_form(&json)
+                .await
+                .prev_state::<FormState>()
+                .get()
+                .unwrap()
+                .attempts,
             3
         );
 
         let form = form_request("email=a%40b.c&__ossido_prev_state=%7B%22attempts%22%3A5%7D");
         assert_eq!(
-            decode_form(&form).await.prev_state::<FormState>().get().unwrap().attempts,
+            decode_form(&form)
+                .await
+                .prev_state::<FormState>()
+                .get()
+                .unwrap()
+                .attempts,
             5
         );
     }
@@ -564,7 +577,13 @@ mod tests {
     #[tokio::test]
     async fn decode_prev_state_defaults_to_none_when_absent() {
         let req = json_request(r#"{"input":{"email":"a@b.c"}}"#);
-        assert!(decode_form(&req).await.prev_state::<FormState>().get().is_none());
+        assert!(
+            decode_form(&req)
+                .await
+                .prev_state::<FormState>()
+                .get()
+                .is_none()
+        );
     }
 
     #[tokio::test]

@@ -243,7 +243,10 @@ impl SourceBuilder {
         // — a real module (not just an ambient declaration) so user code can
         // `import { createUser } from ".ossido/actions"`.
         let actions_client = render_actions_client(&collect_actions(&self.base_path));
-        self.create_file(PathBuf::from(DEV_FOLDER).join("actions.ts"), &actions_client)?;
+        self.create_file(
+            PathBuf::from(DEV_FOLDER).join("actions.ts"),
+            &actions_client,
+        )?;
 
         self.types_jar
             .generate_typescript_file(&self.base_path, &extra, &api_routes)

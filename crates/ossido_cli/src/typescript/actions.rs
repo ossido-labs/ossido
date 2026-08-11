@@ -109,7 +109,12 @@ fn is_actions_file(file: &Path) -> bool {
 fn rel_route_path(base_path: &Path, file: &Path) -> Option<String> {
     let relative = file.strip_prefix(base_path.join("src/routes")).ok()?;
     let relative = relative.to_string_lossy().replace('\\', "/");
-    Some(relative.strip_suffix(".rs").unwrap_or(&relative).to_string())
+    Some(
+        relative
+            .strip_suffix(".rs")
+            .unwrap_or(&relative)
+            .to_string(),
+    )
 }
 
 /// Turn a route-relative path into a single safe identifier segment used for
@@ -255,9 +260,7 @@ fn single_generic_of(ty: &Type, name: &str) -> Option<Type> {
 /// built on the runtime `createAction` / `createStatefulAction` helpers from
 /// `@ossido-labs/ossido/actions`.
 pub fn render_actions_client(actions: &[ActionDef]) -> String {
-    let mut ts = String::from(
-        "// File automatically generated\n// Do not manually change it\n\n",
-    );
+    let mut ts = String::from("// File automatically generated\n// Do not manually change it\n\n");
 
     if actions.is_empty() {
         ts.push_str("export {}\n");
@@ -352,7 +355,10 @@ mod tests {
         );
         assert_eq!(action_input_type(&stateful), Some("Subscribe".to_string()));
         assert_eq!(action_output_type(&stateful), "FormState");
-        assert_eq!(action_prev_state_type(&stateful), Some("FormState".to_string()));
+        assert_eq!(
+            action_prev_state_type(&stateful),
+            Some("FormState".to_string())
+        );
 
         // logger is not treated as the input.
         let logged = parse_fn(
@@ -368,11 +374,13 @@ mod tests {
         assert_eq!(action_custom_name(&default), None);
 
         // Bare identifier.
-        let ident = parse_fn("#[action(createUser)] async fn create_user(i: In) -> Out { todo!() }");
+        let ident =
+            parse_fn("#[action(createUser)] async fn create_user(i: In) -> Out { todo!() }");
         assert_eq!(action_custom_name(&ident), Some("createUser".to_string()));
 
         // String literal (allows names an identifier can't spell).
-        let lit = parse_fn("#[action(\"createUser\")] async fn create_user(i: In) -> Out { todo!() }");
+        let lit =
+            parse_fn("#[action(\"createUser\")] async fn create_user(i: In) -> Out { todo!() }");
         assert_eq!(action_custom_name(&lit), Some("createUser".to_string()));
     }
 

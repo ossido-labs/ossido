@@ -48,7 +48,10 @@ pub fn action_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let fn_name = &item.sig.ident;
-    let handler_name = Ident::new(&format!("{fn_name}_ossido_internal_action"), Span::call_site());
+    let handler_name = Ident::new(
+        &format!("{fn_name}_ossido_internal_action"),
+        Span::call_site(),
+    );
 
     let mut roles: Vec<Role> = Vec::new();
     let mut state_field_names: Punctuated<Pat, Comma> = Punctuated::new();
@@ -67,8 +70,11 @@ pub fn action_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
         if let Some(inner) = prev_state_inner(&ty) {
             if prev_ty.is_some() {
-                return syn::Error::new_spanned(arg, "an action can declare at most one `PrevState`")
-                    .to_compile_error();
+                return syn::Error::new_spanned(
+                    arg,
+                    "an action can declare at most one `PrevState`",
+                )
+                .to_compile_error();
             }
             prev_ty = Some(inner);
             roles.push(Role::Prev);
@@ -240,7 +246,9 @@ mod tests {
     use super::*;
 
     fn expand(item: TokenStream) -> String {
-        action_core(TokenStream::new(), item).to_string().replace(' ', "")
+        action_core(TokenStream::new(), item)
+            .to_string()
+            .replace(' ', "")
     }
 
     fn expand_with(attrs: TokenStream, item: TokenStream) -> String {
@@ -249,13 +257,18 @@ mod tests {
 
     #[test]
     fn accepts_an_optional_name_argument_and_rejects_junk() {
-        let item = quote! { async fn create_user(input: In) -> Result<Out, ActionError> { todo!() } };
+        let item =
+            quote! { async fn create_user(input: In) -> Result<Out, ActionError> { todo!() } };
         // A bare ident or string literal name is accepted (the CLI reads it; the
         // macro just generates the handler as usual).
-        assert!(expand_with(quote!(createUser), item.clone())
-            .contains("create_user_ossido_internal_action"));
-        assert!(expand_with(quote!("createUser"), item.clone())
-            .contains("create_user_ossido_internal_action"));
+        assert!(
+            expand_with(quote!(createUser), item.clone())
+                .contains("create_user_ossido_internal_action")
+        );
+        assert!(
+            expand_with(quote!("createUser"), item.clone())
+                .contains("create_user_ossido_internal_action")
+        );
         // Anything that is not an ident or string literal is a clear error.
         assert!(expand_with(quote!(1 + 2), item).contains("compile_error!"));
     }
@@ -274,7 +287,9 @@ mod tests {
         assert!(out.contains("decode_form(&req).await"));
         assert!(out.contains("__ossido_form.input::<CreateUser>()"));
         // Forwards input + state to the user function.
-        assert!(out.contains("run_action(&req,__ossido_decoded,move|__ossido_input|create_user(__ossido_input,db)"));
+        assert!(out.contains(
+            "run_action(&req,__ossido_decoded,move|__ossido_input|create_user(__ossido_input,db)"
+        ));
         // Extracts application state.
         assert!(out.contains("letApplicationState{db,..}=state;"));
     }
