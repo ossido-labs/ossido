@@ -1,6 +1,6 @@
 [package]
 name = "ossido"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 authors = ["Chris Schofield <chris@childishforces.com>"]
 description = "Superfast React fullstack framework"
@@ -22,7 +22,7 @@ include = [
 # surfaced `JsException` errors. A path dependency (unlike a workspace `[patch]`)
 # propagates transitively, so the excluded fixture/example apps that build
 # against this crate resolve it too.
-ossido_ssr = { path = "../ossido_ssr", version = "0.1.2" }
+ossido_ssr = { path = "../ossido_ssr", version = "0.1.3" }
 axum = {version = "0.8.9", features = ["json", "ws"]}
 axum-extra = {version = "0.12.6", features = ["cookie"]}
 tokio = { version = "1.53.1", features = ["full"] }
@@ -46,8 +46,8 @@ tower-http = {version = "0.7.0", features = ["fs", "compression-br", "compressio
 brotli = "8"
 colored = "3.1.1"
 
-ossido_macros = {path = "../ossido_macros", version = "0.1.2"}
-ossido_internal = {path = "../ossido_internal", version = "0.1.2"}
+ossido_macros = {path = "../ossido_macros", version = "0.1.3"}
+ossido_internal = {path = "../ossido_internal", version = "0.1.3"}
 # Match the same version used by axum
 tokio-tungstenite = "0.29.0"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }

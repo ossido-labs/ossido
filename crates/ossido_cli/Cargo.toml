@@ -1,6 +1,6 @@
 [package]
 name = "ossido_cli"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 authors = ["Chris Schofield <chris@childishforces.com>"]
 description = "Superfast React fullstack framework"
@@ -45,7 +45,7 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 cliclack = "0.5"
 fs_extra = "1.3.0"
 http = "1.1.0"
-ossido_internal = {path = "../ossido_internal", version = "0.1.2"}
+ossido_internal = {path = "../ossido_internal", version = "0.1.3"}
 spinners = "4.2.0"
 console = "0.16.4"
 convert_case = "0.11.0"
