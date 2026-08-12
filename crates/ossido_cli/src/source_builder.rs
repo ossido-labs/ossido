@@ -662,8 +662,6 @@ mod tests {
 
         let fallback_html = source_builder.build_html_fallback();
 
-        assert!(
-            fallback_html.contains("https://dev.example.com/vite-server/@vite/client")
-        );
+        assert!(fallback_html.contains("https://dev.example.com/vite-server/@vite/client"));
     }
 }
