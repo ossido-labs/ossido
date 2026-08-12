@@ -38,7 +38,7 @@ pub async fn vite_reverse_proxy(
 
     let vite_url = format!(
         "http://{}:{}/vite-server",
-        config.server.host,
+        crate::config::vite_connect_host(&config.server.host),
         config.server.port + 1
     );
 

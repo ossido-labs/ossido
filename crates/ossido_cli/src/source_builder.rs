@@ -548,12 +548,13 @@ impl SourceBuilder {
 
     fn build_html_fallback(&self) -> String {
         if let Some(config) = &self.app.config.as_ref() {
-            if let Some(origin) = &config.server.origin {
-                FALLBACK_HTML.replace("[BASE_URL]", origin)
-            } else {
-                let url = format!("http://{}:{}", config.server.host, config.server.port);
-                FALLBACK_HTML.replace("[BASE_URL]", url.as_str())
-            }
+            // The vite assets are proxied through this same server, so use a
+            // relative base — it resolves against whatever address the browser
+            // reached the dev server on (localhost, a LAN IP, …), which is what
+            // lets `host: '0.0.0.0'` work; an absolute `http://0.0.0.0:port` is
+            // not loadable by a browser. An explicit `origin` still wins.
+            let base_url = config.server.origin.as_deref().unwrap_or("");
+            FALLBACK_HTML.replace("[BASE_URL]", base_url)
         } else {
             "".to_string()
         }
@@ -637,8 +638,32 @@ mod tests {
 
         let fallback_html = source_builder.build_html_fallback();
 
-        assert!(fallback_html.contains("http://localhost:3000/vite-server/@react-refresh"));
-        assert!(fallback_html.contains("http://localhost:3000/vite-server/@vite/client"));
-        assert!(fallback_html.contains("http://localhost:3000/vite-server/client-main.tsx"));
+        // With no configured `origin`, vite URLs are relative (same origin as
+        // the page) so `host: '0.0.0.0'` / LAN access resolve correctly.
+        assert!(fallback_html.contains("'/vite-server/@react-refresh'"));
+        assert!(fallback_html.contains("\"/vite-server/@vite/client\""));
+        assert!(fallback_html.contains("\"/vite-server/client-main.tsx\""));
+        assert!(!fallback_html.contains("http://"));
+    }
+
+    #[test]
+    fn fallback_html_uses_configured_origin_when_set() {
+        let mut app = App::new();
+        let mut config: ossido_internal::config::Config = Default::default();
+        config.server.origin = Some("https://dev.example.com".to_string());
+        app.config = Some(config);
+
+        let source_builder = SourceBuilder {
+            app,
+            mode: Mode::Dev,
+            base_path: PathBuf::new(),
+            types_jar: TypesJar::default(),
+        };
+
+        let fallback_html = source_builder.build_html_fallback();
+
+        assert!(
+            fallback_html.contains("https://dev.example.com/vite-server/@vite/client")
+        );
     }
 }

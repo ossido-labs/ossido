@@ -35,7 +35,7 @@ async fn handle_socket(mut ossido_socket: WebSocket) {
 
     let vite_ws = format!(
         "ws://{}:{}/vite-server/",
-        config.server.host,
+        crate::config::vite_connect_host(&config.server.host),
         config.server.port + 1
     );
 

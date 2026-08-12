@@ -12,12 +12,15 @@ interface DevResourcesProps {
 export const DevResources = ({
   devServerConfig,
 }: DevResourcesProps): JSX.Element => {
-  const { host, origin, port } = devServerConfig ?? DEFAULT_SERVER_CONFIG;
+  const { origin } = devServerConfig ?? DEFAULT_SERVER_CONFIG;
 
+  // The vite assets are proxied through *this* ossido server (same origin), so a
+  // relative URL is correct and resolves against whatever address the browser
+  // used — which is what makes `host: '0.0.0.0'` and LAN access work (an
+  // absolute `http://0.0.0.0:port/...` is unreachable from a browser). An
+  // explicit `origin` (e.g. a custom dev domain behind a proxy) still wins.
   const viteBaseUrl =
-    origin != null
-      ? `${origin}${VITE_PROXY_PATH}`
-      : `http://${host}:${port}${VITE_PROXY_PATH}`;
+    origin != null ? `${origin}${VITE_PROXY_PATH}` : VITE_PROXY_PATH;
 
   /**
    * These scripts must execute in order: the react-refresh preamble has to run
