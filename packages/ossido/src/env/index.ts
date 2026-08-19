@@ -53,12 +53,34 @@ export type PublicEnv = Register extends { env: infer E }
  * `#[ossido::Environment]` struct (the Rust equivalent, `get_env!`, is a compile
  * error in that case) — or if the key is not a known public variable.
  */
-export function getEnv<K extends keyof PublicEnv>(key: K): PublicEnv[K] {
+export function getEnv<K extends keyof PublicEnv>(key: K): PublicEnv[K];
+/**
+ * Read a public environment variable, collapsing an optional value to a concrete
+ * `T`: `fallback` is returned whenever the value is absent (an optional variable
+ * unset, or no public environment available). The `null`/`undefined` member is
+ * stripped from the return type.
+ *
+ * ```ts
+ * // env type: { analytics_enabled: boolean | null }
+ * const analytics = getEnv('analytics_enabled', false); //=> boolean
+ * ```
+ */
+export function getEnv<K extends keyof PublicEnv>(
+  key: K,
+  fallback: NonNullable<PublicEnv[K]>,
+): NonNullable<PublicEnv[K]>;
+export function getEnv<K extends keyof PublicEnv>(
+  key: K,
+  fallback?: NonNullable<PublicEnv[K]>,
+): PublicEnv[K] {
+  const hasFallback = fallback !== undefined;
+
   const env = (globalThis as Record<string, unknown>)[
     PUBLIC_ENV_VARIABLE_NAME
   ] as PublicEnv | undefined;
 
   if (env == null) {
+    if (hasFallback) return fallback;
     throw new Error(
       'getEnv: no public environment is available. Define an `Environment` struct ' +
         'with `#[ossido::Environment]` and mark fields `#[public]` to expose them.',
@@ -66,10 +88,17 @@ export function getEnv<K extends keyof PublicEnv>(key: K): PublicEnv[K] {
   }
 
   if (!(key in (env as object))) {
+    if (hasFallback) return fallback;
     throw new Error(
       `getEnv: "${String(key)}" is not a public environment variable.`,
     );
   }
 
-  return env[key];
+  const value = env[key];
+  // An unset optional variable serializes to `null`; fall back to the concrete
+  // default when one was provided.
+  if (hasFallback && (value === null || value === undefined)) {
+    return fallback;
+  }
+  return value;
 }

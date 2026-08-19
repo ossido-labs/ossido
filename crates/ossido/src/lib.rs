@@ -11,6 +11,17 @@
 /// let port = ossido::get_env!(port);       // -> u16
 /// ```
 ///
+/// With a second argument, an **`Option<T>` field is collapsed to a concrete
+/// `T`**, using the fallback when the variable is unset (`None`):
+///
+/// ```ignore
+/// // field: `analytics_enabled: Option<bool>`
+/// let analytics = ossido::get_env!(analytics_enabled, false); // -> bool
+/// ```
+///
+/// The fallback form only applies to `Option<T>` fields (a required field is
+/// always present, so a fallback is meaningless — passing one is a type error).
+///
 /// Resolves to the parsed environment singleton the generated `main.rs` builds
 /// at `crate::__ossido_environment()`. If the project defines **no** `Environment`
 /// struct that accessor is never generated, so `get_env!` fails to compile at the
@@ -23,6 +34,9 @@
 macro_rules! get_env {
     ($field:ident) => {
         crate::__ossido_environment().$field.clone()
+    };
+    ($field:ident, $fallback:expr) => {
+        $crate::__env_or(crate::__ossido_environment().$field.clone(), $fallback)
     };
 }
 
@@ -59,8 +73,9 @@ pub use mode::Mode;
 pub use ossido_macros::{Environment, Props, Type, action, api, handler, middleware, static_paths};
 // `bootstrap` loads `.env` and registers the project's public env at the top of
 // the generated `main.rs` — before app-state init, so app state can read env.
-// `public_env_json` is read by the SSR payload (`payload.rs`).
-pub use env::{bootstrap, public_env_json, register_public_env};
+// `public_env_json` is read by the SSR payload (`payload.rs`). `__env_or` backs
+// the two-argument `get_env!` fallback form.
+pub use env::{__env_or, bootstrap, public_env_json, register_public_env};
 pub use ossido_ssr::Ssr;
 pub use payload::Payload;
 pub use request::{BodyParseError, Request};

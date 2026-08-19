@@ -29,6 +29,16 @@ pub fn public_env_json() -> Option<&'static RawValue> {
     PUBLIC_ENV_JSON.get().map(|raw| raw.as_ref())
 }
 
+/// Backing helper for the two-argument [`get_env!`](crate::get_env) form:
+/// collapse an `Option<T>` field to a concrete `T`, using `fallback` when the
+/// variable is unset. Restricted to `Option<T>` inputs, so passing a fallback
+/// for a required (non-`Option`) field is a type error — a fallback there would
+/// be meaningless.
+#[doc(hidden)]
+pub fn __env_or<T>(value: Option<T>, fallback: T) -> T {
+    value.unwrap_or(fallback)
+}
+
 /// Prepare the environment at the very start of the generated `main.rs`, before
 /// anything else:
 ///
@@ -117,6 +127,14 @@ mod tests {
 
     use super::*;
     use crate::mode::Mode;
+
+    #[test]
+    fn env_or_returns_value_when_present_else_fallback() {
+        assert_eq!(__env_or(Some(3u16), 9), 3);
+        assert_eq!(__env_or(None, 9u16), 9);
+        assert_eq!(__env_or(Some(String::from("x")), String::from("d")), "x");
+        assert_eq!(__env_or(None::<String>, String::from("d")), "d");
+    }
 
     struct MockEnv {
         files: Vec<String>,

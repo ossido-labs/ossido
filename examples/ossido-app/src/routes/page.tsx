@@ -50,8 +50,10 @@ function NavCard({ href, label, desc }: NavLink): JSX.Element {
 
 const IndexPage: OssidoPage<'/'> = ({ subtitle }) => {
   // Public env var, typed from the `#[ossido::Environment]` struct and injected
-  // into the SSR global. `analytics_enabled` is `boolean | null`.
+  // into the SSR global.
   const apiUrl = getEnv('api_url');
+  // `analytics_enabled` is `boolean | null`; the fallback collapses it to `boolean`.
+  const analytics = getEnv('analytics_enabled', false);
 
   return (
     <>
@@ -61,7 +63,7 @@ const IndexPage: OssidoPage<'/'> = ({ subtitle }) => {
         </h1>
         <p className="subtitle">{subtitle}</p>
         <p className="subtitle" data-testid="api-url">
-          API: {apiUrl}
+          API: {apiUrl} · analytics: {String(analytics)}
         </p>
       </div>
 
