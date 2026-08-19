@@ -254,6 +254,30 @@ describe('normalizeConfig', () => {
     });
   });
 
+  describe('lightningcss', () => {
+    it('should be absent by default', () => {
+      expect(normalizeConfig({})).not.toHaveProperty('lightningcss');
+    });
+
+    it('should pass through the boolean form', () => {
+      expect(normalizeConfig({ lightningcss: true })).toStrictEqual(
+        expect.objectContaining({ lightningcss: true }),
+      );
+    });
+
+    it('should pass through the object form with targets', () => {
+      const config: OssidoConfig = {
+        lightningcss: { targets: '>= 0.25%, not dead' },
+      };
+
+      expect(normalizeConfig(config)).toStrictEqual(
+        expect.objectContaining({
+          lightningcss: { targets: '>= 0.25%, not dead' },
+        }),
+      );
+    });
+  });
+
   describe('vite - css config', () => {
     it('should have css undefined if not provided', () => {
       const config: OssidoConfig = {};

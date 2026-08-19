@@ -84,7 +84,9 @@
   "dependencies": {
     "@rollup/plugin-inject": "^5.0.5",
     "@vitejs/plugin-react-swc": "^4.3.2",
+    "browserslist": "^4.28.8",
     "fast-text-encoding": "^1.0.6",
+    "lightningcss": "^1.33.0",
     "@ossido-labs/ossido-react-vite-plugin": "workspace:*",
     "@ossido-labs/ossido-router": "workspace:*",
     "@ossido-labs/ossido-ui": "workspace:*",
