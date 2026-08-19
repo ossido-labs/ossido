@@ -35,6 +35,15 @@ pub struct Payload<'a> {
     css_bundles: Option<&'a Vec<String>>,
     #[serde(rename(serialize = "devServerConfig"))]
     dev_server_config: Option<&'a ServerConfig>,
+    /// The project's `#[public]` environment variables (a JSON object), embedded
+    /// verbatim. Absent when the project defines no `Environment` struct. The SSR
+    /// runtime lifts this into the `__OSSIDO_PUBLIC_ENV__` global that powers the
+    /// frontend `getEnv`.
+    #[serde(
+        rename(serialize = "publicEnv"),
+        skip_serializing_if = "Option::is_none"
+    )]
+    public_env: Option<&'a RawValue>,
     /// Present only when a handler panicked (dev mode). The client seeds the
     /// route's data resource as rejected so the error overlay renders.
     #[serde(
@@ -66,6 +75,7 @@ impl<'a> Payload<'a> {
             js_bundles: None,
             css_bundles: None,
             dev_server_config,
+            public_env: crate::env::public_env_json(),
             server_error: None,
         }
     }
@@ -185,6 +195,7 @@ mod tests {
             js_bundles: None,
             css_bundles: None,
             dev_server_config: None,
+            public_env: None,
             server_error: None,
         }
     }

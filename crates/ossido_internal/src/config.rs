@@ -80,6 +80,13 @@ pub struct Config {
     pub ssr: SsrConfig,
     #[serde(default)]
     pub output: OutputMode,
+    /// Override for which `.env` files are loaded, from the `env` option in
+    /// `ossido.config.ts`. When present, these paths **replace** the default
+    /// `.env`/`.env.local`/`.env.[mode]` cascade (loaded in order). `None` keeps
+    /// the default cascade. The JS normalizer coerces a single string to a
+    /// one-element array.
+    #[serde(default)]
+    pub env: Option<Vec<String>>,
 }
 
 impl Config {
@@ -123,6 +130,25 @@ mod tests {
         let config: Config =
             serde_json::from_str(&format!("{base}, \"output\": \"server\" }}")).unwrap();
         assert_eq!(config.output, OutputMode::Server);
+    }
+
+    #[test]
+    fn deserializes_env_override_and_defaults_to_none() {
+        let base = r#"{ "server": { "host": "localhost", "port": 3000, "origin": null }"#;
+
+        // Absent → None (default cascade).
+        let config: Config = serde_json::from_str(&format!("{base} }}")).unwrap();
+        assert_eq!(config.env, None);
+
+        // Array of paths (the shape the JS normalizer emits).
+        let config: Config = serde_json::from_str(&format!(
+            "{base}, \"env\": [\".env.shared\", \".env.secret\"] }}"
+        ))
+        .unwrap();
+        assert_eq!(
+            config.env,
+            Some(vec![".env.shared".to_string(), ".env.secret".to_string()])
+        );
     }
 
     #[test]

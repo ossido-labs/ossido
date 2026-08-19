@@ -91,7 +91,7 @@ impl Server {
             // which is not thread-safe.
             // However, we are using it in a controlled environment which hasn't
             // spawned any threads yet.
-            load_env_vars(mode);
+            load_env_vars(mode, config.env.as_deref());
         }
 
         let listener = match tokio::net::TcpListener::bind(&server_address).await {

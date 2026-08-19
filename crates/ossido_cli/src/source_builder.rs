@@ -10,8 +10,9 @@ use crate::mode::Mode;
 use crate::route::AxumInfo;
 use crate::route_directory_info::RouteDirectoryInfo;
 use crate::typescript::{
-    ActionDef, TypesJar, collect_actions, collect_api_routes, collect_layout_props,
-    collect_route_props, render_actions_client, render_api_routes, render_route_props,
+    ActionDef, EnvStruct, TypesJar, collect_actions, collect_api_routes, collect_environment,
+    collect_layout_props, collect_route_props, render_actions_client, render_api_routes,
+    render_env_module, render_route_props,
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -162,8 +163,16 @@ impl SourceBuilder {
             mod ossido_main_state;
             "#;
         }
+        // The `#[ossido::Environment]` wiring: a top-level module include +
+        // singleton accessor (empty without a struct), and the single
+        // `ossido::bootstrap(..)` call that loads `.env` and registers the
+        // public env before app-state init.
+        let (env_module, bootstrap_call) = self.env_wiring();
+
         let src = AXUM_ENTRY_POINT
             .replace("\r", "")
+            .replace("// ENV_MODULE\n", &env_module)
+            .replace("// BOOTSTRAP\n", &bootstrap_call)
             .replace(
                 "// ROUTE_BUILDER\n",
                 &format!(
@@ -208,6 +217,62 @@ impl SourceBuilder {
         src.replace("// AXUM_GET_ROUTE_HANDLER", &import_http_handler)
     }
 
+    /// The generated-`main.rs` wiring for the (optional) `#[ossido::Environment]`
+    /// struct, as `(top_level, bootstrap_call)`:
+    /// - `top_level`: a `#[path]` module include for the struct's file plus a
+    ///   crate-root `__ossido_environment()` singleton accessor (the target of
+    ///   `ossido::get_env!`).
+    /// - `bootstrap_call`: the single `ossido::bootstrap(..)` call at the very
+    ///   top of `main` — before the app-state initializer — that loads `.env`
+    ///   and, when the struct exists, parses it (fail-fast) and registers its
+    ///   public JSON for SSR injection.
+    ///
+    /// When no `Environment` struct exists, `top_level` is empty and the
+    /// bootstrap call passes `None` (still loads `.env`), keeping the env feature
+    /// fully optional.
+    fn env_wiring(&self) -> (String, String) {
+        let Some(EnvStruct {
+            file_path,
+            struct_name,
+            ..
+        }) = collect_environment(&self.base_path)
+        else {
+            // No struct: still load `.env`, but nothing to register.
+            return (
+                String::new(),
+                "ossido::bootstrap(MODE, None);\n".to_string(),
+            );
+        };
+
+        // `#[path]` is resolved relative to `.ossido/`, so reach back up to the
+        // project root: `../src/env.rs`. Fall back to the raw path if it isn't
+        // under the project root (unusual).
+        let relative = file_path
+            .strip_prefix(&self.base_path)
+            .unwrap_or(&file_path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        let top_level = format!(
+            r#"#[path = "../{relative}"]
+mod __ossido_environment_mod;
+
+/// The parsed environment singleton — the target of `ossido::get_env!`.
+fn __ossido_environment() -> &'static __ossido_environment_mod::{struct_name} {{
+    static __OSSIDO_ENV: ::std::sync::OnceLock<__ossido_environment_mod::{struct_name}> =
+        ::std::sync::OnceLock::new();
+    __OSSIDO_ENV.get_or_init(__ossido_environment_mod::{struct_name}::from_env)
+}}
+"#
+        );
+
+        let bootstrap_call =
+            "ossido::bootstrap(MODE, Some(|| __ossido_environment().__ossido_public_env_json()));\n"
+                .to_string();
+
+        (top_level, bootstrap_call)
+    }
+
     pub fn refresh_axum_source(&self) -> io::Result<()> {
         let axum_source = self.generate_axum_source();
 
@@ -239,6 +304,17 @@ impl SourceBuilder {
         let extra = self.route_props_typescript();
         let api_routes = render_api_routes(&collect_api_routes(&self.base_path));
 
+        // The `@ossido-labs/ossido/env` augmentation for the project's public env
+        // vars — emitted only when an `#[ossido::Environment]` struct exists, so
+        // `getEnv` is typed only for projects that opted in.
+        let env_module = collect_environment(&self.base_path)
+            .map(|env| render_env_module(&env))
+            .unwrap_or_default();
+
+        // Both ambient module augmentations are appended after the
+        // `@ossido-labs/ossido/types` block, in the `trailing` slot.
+        let trailing = format!("{api_routes}{env_module}");
+
         // The importable, typed server-action functions (`.ossido/actions.ts`)
         // — a real module (not just an ambient declaration) so user code can
         // `import { createUser } from ".ossido/actions"`.
@@ -249,7 +325,7 @@ impl SourceBuilder {
         )?;
 
         self.types_jar
-            .generate_typescript_file(&self.base_path, &extra, &api_routes)
+            .generate_typescript_file(&self.base_path, &extra, &trailing)
     }
 
     /// The `RouteProps` map + `OssidoPage` helper, derived from each page

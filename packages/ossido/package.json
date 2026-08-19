@@ -46,6 +46,10 @@
       "types": "./dist/esm/config/index.d.ts",
       "default": "./dist/esm/config/index.js"
     },
+    "./env": {
+      "types": "./dist/esm/env/index.d.ts",
+      "default": "./dist/esm/env/index.js"
+    },
     "./ssr": {
       "types": "./dist/esm/ssr/index.d.ts",
       "default": "./dist/esm/ssr/index.js"

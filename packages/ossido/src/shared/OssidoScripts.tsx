@@ -1,6 +1,9 @@
 import type { JSX } from 'react';
 
-import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants';
+import {
+  SERVER_PAYLOAD_VARIABLE_NAME,
+  PUBLIC_ENV_VARIABLE_NAME,
+} from '../constants';
 
 import { DevResources } from './DevResources';
 import { ProdResources } from './ProdResources';
@@ -38,6 +41,16 @@ export function OssidoScripts(): JSX.Element {
           __html: `window['${SERVER_PAYLOAD_VARIABLE_NAME}']=${escapeForScript(payloadJson)}`,
         }}
       />
+      {serverPayload.publicEnv !== undefined && (
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `window['${PUBLIC_ENV_VARIABLE_NAME}']=${escapeForScript(
+              JSON.stringify(serverPayload.publicEnv),
+            )}`,
+          }}
+        />
+      )}
       {serverPayload.mode === 'Dev' && (
         <DevResources devServerConfig={serverPayload.devServerConfig} />
       )}
