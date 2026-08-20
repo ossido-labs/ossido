@@ -65,6 +65,17 @@ export interface OssidoConfig {
   /** Build lifecycle hooks (`ossido build`, both output modes; not `dev`). */
   build?: OssidoConfigBuild;
   /**
+   * Override which `.env` file(s) are loaded, as a path or array of paths
+   * (relative to the project root, loaded in order — a later file overrides an
+   * earlier one). When set, this **replaces** the default
+   * `.env` / `.env.local` / `.env.[mode]` cascade. Leave unset to keep the
+   * default cascade.
+   *
+   * Only meaningful alongside an `#[ossido::Environment]` struct, which defines
+   * the typed schema these variables populate.
+   */
+  env?: string | Array<string>;
+  /**
    * Animate client-side navigations with the browser
    * [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API).
    * Default `false`. When enabled, `push`/`replace`/`<Link>`/back-forward

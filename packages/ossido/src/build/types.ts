@@ -31,7 +31,7 @@ export interface InternalOssidoConfigSsr {
 
 export interface InternalOssidoConfig extends Omit<
   OssidoConfig,
-  'server' | 'logging' | 'dev' | 'ssr' | 'output' | 'viewTransitions'
+  'server' | 'logging' | 'dev' | 'ssr' | 'output' | 'viewTransitions' | 'env'
 > {
   server: OssidoConfigServer;
   logging: InternalOssidoConfigLogging;
@@ -39,4 +39,6 @@ export interface InternalOssidoConfig extends Omit<
   ssr: InternalOssidoConfigSsr;
   output: OssidoConfigOutput;
   viewTransitions: boolean;
+  /** Normalized to an array (a single configured path is wrapped). */
+  env?: Array<string>;
 }

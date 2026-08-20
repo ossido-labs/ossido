@@ -8,6 +8,7 @@ use proc_macro::TokenStream;
 
 mod action;
 mod api;
+mod environment;
 mod handler;
 mod middleware;
 mod props;
@@ -65,4 +66,16 @@ pub fn static_paths(args: TokenStream, item: TokenStream) -> TokenStream {
 #[allow(non_snake_case)]
 pub fn Type(args: TokenStream, item: TokenStream) -> TokenStream {
     props::type_attr(args.into(), item.into()).into()
+}
+
+/// `#[ossido::Environment]` — mark the project's typed environment schema. See
+/// [`environment::environment_attr`] for the full contract (typed `FromStr`
+/// parsing, required vs `Option` fields, the `#[public]` helper, and the
+/// generated `from_env` / public-JSON methods). Read fields in Rust via
+/// [`ossido::get_env!`](../ossido/macro.get_env.html); TypeScript types for the
+/// public fields are generated only when this struct exists.
+#[proc_macro_attribute]
+#[allow(non_snake_case)]
+pub fn Environment(args: TokenStream, item: TokenStream) -> TokenStream {
+    environment::environment_attr(args.into(), item.into()).into()
 }

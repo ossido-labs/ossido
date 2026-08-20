@@ -1,5 +1,5 @@
 use ossido::axum::Json;
-use ossido::{api, Request, Type};
+use ossido::{Request, Type, api};
 
 // `pub` because the generated `#[api]` wrapper is `pub` and returns `Json<Pokemon>`.
 #[Type]

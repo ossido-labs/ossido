@@ -27,6 +27,13 @@ export type ServerPayload<TData = unknown> = {
   /** Wrapping `layout.rs` handlers' data, keyed by each layout's `dataKey`. */
   layoutData?: Record<string, unknown>;
 
+  /**
+   * The project's `#[public]` environment variables. Present only when the
+   * project defines an `#[ossido::Environment]` struct. Lifted into the
+   * `__OSSIDO_PUBLIC_ENV__` global that powers `getEnv`.
+   */
+  publicEnv?: Record<string, unknown>;
+
   /** Present (dev only) when the route's Rust handler panicked. */
   serverError?: ServerErrorPayload;
 } & (
