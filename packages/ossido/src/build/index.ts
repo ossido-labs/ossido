@@ -7,6 +7,8 @@ import type { InlineConfig, Plugin } from 'vite';
 import { build, createServer, mergeConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import inject from '@rollup/plugin-inject';
+import browserslist from 'browserslist';
+import { browserslistToTargets } from 'lightningcss';
 import {
   OssidoReactPlugin,
   routeGenerator,
@@ -66,6 +68,38 @@ const VITE_SSR_PLUGINS: Array<Plugin> = [
   },
 ];
 
+/** Default browser-targets query when `lightningcss` is enabled without one. */
+const DEFAULT_BROWSERSLIST = 'defaults';
+
+/**
+ * Vite `css` / `build.cssMinify` fragments for the (optional) Lightning CSS
+ * pipeline. Returns `{}` when disabled, so the default Vite/PostCSS behaviour is
+ * untouched. When enabled, it sets `css.transformer: 'lightningcss'` (applies in
+ * dev-serve and build) and `cssMinify: 'lightningcss'` (prod build), deriving
+ * targets from a browserslist query (`targets` override, else `'defaults'`).
+ */
+function lightningCssOverrides(ossidoConfig: InternalOssidoConfig): {
+  css?: InlineConfig['css'];
+  cssMinify?: 'lightningcss';
+} {
+  const option = ossidoConfig.lightningcss;
+  if (!option) return {};
+
+  const query = typeof option === 'object' ? option.targets : undefined;
+  const targets = browserslistToTargets(
+    browserslist(query ?? DEFAULT_BROWSERSLIST),
+  );
+
+  return {
+    css: {
+      ...ossidoConfig.vite?.css,
+      transformer: 'lightningcss',
+      lightningcss: { ...ossidoConfig.vite?.css?.lightningcss, targets },
+    },
+    cssMinify: 'lightningcss',
+  };
+}
+
 /**
  * From a resolved {@link InternalOssidoConfig} return a `vite` "mergeable"
  * {@link InlineConfig} including all default ossido related options
@@ -78,6 +112,9 @@ function createBaseViteConfigFromOssidoConfig(
    * packages/lazy-fn-vite-plugin/tests/transpileSource.test.ts
    */
   const pluginFilesInclude = /\.(jsx|js|mdx|md|tsx|ts)$/;
+
+  // Optional Lightning CSS pipeline (empty unless `lightningcss` is configured).
+  const lightning = lightningCssOverrides(ossidoConfig);
 
   const viteBaseConfig: InlineConfig = {
     root: '.ossido',
@@ -118,7 +155,13 @@ function createBaseViteConfigFromOssidoConfig(
       alias: ossidoConfig.vite?.alias ?? {},
     },
 
-    css: ossidoConfig.vite?.css,
+    css: lightning.css ?? ossidoConfig.vite?.css,
+
+    // Only present when Lightning CSS is enabled; merged into every build phase
+    // (a no-op for the dev CSR serve, which doesn't minify).
+    ...(lightning.cssMinify
+      ? { build: { cssMinify: lightning.cssMinify } }
+      : {}),
 
     optimizeDeps: ossidoConfig.vite?.optimizeDeps,
 

@@ -41,4 +41,6 @@ export interface InternalOssidoConfig extends Omit<
   viewTransitions: boolean;
   /** Normalized to an array (a single configured path is wrapped). */
   env?: Array<string>;
+  /** Build-only; consumed by the Vite config, not written to `config.json`. */
+  lightningcss?: OssidoConfig['lightningcss'];
 }

@@ -103,6 +103,10 @@ export const normalizeConfig = (config: OssidoConfig): InternalOssidoConfig => {
     ...(config.env !== undefined
       ? { env: Array.isArray(config.env) ? config.env : [config.env] }
       : {}),
+    // Passed through untouched; interpreted by the Vite config (JS-only).
+    ...(config.lightningcss !== undefined
+      ? { lightningcss: config.lightningcss }
+      : {}),
     // Carried through as-is (its `prebuild`/`postbuild` are functions, so they
     // are only reachable via `loadConfig`, never the JSON config). Spread
     // conditionally so an absent `build` isn't materialised as `undefined`.

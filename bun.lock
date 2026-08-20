@@ -4,14 +4,6 @@
   "workspaces": {
     "": {
       "name": "workspace",
-      "dependencies": {
-        "@ossido-labs/ossido": "./packages/ossido/",
-        "@ossido-labs/ossido-eslint-plugin": "./packages/ossido-eslint-plugin/",
-        "@ossido-labs/ossido-mdx": "workspace:*",
-        "@ossido-labs/ossido-react-vite-plugin": "./packages/ossido-react-vite-plugin/",
-        "@ossido-labs/ossido-router": "workspace:*",
-        "@ossido-labs/ossido-ui": "./packages/ossido-ui/",
-      },
       "devDependencies": {
         "@ossido-labs/ossido-eslint-plugin": "workspace:*",
         "@oxlint/plugins": "1.76.0",
@@ -136,7 +128,9 @@
         "@ossido-labs/ossido-ui": "workspace:*",
         "@rollup/plugin-inject": "^5.0.5",
         "@vitejs/plugin-react-swc": "^4.3.2",
+        "browserslist": "^4.28.8",
         "fast-text-encoding": "^1.0.6",
+        "lightningcss": "^1.33.0",
         "url-search-params-polyfill": "^8.2.5",
         "web-streams-polyfill": "^4.0.0",
       },
