@@ -9,6 +9,7 @@
     // Emit
     "noEmit": false,
     "declaration": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "rootDir": "src"
   }
 }
