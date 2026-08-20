@@ -65,17 +65,17 @@ mod vite_websocket_proxy;
 pub use action::{ActionError, ActionInputError, Files, PrevState, UploadedFile};
 pub use axum;
 pub use axum_extra::extract::cookie;
+// `bootstrap` loads `.env` and registers the project's public env at the top of
+// the generated `main.rs` — before app-state init, so app state can read env.
+// `public_env_json` is read by the SSR payload (`payload.rs`). `__env_or` backs
+// the two-argument `get_env!` fallback form.
+pub use env::{__env_or, bootstrap, public_env_json, register_public_env};
 pub use error_handler::{ErrorContext, set_error_handler};
 pub use logger::Logger;
 pub use mode::Mode;
 // `Props` is re-exported both as the struct (from `response`) and as the
 // attribute macro — the same name in two namespaces, like `serde::Serialize`.
 pub use ossido_macros::{Environment, Props, Type, action, api, handler, middleware, static_paths};
-// `bootstrap` loads `.env` and registers the project's public env at the top of
-// the generated `main.rs` — before app-state init, so app state can read env.
-// `public_env_json` is read by the SSR payload (`payload.rs`). `__env_or` backs
-// the two-argument `get_env!` fallback form.
-pub use env::{__env_or, bootstrap, public_env_json, register_public_env};
 pub use ossido_ssr::Ssr;
 pub use payload::Payload;
 pub use request::{BodyParseError, Request};
