@@ -8,6 +8,8 @@ const config: OssidoConfig = {
   // Animate client-side navigations with the browser View Transitions API.
   dev: { criticalCss: true },
   viewTransitions: false,
+  // Use Lightning CSS (Rust-based) for CSS transform + minify.
+  lightningcss: true,
   build: {
     prebuild: (ctx) => {
       console.log(`[prebuild] mode=${ctx.mode} output=${ctx.outputDirectory}`);

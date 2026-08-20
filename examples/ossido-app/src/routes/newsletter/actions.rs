@@ -1,4 +1,4 @@
-use ossido::{action, ActionError, Files, Logger, PrevState, Type};
+use ossido::{ActionError, Files, Logger, PrevState, Type, action};
 
 #[Type]
 pub struct Subscribe {

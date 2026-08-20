@@ -1,6 +1,6 @@
-use tower_http::cors::{Any, CorsLayer};
 use ossido::axum::http::Method;
 use ossido::middleware;
+use tower_http::cors::{Any, CorsLayer};
 
 #[middleware]
 pub fn api_cors_layer() -> CorsLayer {

@@ -12,6 +12,7 @@ export default defineBuildConfig({
     './src/build-client/index.ts',
     './src/client/index.ts',
     './src/config/index.ts',
+    './src/env/index.ts',
     './src/ssr/index.ts',
     './src/hydration/index.tsx',
   ],

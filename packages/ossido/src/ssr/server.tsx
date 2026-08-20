@@ -52,6 +52,7 @@ import { createRouter, preloadRouteChain } from '@ossido-labs/ossido-router';
 import type { createRoute } from '@ossido-labs/ossido-router';
 
 import { OssidoEntryPoint } from '../shared/OssidoEntryPoint';
+import { PUBLIC_ENV_VARIABLE_NAME } from '../constants';
 import type { ServerPayload } from '../types';
 
 import { streamToString, createUtf8Streamer } from './utils';
@@ -84,6 +85,13 @@ export function serverSideRendering(routeTree: RouteTree): ServerSideRenderer {
   // inlined, so this resolves in a microtask.
   const element = async (payload: string | undefined): Promise<JSX.Element> => {
     const serverPayload = (payload ? JSON.parse(payload) : {}) as ServerPayload;
+    // Mirror the browser global on the SSR V8 runtime so `getEnv` works during
+    // server rendering too. Env is process-global, so this is stable across
+    // requests sharing an isolate; only set when the project exposes public vars.
+    if (serverPayload.publicEnv !== undefined) {
+      (globalThis as Record<string, unknown>)[PUBLIC_ENV_VARIABLE_NAME] =
+        serverPayload.publicEnv;
+    }
     const router = createRouter({ routeTree });
     await preloadRouteChain(router, serverPayload.location?.pathname);
     return (

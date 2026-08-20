@@ -1,5 +1,5 @@
-use tower_http::trace::TraceLayer;
 use ossido::middleware;
+use tower_http::trace::TraceLayer;
 
 #[middleware]
 pub fn trace_layer()

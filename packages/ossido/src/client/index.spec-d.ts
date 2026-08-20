@@ -7,16 +7,14 @@ interface Pokemon {
   name: string;
   weight: number;
 }
-declare module './index' {
-  interface Register {
-    apiRoutes: {
-      '/api/health': {
-        GET: { params: Record<string, never>; response: unknown };
-      };
-      '/api/pokemons/[name]': {
-        GET: { params: { name: string }; response: Pokemon };
-        POST: { params: { name: string }; response: Pokemon };
-      };
+declare global {
+  interface OssidoApiRoutes {
+    '/api/health': {
+      GET: { params: Record<string, never>; response: unknown };
+    };
+    '/api/pokemons/[name]': {
+      GET: { params: { name: string }; response: Pokemon };
+      POST: { params: { name: string }; response: Pokemon };
     };
   }
 }

@@ -134,16 +134,21 @@ fn json_inner_type_name(ty: &Type) -> Option<String> {
     Some(inner.path.segments.last()?.ident.to_string())
 }
 
-/// Render the `apiClient` route map as an augmentation of `@ossido-labs/ossido/client`'s
-/// `Register` interface. Returns an empty string when there are no API routes.
+/// Render the `apiClient` route map as a merge into the global `OssidoApiRoutes`
+/// interface that `@ossido-labs/ossido/client` reads. Returns an empty string
+/// when there are no API routes.
+///
+/// A global interface (not a `declare module` augmentation) is used on purpose:
+/// `.ossido/types.ts` is a global script, so a `declare module` there would
+/// *shadow* the real `@ossido-labs/ossido/client` module — hiding `apiClient` —
+/// rather than augment it. Global interfaces merge across files without that
+/// hazard.
 pub fn render_api_routes(routes: &[ApiRoute]) -> String {
     if routes.is_empty() {
         return String::new();
     }
 
-    let mut ts = String::from(
-        "declare module \"@ossido-labs/ossido/client\" {\n  interface Register {\n    apiRoutes: {\n",
-    );
+    let mut ts = String::from("interface OssidoApiRoutes {\n");
 
     for route in routes {
         let params = params_from_path(&route.path);
@@ -158,20 +163,20 @@ pub fn render_api_routes(routes: &[ApiRoute]) -> String {
             format!("{{ {fields} }}")
         };
 
-        ts.push_str(&format!("      \"{}\": {{\n", route.path));
+        ts.push_str(&format!("  \"{}\": {{\n", route.path));
         for ApiMethod { method, response } in &route.methods {
             let response_ts = match response {
                 Some(name) => format!("import(\"@ossido-labs/ossido/types\").{name}"),
                 None => "unknown".to_string(),
             };
             ts.push_str(&format!(
-                "        {method}: {{ params: {params_ts}; response: {response_ts} }}\n"
+                "    {method}: {{ params: {params_ts}; response: {response_ts} }}\n"
             ));
         }
-        ts.push_str("      }\n");
+        ts.push_str("  }\n");
     }
 
-    ts.push_str("    }\n  }\n}\n");
+    ts.push_str("}\n");
     ts
 }
 
@@ -246,7 +251,7 @@ mod tests {
             },
         ];
         let ts = render_api_routes(&routes);
-        assert!(ts.contains("declare module \"@ossido-labs/ossido/client\""));
+        assert!(ts.contains("interface OssidoApiRoutes {"));
         assert!(ts.contains("\"/api/health\": {"));
         assert!(ts.contains("GET: { params: Record<string, never>; response: unknown }"));
         assert!(ts.contains(

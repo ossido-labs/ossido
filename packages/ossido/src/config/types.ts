@@ -65,6 +65,31 @@ export interface OssidoConfig {
   /** Build lifecycle hooks (`ossido build`, both output modes; not `dev`). */
   build?: OssidoConfigBuild;
   /**
+   * Enable [Lightning CSS](https://lightningcss.dev/) — a fast, Rust-based CSS
+   * transformer + minifier — in place of Vite's default PostCSS pipeline. Off by
+   * default.
+   *
+   * `true` enables it with default browser targets; pass an object to override
+   * `targets`.
+   *
+   * NOTE: enabling this replaces PostCSS entirely (a `postcss.config.js` is
+   * ignored) and changes CSS-modules class hashing. Vite plugins such as
+   * `@tailwindcss/vite` are unaffected — they run as plugins, not through the
+   * CSS transformer.
+   */
+  lightningcss?: boolean | OssidoLightningCss;
+  /**
+   * Override which `.env` file(s) are loaded, as a path or array of paths
+   * (relative to the project root, loaded in order — a later file overrides an
+   * earlier one). When set, this **replaces** the default
+   * `.env` / `.env.local` / `.env.[mode]` cascade. Leave unset to keep the
+   * default cascade.
+   *
+   * Only meaningful alongside an `#[ossido::Environment]` struct, which defines
+   * the typed schema these variables populate.
+   */
+  env?: string | Array<string>;
+  /**
    * Animate client-side navigations with the browser
    * [View Transitions API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API).
    * Default `false`. When enabled, `push`/`replace`/`<Link>`/back-forward
@@ -79,6 +104,17 @@ export interface OssidoConfig {
 
 /** Build output mode. */
 export type OssidoConfigOutput = 'static' | 'server';
+
+/** Lightning CSS options. `true` enables it with default browser targets. */
+export interface OssidoLightningCss {
+  /**
+   * [browserslist](https://github.com/browserslist/browserslist) query used to
+   * derive Lightning CSS targets (autoprefixing + modern-CSS lowering).
+   * Defaults to `'defaults'`. The query is used verbatim — the project's
+   * `.browserslistrc` / `package.json` `browserslist` field is not consulted.
+   */
+  targets?: string;
+}
 
 /**
  * Everything a build hook is given about the current `ossido build`.
