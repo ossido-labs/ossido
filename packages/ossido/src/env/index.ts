@@ -5,16 +5,12 @@
  * The Rust build serializes the public fields into the `__OSSIDO_PUBLIC_ENV__`
  * global (injected into the SSR HTML for the browser, and set on `globalThis`
  * during server rendering). The variable map is generated into `.ossido/types.ts`
- * as an augmentation of the `Register` interface below:
+ * as a merge into the global `OssidoPublicEnv` interface below:
  *
  * ```ts
- * declare module "@ossido-labs/ossido/env" {
- *   interface Register {
- *     env: {
- *       api_url: string
- *       port: number
- *     }
- *   }
+ * interface OssidoPublicEnv {
+ *   api_url: string
+ *   port: number
  * }
  * ```
  *
@@ -30,20 +26,28 @@
 
 import { PUBLIC_ENV_VARIABLE_NAME } from '../constants';
 
-/**
- * Augmentation target for the generated env map. Left empty here; the project's
- * generated `.ossido/types.ts` merges an `env` member into it.
- */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Register {}
+declare global {
+  /**
+   * Describes the project's public environment variables. The generated
+   * `.ossido/types.ts` merges the concrete keys into this global interface (a
+   * matching `interface OssidoPublicEnv { ... }`). Empty until generated.
+   *
+   * This is a **global** interface rather than a module-augmentation target on
+   * purpose: `.ossido/types.ts` is a global script, so a `declare module` there
+   * would *shadow* this module (hiding `getEnv`) instead of augmenting it —
+   * global interfaces merge across files without that hazard.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface OssidoPublicEnv {}
+}
 
 /**
- * The registered public env vars, or a permissive fallback when a project hasn't
- * generated its types yet (so `getEnv` stays usable, just untyped).
+ * The public env keys, or a permissive fallback when a project hasn't generated
+ * its types yet (so `getEnv` stays usable, just untyped).
  */
-export type PublicEnv = Register extends { env: infer E }
-  ? E
-  : Record<string, unknown>;
+export type PublicEnv = keyof OssidoPublicEnv extends never
+  ? Record<string, unknown>
+  : OssidoPublicEnv;
 
 /**
  * Read a public environment variable by key, returning a typed copy of its

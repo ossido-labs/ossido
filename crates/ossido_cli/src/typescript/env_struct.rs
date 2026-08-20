@@ -98,28 +98,27 @@ fn public_fields(item_struct: &ItemStruct) -> Vec<EnvField> {
         .collect()
 }
 
-/// Render the public env fields as an augmentation of `@ossido-labs/ossido/env`'s
-/// `Register` interface. Emitted only when an `Environment` struct exists, so the
-/// feature stays fully optional.
+/// Render the public env fields as a merge into the global `OssidoPublicEnv`
+/// interface that `@ossido-labs/ossido/env` reads. Emitted only when an
+/// `Environment` struct exists, so the feature stays fully optional.
+///
+/// A global interface (not a `declare module` augmentation) is used on purpose:
+/// `.ossido/types.ts` is a global script, so a `declare module` there would
+/// *shadow* the real `@ossido-labs/ossido/env` module — hiding `getEnv` — rather
+/// than augment it. Global interfaces merge across files without that hazard.
 ///
 /// ```ts
-/// declare module "@ossido-labs/ossido/env" {
-///   interface Register {
-///     env: {
-///       api_url: string
-///       port: number
-///     }
-///   }
+/// interface OssidoPublicEnv {
+///   api_url: string
+///   port: number
 /// }
 /// ```
 pub fn render_env_module(env: &EnvStruct) -> String {
-    let mut ts = String::from(
-        "declare module \"@ossido-labs/ossido/env\" {\n  interface Register {\n    env: {\n",
-    );
+    let mut ts = String::from("interface OssidoPublicEnv {\n");
     for EnvField { name, ts_type } in &env.public_fields {
-        ts.push_str(&format!("      {name}: {ts_type}\n"));
+        ts.push_str(&format!("  {name}: {ts_type}\n"));
     }
-    ts.push_str("    }\n  }\n}\n");
+    ts.push_str("}\n");
     ts
 }
 
@@ -196,7 +195,7 @@ mod tests {
             ],
         };
         let ts = render_env_module(&env);
-        assert!(ts.contains("declare module \"@ossido-labs/ossido/env\""));
+        assert!(ts.contains("interface OssidoPublicEnv {"));
         assert!(ts.contains("api_url: string"));
         assert!(ts.contains("port: number"));
     }

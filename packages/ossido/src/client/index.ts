@@ -3,17 +3,13 @@
  *
  * The HTTP method is the client method name (`apiClient.post(...)`) so the URL,
  * route params, and the `.json()` response are all inferred from the method +
- * path. The route map is generated into `.ossido/types.ts` as an augmentation of
- * the `Register` interface below:
+ * path. The route map is generated into `.ossido/types.ts` as a merge into the
+ * global `OssidoApiRoutes` interface below:
  *
  * ```ts
- * declare module "@ossido-labs/ossido/client" {
- *   interface Register {
- *     apiRoutes: {
- *       "/api/pokemons/[name]": {
- *         GET: { params: { name: string }; response: import("@ossido-labs/ossido/types").Pokemon }
- *       }
- *     }
+ * interface OssidoApiRoutes {
+ *   "/api/pokemons/[name]": {
+ *     GET: { params: { name: string }; response: import("@ossido-labs/ossido/types").Pokemon }
  *   }
  * }
  * ```
@@ -29,12 +25,21 @@
 type MethodName = 'get' | 'post' | 'put' | 'patch' | 'delete';
 type HttpMethod = Uppercase<MethodName>;
 
-/**
- * Augmentation target for the generated route map. Left empty here; the
- * project's generated `.ossido/types.ts` merges an `apiRoutes` member into it.
- */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Register {}
+declare global {
+  /**
+   * The project's API route map (path → method → `{ params, response }`). The
+   * generated `.ossido/types.ts` merges the concrete routes into this global
+   * interface (a matching `interface OssidoApiRoutes { ... }`). Empty until
+   * generated.
+   *
+   * A **global** interface rather than a module-augmentation target on purpose:
+   * `.ossido/types.ts` is a global script, so a `declare module` there would
+   * *shadow* this module (hiding `apiClient`) instead of augmenting it — global
+   * interfaces merge across files without that hazard.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface OssidoApiRoutes {}
+}
 
 // Route params are always URL-segment strings; an empty route has
 // `Record<string, never>` (no fillable segments).
@@ -47,12 +52,15 @@ type AnyApiRoutes = Record<string, Partial<Record<HttpMethod, ApiRouteEntry>>>;
 /**
  * The registered routes, or a permissive fallback when a project hasn't
  * generated its types yet (so the client stays usable, just untyped).
+ *
+ * Used directly (no `extends AnyApiRoutes` guard): `OssidoApiRoutes` is an
+ * interface, which has no implicit index signature and so never satisfies the
+ * `Record<string, …>` shape — `PathsFor`/`EntryFor` operate on it structurally
+ * instead, and `EntryFor` carries its own per-entry fallback.
  */
-type ApiRoutes = Register extends { apiRoutes: infer R }
-  ? R extends AnyApiRoutes
-    ? R
-    : AnyApiRoutes
-  : AnyApiRoutes;
+type ApiRoutes = keyof OssidoApiRoutes extends never
+  ? AnyApiRoutes
+  : OssidoApiRoutes;
 
 /** Paths that serve the given HTTP method. */
 type PathsFor<M extends HttpMethod> = {
