@@ -16,7 +16,7 @@ runs:
     - name: Install Bun
       uses: oven-sh/setup-bun@v2
       with:
-        bun-version: 1.3.14
+        bun-version: 1.4.0
 
     # Node is still required: Playwright and the e2e webServer command run under
     # `node`. Bun is the package manager and script runner.
