@@ -22,6 +22,7 @@
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/examples/ssg-example/target" />
       <excludeFolder url="file://$MODULE_DIR$/examples/ossido-tutorial/target" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/local-registry/storage" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

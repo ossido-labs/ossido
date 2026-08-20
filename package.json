@@ -8,6 +8,8 @@
     "build": "turbo build --filter='./devtools/*' --filter='./packages/*'",
     "lint": "turbo lint --filter='./devtools/*' --filter='./packages/*' && cargo +nightly fmt --all --check",
     "lint:rust": "cargo +nightly fmt --all --check",
+    "clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
+    "clippy:fix": "cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings",
     "format:fix": "turbo format:fix --filter='./devtools/*' --filter='./packages/*' && cargo +nightly fmt --all",
     "format:rust:fix": "cargo +nightly fmt --all",
     "format": "turbo format --filter='./devtools/*' --filter='./packages/*'",
@@ -49,6 +51,6 @@
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "turbo": "2.5.5",
-    "typescript": "5.8.3"
+    "typescript": "^7.0.2"
   }
 }
