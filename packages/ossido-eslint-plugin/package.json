@@ -1,6 +1,6 @@
 {
   "name": "@ossido-labs/ossido-eslint-plugin",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publishConfig": {
     "access": "public"
   },
