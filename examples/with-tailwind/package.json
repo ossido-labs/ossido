@@ -19,7 +19,7 @@
     "@types/react-dom": "^19.0.2",
     "@ossido-labs/ossido-eslint-plugin": "workspace:*",
     "oxlint": "1.76.0",
-    "typescript": "^5.6.3",
+    "typescript": "^7.0.2",
     "vite": "^8.2.0"
   }
 }

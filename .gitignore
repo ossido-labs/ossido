@@ -40,3 +40,5 @@ coverage/
 # Local Verdaccio registry (scripts/local-registry) — package storage + htpasswd
 scripts/local-registry/storage/
 scripts/local-registry/htpasswd
+
+.DS_Store
