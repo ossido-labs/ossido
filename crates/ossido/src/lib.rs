@@ -30,6 +30,12 @@
 /// The `crate::` path (deliberately not `$crate::`) resolves against the crate
 /// where the macro is *invoked* (the user's binary), where the generated
 /// accessor lives — not against `ossido`.
+// `clippy::crate_in_macro_def` flags `crate::` in a macro as "usually not what
+// you want" — but here it is exactly the intent: `__ossido_environment()` is
+// generated at the *caller's* crate root, so `crate::` (call site) is correct
+// and `$crate::` (this crate, `ossido`) would be wrong. The `__env_or` helper
+// does use `$crate::` because it genuinely lives in `ossido`.
+#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
 macro_rules! get_env {
     ($field:ident) => {
