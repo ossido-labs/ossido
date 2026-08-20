@@ -204,6 +204,11 @@ impl ServerError {
 /// [`ServerError`]. Used by the `#[handler]`-generated route/api functions so an
 /// unexpected panic surfaces as a structured error instead of tearing down the
 /// connection.
+///
+/// `ServerError` is intentionally large — it embeds the full panic-site source
+/// file for the dev overlay — but it is only ever built on the cold caught-panic
+/// path, so the `result_large_err` lint doesn't apply here.
+#[allow(clippy::result_large_err)]
 pub async fn catch_handler<F, T>(fut: F) -> Result<T, ServerError>
 where
     F: Future<Output = T>,
