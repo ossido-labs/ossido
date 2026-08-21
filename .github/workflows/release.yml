@@ -417,11 +417,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # `cache: false`: release binary builds must be hermetic. The action's
+      # default cache saves even from failed/cancelled runs (CACHE_ON_FAILURE),
+      # and a cache cut mid-build by a fail-fast cancellation poisons later
+      # runs — cargo's fingerprints claim host proc-macro artifacts (e.g.
+      # thiserror_impl) exist when they don't, which surfaces as E0463 inside
+      # the cross containers. Releases are rare; a full rebuild is the price of
+      # a binary that never depends on leftover state.
       - name: Setup rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           target: ${{ matrix.target }}
+          cache: false
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
