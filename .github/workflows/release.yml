@@ -30,18 +30,20 @@ jobs:
       - name: Install NodeJS Dependencies
         uses: ./.github/actions/install-node-dependencies
 
-      # Stamp every manifest with the release tag version, then refresh each
-      # workspace package's version in bun.lock so `bun pm pack` rewrites
-      # workspace:* interlinks to it. A plain `bun install` does NOT refresh
-      # workspace versions after a manifest bump — a known bun bug being fixed
-      # in https://github.com/oven-sh/bun/pull/36285 — so update the lockfile
-      # entries explicitly (lockfile-only: no install / node_modules churn).
+      # Stamp every manifest with the release tag version, then refresh the
+      # workspace package versions in bun.lock so `bun pm pack` rewrites
+      # workspace:* interlinks to it. Bun 1.4 fixed the refresh bug
+      # (https://github.com/oven-sh/bun/pull/36285), so a plain
+      # `bun install --lockfile-only` now does this (no node_modules churn).
+      # Do NOT use the old `bun update --lockfile-only ./<pkg>` workaround:
+      # bun 1.4 rejects path args, and by-name it acts like `bun add`,
+      # grafting the package onto the root manifest.
       - name: Set version from release tag
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           bun scripts/set-version.ts "${TAG#v}"
-          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+          bun install --lockfile-only
 
       - name: Build
         run: bun run build
@@ -121,18 +123,20 @@ jobs:
       - name: Install NodeJS Dependencies
         uses: ./.github/actions/install-node-dependencies
 
-      # Stamp every manifest with the release tag version, then refresh each
-      # workspace package's version in bun.lock so `bun pm pack` rewrites
-      # workspace:* interlinks to it. A plain `bun install` does NOT refresh
-      # workspace versions after a manifest bump — a known bun bug being fixed
-      # in https://github.com/oven-sh/bun/pull/36285 — so update the lockfile
-      # entries explicitly (lockfile-only: no install / node_modules churn).
+      # Stamp every manifest with the release tag version, then refresh the
+      # workspace package versions in bun.lock so `bun pm pack` rewrites
+      # workspace:* interlinks to it. Bun 1.4 fixed the refresh bug
+      # (https://github.com/oven-sh/bun/pull/36285), so a plain
+      # `bun install --lockfile-only` now does this (no node_modules churn).
+      # Do NOT use the old `bun update --lockfile-only ./<pkg>` workaround:
+      # bun 1.4 rejects path args, and by-name it acts like `bun add`,
+      # grafting the package onto the root manifest.
       - name: Set version from release tag
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           bun scripts/set-version.ts "${TAG#v}"
-          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+          bun install --lockfile-only
 
       # Trusted publishing (OIDC) needs npm >= 11.5.1. Node 24 already ships
       # npm 11.x; this guarantees the minimum regardless of the bundled version.
@@ -226,7 +230,7 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           bun scripts/set-version.ts "${TAG#v}"
-          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+          bun install --lockfile-only
 
       # Fail fast if set-version missed the meta-package's optionalDependencies
       # (they must all equal the release version, or installs resolve stale binaries).
@@ -457,7 +461,7 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           bun scripts/set-version.ts "${TAG#v}"
-          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+          bun install --lockfile-only
 
       - name: Ensure npm supports trusted publishing
         run: npm install -g npm@^11.5.1
@@ -490,7 +494,7 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           bun scripts/set-version.ts "${TAG#v}"
-          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+          bun install --lockfile-only
 
       - name: Ensure npm supports trusted publishing
         run: npm install -g npm@^11.5.1
@@ -533,18 +537,18 @@ jobs:
 
       # Stamp the released version onto main and commit it back so the repo
       # reflects what was published. `[skip ci]` stops this housekeeping commit
-      # from re-triggering the CI workflows. Each workspace package's version is
-      # refreshed in bun.lock with `bun update --lockfile-only` — a plain
-      # `bun install` does not refresh workspace versions after a manifest bump
-      # (known bun bug: https://github.com/oven-sh/bun/pull/36285). Cargo.lock is
-      # git-ignored, so it needs no commit.
+      # from re-triggering the CI workflows. The workspace package versions are
+      # refreshed in bun.lock with `bun install --lockfile-only` (bun 1.4 fixed
+      # https://github.com/oven-sh/bun/pull/36285, so a plain install refreshes
+      # them; the old per-package `bun update` workaround breaks on bun 1.4).
+      # Cargo.lock is git-ignored, so it needs no commit.
       - name: Stamp version and commit
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           VERSION="${TAG#v}"
           bun scripts/set-version.ts "$VERSION"
-          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+          bun install --lockfile-only
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add packages/*/package.json npm/platforms/*/package.json crates/*/Cargo.toml bun.lock

@@ -17,12 +17,13 @@
 //
 // npm workspace interlinks stay `workspace:*` in source — `bun pm pack` rewrites
 // them to the concrete version at pack time, reading the version from bun.lock.
-// bun.lock therefore has to be refreshed after this bump, BUT a plain
-// `bun install` does not refresh workspace package versions after a manifest
-// bump — a known bun bug being fixed in
-// https://github.com/oven-sh/bun/pull/36285. Until that lands, refresh each
-// entry explicitly (as the release workflow does):
-//   for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+// bun.lock therefore has to be refreshed after this bump (as the release
+// workflow does):
+//   bun install --lockfile-only
+// Bun 1.4 fixed https://github.com/oven-sh/bun/pull/36285, so a plain install
+// refreshes workspace versions. Do NOT use the old per-package
+// `bun update --lockfile-only ./<pkg>` workaround: bun 1.4 rejects path args,
+// and by-name `bun update` acts like `bun add`, mutating the root manifest.
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
