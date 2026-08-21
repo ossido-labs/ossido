@@ -393,7 +393,7 @@ fn scaffold_download(folder: &str, template: &str, select_head: Option<bool>) ->
         .send()
         .unwrap_or_else(|_| {
             exit_with_error(&format!(
-                "Failed to call the tagged commit tree github API for v{cli_version}"
+                "Failed to call the tagged commit tree github API for {cli_version}"
             ))
         })
         .json::<GithubTreeResponse<GithubFile>>()
@@ -552,7 +552,7 @@ fn generate_raw_content_url(
     let tag = if select_head.unwrap_or(false) {
         "/ossido-labs/ossido/main".to_string()
     } else {
-        format!("/ossido-labs/ossido/v{cli_version}")
+        format!("/ossido-labs/ossido/{cli_version}")
     };
     format!("{url}{tag}/{path}")
 }
@@ -567,15 +567,15 @@ fn generate_tree_url(
         return format!("{url}/repos/ossido-labs/ossido/git/trees/main?recursive=1");
     }
 
-    // This string does not include the "v" version prefix
+    // Release tags are bare semver (no `v` prefix), matching crate_version!().
     let response = client
         .get(format!(
-            "{url}/repos/ossido-labs/ossido/git/ref/tags/v{cli_version}"
+            "{url}/repos/ossido-labs/ossido/git/ref/tags/{cli_version}"
         ))
         .send()
         .unwrap_or_else(|_| {
             exit_with_error(&format!(
-                "Failed to reach the GitHub API while resolving the v{cli_version} tag"
+                "Failed to reach the GitHub API while resolving the {cli_version} tag"
             ))
         });
 
@@ -585,20 +585,20 @@ fn generate_tree_url(
     // fall through to an opaque JSON parse error.
     if response.status().as_u16() == 404 {
         exit_with_error(&format!(
-            "No template release found for ossido v{cli_version} — the v{cli_version} git tag does not exist.\nHint: scaffold from the latest `main` instead with `ossido new <folder> --head true`."
+            "No template release found for ossido {cli_version} — the {cli_version} git tag does not exist.\nHint: scaffold from the latest `main` instead with `ossido new <folder> --head true`."
         ));
     }
 
     if !response.status().is_success() {
         exit_with_error(&format!(
-            "GitHub API returned {} while resolving the v{cli_version} tag.\nHint: retry, or scaffold from `main` with `ossido new <folder> --head true`.",
+            "GitHub API returned {} while resolving the {cli_version} tag.\nHint: retry, or scaffold from `main` with `ossido new <folder> --head true`.",
             response.status()
         ));
     }
 
     let res_tag = response.json::<GithubTagResponse>().unwrap_or_else(|_| {
         exit_with_error(&format!(
-            "Failed to parse the GitHub tag response for v{cli_version}"
+            "Failed to parse the GitHub tag response for {cli_version}"
         ))
     });
 
@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn generate_valid_content_url_from_cli_version() {
         let expected = format!(
-            "{}/ossido-labs/ossido/v{}/{}",
+            "{}/ossido-labs/ossido/{}/{}",
             "http://localhost:3000",
             crate_version!(),
             "examples/ossido-app"

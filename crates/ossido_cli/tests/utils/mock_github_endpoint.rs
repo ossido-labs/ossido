@@ -26,7 +26,7 @@ impl GitHubServerMock {
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "repos/ossido-labs/ossido/git/ref/tags/v{ossido_version}"
+                "repos/ossido-labs/ossido/git/ref/tags/{ossido_version}"
             )))
             .respond_with(sha_response_template)
             .mount(&server)
@@ -79,7 +79,7 @@ impl GitHubServerMock {
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "ossido-labs/ossido/v{ossido_version}/examples/ossido-app/src/main.rs"
+                "ossido-labs/ossido/{ossido_version}/examples/ossido-app/src/main.rs"
             )))
             .respond_with(file_response_template(
                 "fn main() { println!(\"Hello, world!\"); }",
@@ -89,7 +89,7 @@ impl GitHubServerMock {
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "ossido-labs/ossido/v{ossido_version}/examples/ossido-app/Cargo.toml"
+                "ossido-labs/ossido/{ossido_version}/examples/ossido-app/Cargo.toml"
             )))
             .respond_with(file_response_template(
                 "[package] name = \"ossido-tutorial\" [dependencies] ossido = { path = \"../../crates/ossido/\" }"
@@ -99,7 +99,7 @@ impl GitHubServerMock {
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "ossido-labs/ossido/v{ossido_version}/examples/ossido-app/package.json"
+                "ossido-labs/ossido/{ossido_version}/examples/ossido-app/package.json"
             )))
             .respond_with(file_response_template(
                 r#"{"name": "ossido-app", "dependencies": { "@ossido-labs/ossido": "workspace:*" }, "devDependencies": { "@ossido-labs/ossido-eslint-plugin": "workspace:*" }}"#,
@@ -109,7 +109,7 @@ impl GitHubServerMock {
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "ossido-labs/ossido/v{ossido_version}/examples/ossido-app/ossido.config.ts"
+                "ossido-labs/ossido/{ossido_version}/examples/ossido-app/ossido.config.ts"
             )))
             .respond_with(file_response_template(
                 "import type { OssidoConfig } from '@ossido-labs/ossido/config'\n\nconst config: OssidoConfig = {}\n\nexport default config\n",
@@ -119,7 +119,7 @@ impl GitHubServerMock {
 
         Mock::given(method("GET"))
             .and(path(format!(
-                "ossido-labs/ossido/v{ossido_version}/examples/ossido-app/src/styles/global.css"
+                "ossido-labs/ossido/{ossido_version}/examples/ossido-app/src/styles/global.css"
             )))
             .respond_with(file_response_template("body {\n  margin: 0;\n}\n"))
             .mount(&server)

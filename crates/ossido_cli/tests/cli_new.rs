@@ -165,7 +165,7 @@ async fn it_reports_an_actionable_error_when_the_version_tag_is_missing() {
     // Emulate an unpublished version: the tag ref lookup 404s.
     Mock::given(method("GET"))
         .and(path(format!(
-            "repos/ossido-labs/ossido/git/ref/tags/v{version}"
+            "repos/ossido-labs/ossido/git/ref/tags/{version}"
         )))
         .respond_with(
             ResponseTemplate::new(404)
@@ -185,10 +185,11 @@ async fn it_reports_an_actionable_error_when_the_version_tag_is_missing() {
         .failure();
 
     let stderr = String::from_utf8_lossy(&assert.get_output().stderr).to_string();
-    // The error names the version and points at the `--head` escape hatch, rather
-    // than the opaque "Failed to parse the tag response".
+    // The error names the version (release tags are bare semver, no `v` prefix)
+    // and points at the `--head` escape hatch, rather than the opaque "Failed
+    // to parse the tag response".
     assert!(
-        stderr.contains(&format!("v{version}")) && stderr.contains("--head"),
+        stderr.contains(&format!("the {version} git tag")) && stderr.contains("--head"),
         "unexpected stderr: {stderr}"
     );
 }

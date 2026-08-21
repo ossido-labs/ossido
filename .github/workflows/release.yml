@@ -672,14 +672,29 @@ jobs:
       ]
     runs-on: ubuntu-latest
 
+    # The push authenticates as the release GitHub App (below), which is on the
+    # ruleset bypass list — the default GITHUB_TOKEN cannot push to main under
+    # the push rules, so this job needs no write permission of its own.
     permissions:
-      contents: write
+      contents: read
 
     steps:
+      # Mint a short-lived installation token for the release app (repo-scoped,
+      # Contents: read/write, expires in an hour). The app must be installed on
+      # this repo and added to the ruleset's bypass list.
+      - name: Mint release app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
+          # Persisted for the `git push` below, replacing GITHUB_TOKEN.
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
