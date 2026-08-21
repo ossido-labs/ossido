@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   spell_checking:
-    name: LanguageTool
+    name: Vale
     runs-on: ubuntu-latest
 
     permissions:
@@ -56,15 +56,15 @@ jobs:
             echo "name=github-pr-annotations" >> $GITHUB_OUTPUT
           fi
 
-      - name: Review dog languagetool
-        uses: reviewdog/action-languagetool@v1
+      - name: Vale
+        uses: errata-ai/vale-action@reviewdog
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # Change reviewdog reporter if you need [github-pr-check,github-check,github-pr-review].
           reporter: ${{ steps.reporter.outputs.name }}
-          # Change reporter level if you need.
-          level: 'warning'
-          patterns: '**/*.md **/*.txt **/*.mdx'
-          # enabled_categories: "STYLE,PLAIN_ENGLISH,WHITESPACE_RULE,EN_QUOTES,DASH_RULE,WORD_CONTAINS_UNDERSCORE,UPPERCASE_SENTENCE_START,ARROWS,COMMA_PARENTHESIS_WHITESPACE,UNLIKELY_OPENING_PUNCTUATION,SENTENCE_WHITESPACE,EN_UNPAIRED_BRACKETS,PHRASE_REPETITION,PUNCTUATION_PARAGRAPH_END"
-          disabled_categories: ''
-          disabled_rules: ''
+          # Only report on newly added lines.
+          filter_mode: added
+          fail_on_error: false
+          files: '.'
+          # Scope (*.md, *.mdx), rules, and the Ossido vocabulary are all
+          # controlled by .vale.ini at the repo root.

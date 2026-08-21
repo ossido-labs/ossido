@@ -1,0 +1,97 @@
+# Ossido accept-list for Vale spell checking.
+# One term per line; entries are treated as case-insensitive regex.
+# Add new terms here as legitimate flags surface — no need to front-load everything.
+
+# --- Product / brand ---
+Ossido
+ossido
+ossido-labs
+
+# --- Rust crates / macros ---
+ossido_cli
+ossido_internal
+ossido_macros
+ossido_ssr
+ssr_rs
+
+# --- Predecessor / related projects & people ---
+Tuono
+ESLint
+Valerio
+Ageno
+Schofield
+npmjs
+
+# --- Tooling ---
+Oxlint
+Oxfmt
+Oxc
+tsdown
+Vitest
+Playwright
+Verdaccio
+Storybook
+lightningcss
+SWC
+NAPI
+Browserslist
+Turbo
+Bun
+Vite
+Rollup
+Tailwind
+Hunspell
+
+# --- Languages / formats ---
+TypeScript
+Rust
+MDX
+JSX
+TSX
+
+# --- Acronyms ---
+SSR
+CSR
+SSG
+HMR
+HTML
+CLI
+NPM
+FFI
+E2E
+UI
+
+# --- Platform / build targets ---
+arm64
+x64
+armv7
+msvc
+musl
+glibc
+gnueabihf
+darwin
+win32
+
+# --- Domain terms ---
+hydration
+transpiler
+transpile
+monorepo
+scaffold
+scaffolded
+middleware
+subcommand
+runtime
+allowlist
+config
+dev
+repo
+vendored
+performant
+proxied
+refetches
+gitignored
+devDependency
+sublicense
+unpublishes
+uplink
