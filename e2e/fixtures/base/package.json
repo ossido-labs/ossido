@@ -12,6 +12,7 @@
     "@ossido-labs/ossido": "workspace:*"
   },
   "devDependencies": {
+    "@ossido-labs/ossido-cli": "workspace:*",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "typescript": "^7.0.2"

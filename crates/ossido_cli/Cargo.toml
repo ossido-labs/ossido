@@ -52,6 +52,14 @@ convert_case = "0.11.0"
 quote = "1.0.47"
 prettyplease = "0.3.0"
 
+[features]
+# Statically build OpenSSL from source instead of linking the system one. Enable
+# for release/cross builds (Linux, musl, armv7) so `native-tls` cross-compiles
+# cleanly and the produced binary is portable across distros. macOS
+# (Security.framework) and Windows (SChannel) don't use OpenSSL, so they don't
+# need this. See the npm-distribution release workflow.
+vendored-tls = ["reqwest/native-tls-vendored"]
+
 [dev-dependencies]
 wiremock = "0.6.5"
 tempfile = "3.27.0"

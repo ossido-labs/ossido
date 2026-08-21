@@ -34,6 +34,11 @@ vite.config.ts.timestamp*
 # Tarballs
 *.tgz
 
+# Prebuilt CLI binaries dropped into the per-platform npm packages at pack time
+# (by CI or scripts/local-registry). The package.json/README are committed; the
+# binary is a build artifact.
+npm/platforms/*/bin/
+
 # Test coverage output (cargo-llvm-cov / vitest)
 coverage/
 

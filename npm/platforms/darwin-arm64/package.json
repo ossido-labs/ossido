@@ -1,0 +1,25 @@
+{
+  "name": "@ossido-labs/cli-darwin-arm64",
+  "version": "0.1.4",
+  "description": "Prebuilt ossido CLI binary for macOS arm64.",
+  "homepage": "https://ossido.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossido-labs/ossido.git",
+    "directory": "npm/platforms/darwin-arm64"
+  },
+  "license": "MIT",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/ossido",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

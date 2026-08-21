@@ -28,6 +28,12 @@ const ROOT = resolve(HERE, '..');
 
 // Folder names under `packages/`, ordered deps-before-dependents:
 //   ossido-router → ossido-ui;  ossido → react-vite-plugin, router, ui.
+//
+// The CLI packages (`@ossido-labs/ossido-cli`, its `@ossido-labs/cli-*` platform
+// binaries, and `create-ossido`) are intentionally NOT listed here: the platform
+// packages need cross-compiled binaries, so they are released only through the
+// `release.yml` CI matrix. Use `bun run registry:publish` to exercise the CLI
+// packages against the local Verdaccio registry.
 const PACKAGES = [
   'ossido-ui',
   'ossido-eslint-plugin',
