@@ -71,7 +71,7 @@ jobs:
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.0
 
       # Stamp every crate manifest (package version + internal dep requirements)
       # with the release tag version before packaging.
@@ -191,7 +191,7 @@ jobs:
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.0
 
       # Stamp every crate manifest (package version + internal dep requirements)
       # with the release tag version before publishing.
@@ -207,10 +207,314 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
+  # --- ossido CLI: prebuilt native binary distributed via npm ---
+  # `@ossido-labs/ossido-cli` is a JS launcher whose per-platform binaries ship
+  # as `@ossido-labs/cli-*` optionalDependencies. `create-ossido` wraps it.
+
+  publish_cli_dry_run:
+    name: CLI npm packages (dry run)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install NodeJS Dependencies
+        uses: ./.github/actions/install-node-dependencies
+
+      - name: Set version from release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          bun scripts/set-version.ts "${TAG#v}"
+          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+
+      # Fail fast if set-version missed the meta-package's optionalDependencies
+      # (they must all equal the release version, or installs resolve stale binaries).
+      - name: Assert optionalDependencies are pinned to the release version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG#v}" node -e '
+            const p = require("./packages/ossido-cli/package.json");
+            const bad = Object.entries(p.optionalDependencies || {})
+              .filter(([, v]) => v !== process.env.VERSION);
+            if (bad.length) {
+              console.error("optionalDependencies not pinned to", process.env.VERSION, bad);
+              process.exit(1);
+            }
+          '
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      # Validate the tarball shape of the meta + create-ossido + every platform
+      # package (platform binaries are absent here; `files` just omits them).
+      - name: Pack and validate
+        run: |
+          for dir in packages/ossido-cli packages/create-ossido npm/platforms/*/; do
+            echo "::group::$dir"
+            TARBALL=$(cd "$dir" && bun pm pack --quiet --ignore-scripts | tail -1)
+            (cd "$dir" && npm publish "./$TARBALL" --dry-run --access public)
+            echo "::endgroup::"
+          done
+
+  build_cli_binaries:
+    name: Build ossido binary - ${{ matrix.pkg }}
+    needs: [publish_npm_dry_run, publish_crates_dry_run, publish_cli_dry_run]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - {
+              runner: macos-latest,
+              target: aarch64-apple-darwin,
+              pkg: darwin-arm64,
+              exe: ossido,
+              cross: false,
+              features: '',
+            }
+          - {
+              runner: macos-13,
+              target: x86_64-apple-darwin,
+              pkg: darwin-x64,
+              exe: ossido,
+              cross: false,
+              features: '',
+            }
+          - {
+              runner: windows-latest,
+              target: x86_64-pc-windows-msvc,
+              pkg: win32-x64-msvc,
+              exe: ossido.exe,
+              cross: false,
+              features: '',
+            }
+          - {
+              runner: ubuntu-latest,
+              target: x86_64-unknown-linux-gnu,
+              pkg: linux-x64-gnu,
+              exe: ossido,
+              cross: false,
+              features: vendored-tls,
+            }
+          - {
+              runner: ubuntu-24.04-arm,
+              target: aarch64-unknown-linux-gnu,
+              pkg: linux-arm64-gnu,
+              exe: ossido,
+              cross: false,
+              features: vendored-tls,
+            }
+          - {
+              runner: ubuntu-latest,
+              target: x86_64-unknown-linux-musl,
+              pkg: linux-x64-musl,
+              exe: ossido,
+              cross: true,
+              features: vendored-tls,
+            }
+          - {
+              runner: ubuntu-latest,
+              target: aarch64-unknown-linux-musl,
+              pkg: linux-arm64-musl,
+              exe: ossido,
+              cross: true,
+              features: vendored-tls,
+            }
+          - {
+              runner: ubuntu-latest,
+              target: armv7-unknown-linux-gnueabihf,
+              pkg: linux-arm-gnueabihf,
+              exe: ossido,
+              cross: true,
+              features: vendored-tls,
+            }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      # Stamp the crate version so the binary's `--version` / `crate_version!()`
+      # (used by `ossido new` to pin templates) reports the release version.
+      - name: Set version from release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: bun scripts/set-version.ts "${TAG#v}"
+
+      - name: Install cross
+        if: matrix.cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      # `vendored-tls` builds OpenSSL from source so `native-tls` cross-compiles
+      # cleanly and the Linux binaries are portable across distros. macOS/Windows
+      # use their system TLS stacks and need no feature.
+      - name: Build
+        shell: bash
+        run: |
+          ARGS=(--release -p ossido_cli --target ${{ matrix.target }})
+          if [ -n "${{ matrix.features }}" ]; then ARGS+=(--features "${{ matrix.features }}"); fi
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build "${ARGS[@]}"
+          else
+            cargo build "${ARGS[@]}"
+          fi
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ossido-${{ matrix.pkg }}
+          path: target/${{ matrix.target }}/release/${{ matrix.exe }}
+          if-no-files-found: error
+
+  publish_cli_platforms:
+    name: NPM publish platform - ${{ matrix.pkg }}
+    needs: [build_cli_binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { pkg: darwin-arm64, exe: ossido }
+          - { pkg: darwin-x64, exe: ossido }
+          - { pkg: win32-x64-msvc, exe: ossido.exe }
+          - { pkg: linux-x64-gnu, exe: ossido }
+          - { pkg: linux-arm64-gnu, exe: ossido }
+          - { pkg: linux-x64-musl, exe: ossido }
+          - { pkg: linux-arm64-musl, exe: ossido }
+          - { pkg: linux-arm-gnueabihf, exe: ossido }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Set version from release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: bun scripts/set-version.ts "${TAG#v}"
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ossido-${{ matrix.pkg }}
+          path: npm/platforms/${{ matrix.pkg }}/bin
+
+      # upload-artifact drops the executable bit; restore it for unix binaries.
+      - name: Restore executable bit
+        if: matrix.exe == 'ossido'
+        run: chmod +x npm/platforms/${{ matrix.pkg }}/bin/ossido
+
+      - name: Pack
+        id: pack
+        working-directory: npm/platforms/${{ matrix.pkg }}
+        run: echo "tarball=$(bun pm pack --quiet --ignore-scripts | tail -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        working-directory: npm/platforms/${{ matrix.pkg }}
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
+
+  publish_cli_meta:
+    name: NPM publish - ossido-cli (meta)
+    # Publish the meta-package after its platform packages so an install right
+    # after release can always resolve the matching binary.
+    needs: [publish_cli_platforms]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install NodeJS Dependencies
+        uses: ./.github/actions/install-node-dependencies
+
+      - name: Set version from release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          bun scripts/set-version.ts "${TAG#v}"
+          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Pack
+        id: pack
+        working-directory: packages/ossido-cli
+        run: echo "tarball=$(bun pm pack --quiet --ignore-scripts | tail -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        working-directory: packages/ossido-cli
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
+
+  publish_create_ossido:
+    name: NPM publish - create-ossido
+    needs: [publish_cli_meta]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install NodeJS Dependencies
+        uses: ./.github/actions/install-node-dependencies
+
+      - name: Set version from release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          bun scripts/set-version.ts "${TAG#v}"
+          for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Pack
+        id: pack
+        working-directory: packages/create-ossido
+        run: echo "tarball=$(bun pm pack --quiet --ignore-scripts | tail -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        working-directory: packages/create-ossido
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
+
   commit_version_bump:
     name: Commit version bump
     # Only record the versions once everything actually published.
-    needs: [publish_npm, publish_crates]
+    needs:
+      [
+        publish_npm,
+        publish_crates,
+        publish_cli_platforms,
+        publish_cli_meta,
+        publish_create_ossido,
+      ]
     runs-on: ubuntu-latest
 
     permissions:
@@ -225,7 +529,7 @@ jobs:
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.0
 
       # Stamp the released version onto main and commit it back so the repo
       # reflects what was published. `[skip ci]` stops this housekeeping commit
@@ -243,7 +547,7 @@ jobs:
           for pkg in packages/*/; do bun update --lockfile-only "./$pkg"; done
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages/*/package.json crates/*/Cargo.toml bun.lock
+          git add packages/*/package.json npm/platforms/*/package.json crates/*/Cargo.toml bun.lock
           if git diff --cached --quiet; then
             echo "No version changes to commit."
             exit 0

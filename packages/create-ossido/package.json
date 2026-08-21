@@ -1,0 +1,34 @@
+{
+  "name": "create-ossido",
+  "version": "0.1.4",
+  "description": "Scaffold a new ossido app (npm create ossido@latest).",
+  "homepage": "https://ossido.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossido-labs/ossido.git",
+    "directory": "packages/create-ossido"
+  },
+  "license": "MIT",
+  "author": "Chris Schofield <chris@childishforces.com>",
+  "type": "commonjs",
+  "bin": {
+    "create-ossido": "bin/create-ossido.js"
+  },
+  "files": [
+    "bin/create-ossido.js",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "react",
+    "rust",
+    "scaffold",
+    "create",
+    "fullstack"
+  ],
+  "dependencies": {
+    "@ossido-labs/ossido-cli": "0.1.4"
+  }
+}

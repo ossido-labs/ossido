@@ -1,0 +1,28 @@
+{
+  "name": "@ossido-labs/cli-linux-x64-gnu",
+  "version": "0.1.4",
+  "description": "Prebuilt ossido CLI binary for Linux x64 (glibc).",
+  "homepage": "https://ossido.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossido-labs/ossido.git",
+    "directory": "npm/platforms/linux-x64-gnu"
+  },
+  "license": "MIT",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin/ossido",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

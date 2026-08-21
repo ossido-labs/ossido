@@ -1,0 +1,41 @@
+{
+  "name": "@ossido-labs/ossido-cli",
+  "version": "0.1.4",
+  "description": "The ossido CLI (ossido dev / build / new), distributed as a prebuilt native binary.",
+  "homepage": "https://ossido.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ossido-labs/ossido.git",
+    "directory": "packages/ossido-cli"
+  },
+  "license": "MIT",
+  "author": "Chris Schofield <chris@childishforces.com>",
+  "type": "commonjs",
+  "bin": {
+    "ossido": "bin/ossido.js"
+  },
+  "files": [
+    "bin/ossido.js",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "react",
+    "rust",
+    "cli",
+    "fullstack",
+    "framework"
+  ],
+  "optionalDependencies": {
+    "@ossido-labs/cli-darwin-arm64": "0.1.4",
+    "@ossido-labs/cli-darwin-x64": "0.1.4",
+    "@ossido-labs/cli-win32-x64-msvc": "0.1.4",
+    "@ossido-labs/cli-linux-x64-gnu": "0.1.4",
+    "@ossido-labs/cli-linux-arm64-gnu": "0.1.4",
+    "@ossido-labs/cli-linux-x64-musl": "0.1.4",
+    "@ossido-labs/cli-linux-arm64-musl": "0.1.4",
+    "@ossido-labs/cli-linux-arm-gnueabihf": "0.1.4"
+  }
+}
