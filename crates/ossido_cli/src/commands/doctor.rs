@@ -95,6 +95,20 @@ pub fn run(opts: DoctorOptions) -> i32 {
     }
 }
 
+/// The subset of checks a fresh project needs before scaffolding: a Rust
+/// toolchain that can build edition 2024, and a JS runtime. `ossido new` runs
+/// these as a fail-fast preflight so the two commands stay in lockstep on what
+/// "ready to build" means. `cwd` need not be inside a project yet — the checks
+/// probe `PATH` and fall back to the edition floor when no manifests exist.
+pub fn toolchain_checks(cwd: &Path) -> Vec<Check> {
+    vec![check_rust_toolchain(cwd), check_js_runtime(cwd)]
+}
+
+/// Whether any check hard-failed (warnings never count as a failure).
+pub fn any_failed(checks: &[Check]) -> bool {
+    checks.iter().any(|c| c.status == Status::Fail)
+}
+
 fn check_is_ossido_project(is_project: bool) -> Check {
     if is_project {
         Check::ok("project", "ossido.config.ts found")
@@ -168,7 +182,7 @@ fn check_rust_toolchain(cwd: &Path) -> Check {
         return Check::fail(
             "rust",
             "rustc not found",
-            "install Rust from https://rustup.rs",
+            "install Rust via rustup: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` (Windows: https://rustup.rs)",
         );
     };
 
@@ -241,7 +255,7 @@ fn check_js_runtime(cwd: &Path) -> Check {
         (None, None) => Check::fail(
             "js runtime",
             "no JS runtime found",
-            "install Node (see .nvmrc) or bun — either one works",
+            "install a JS runtime — we recommend Bun: `curl -fsSL https://bun.sh/install | bash` (or Node, see .nvmrc)",
         ),
     }
 }
@@ -306,7 +320,7 @@ fn read_nvmrc(cwd: &Path) -> Option<String> {
         .map(|s| s.trim().to_string())
 }
 
-fn render(checks: &[Check]) {
+pub fn render(checks: &[Check]) {
     for c in checks {
         let icon = match c.status {
             Status::Ok => "✔".green(),
@@ -400,5 +414,15 @@ mod tests {
     fn project_check_reflects_flag() {
         assert_eq!(check_is_ossido_project(true).status, Status::Ok);
         assert_eq!(check_is_ossido_project(false).status, Status::Fail);
+    }
+
+    #[test]
+    fn any_failed_only_on_fail() {
+        assert!(!any_failed(&[Check::ok("a", "fine")]));
+        assert!(!any_failed(&[Check::warn("a", "meh", "hint")]));
+        assert!(any_failed(&[
+            Check::ok("a", "fine"),
+            Check::fail("b", "broken", "fix it"),
+        ]));
     }
 }
