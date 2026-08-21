@@ -1,5 +1,5 @@
 use std::env;
-use std::fs::{self, File, OpenOptions, create_dir};
+use std::fs::{self, File, create_dir};
 use std::io::prelude::*;
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
@@ -12,6 +12,7 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use tracing::trace;
 
+use super::manifest;
 use super::scaffold::{self, BASE_TEMPLATE, Feature, OutputMode};
 use crate::mode::Mode;
 use crate::source_builder::SourceBuilder;
@@ -436,8 +437,13 @@ fn scaffold_download(folder: &str, template: &str, select_head: Option<bool>) ->
         }
     }
 
-    update_package_json_version(&folder_path).expect("Failed to update package.json version");
-    update_cargo_toml_version(&folder_path).expect("Failed to update Cargo.toml version");
+    // Pin every `@ossido-labs/*` interlink and the `ossido` crate path dep to
+    // this CLI's version — the packages are versioned together, and
+    // `workspace:*` / the path dep are only valid inside the monorepo.
+    manifest::rewrite_package_json(&folder_path, crate_version!())
+        .unwrap_or_else(|err| exit_with_error(&format!("Failed to update package.json: {err}")));
+    manifest::rewrite_cargo_toml(&folder_path, crate_version!())
+        .unwrap_or_else(|err| exit_with_error(&format!("Failed to update Cargo.toml: {err}")));
 
     let project_name = derive_project_name(folder, &current_dir);
     set_manifest_names(&folder_path, &project_name);
@@ -594,52 +600,6 @@ fn create_directories(
     }
     Ok(())
 }
-fn update_package_json_version(folder_path: &Path) -> io::Result<()> {
-    let v = crate_version!();
-    let package_json_path = folder_path.join(PathBuf::from("package.json"));
-    let package_json = fs::read_to_string(&package_json_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to read package.json: {err}")));
-    // Pin every `@ossido-labs/*` interlink (ossido, ossido-eslint-plugin,
-    // ossido-mdx, …) to this CLI's version — the packages are versioned
-    // together. `workspace:*` is only valid inside the monorepo, so leaving any
-    // behind would break `npm install` in the scaffolded app.
-    let workspace_dep = Regex::new(r#""(@ossido-labs/[^"]+)":\s*"workspace:\*""#)
-        .expect("valid workspace-dep regex");
-    let package_json = workspace_dep
-        .replace_all(&package_json, format!("\"${{1}}\": \"{v}\""))
-        .into_owned();
-
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(package_json_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to open package.json: {err}")));
-
-    file.write_all(package_json.as_bytes())
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to write to package.json: {err}")));
-
-    Ok(())
-}
-
-fn update_cargo_toml_version(folder_path: &Path) -> io::Result<()> {
-    let v = crate_version!();
-    let cargo_toml_path = folder_path.join(PathBuf::from("Cargo.toml"));
-    let cargo_toml = fs::read_to_string(&cargo_toml_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to read Cargo.toml: {err}")));
-    let cargo_toml = cargo_toml.replace("{ path = \"../../crates/ossido/\" }", &format!("\"{v}\""));
-
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(cargo_toml_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to open Cargo.toml: {err}")));
-
-    file.write_all(cargo_toml.as_bytes())
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to write to Cargo.toml: {err}")));
-
-    Ok(())
-}
-
 fn init_new_git_repo(folder_path: &Path) {
     if let Ok(output) = Command::new("git").arg("init").arg(folder_path).output() {
         if !output.status.success() {

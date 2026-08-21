@@ -5,7 +5,7 @@ use spinners::{Spinner, Spinners};
 use tracing::{Level, span};
 
 use crate::commands::new::NewOptions;
-use crate::commands::{build, dev, new};
+use crate::commands::{build, dev, doctor, new, upgrade};
 use crate::mode::Mode;
 use crate::source_builder::SourceBuilder;
 
@@ -69,6 +69,27 @@ enum Actions {
         /// Skip the interactive wizard, accepting defaults and the given flags
         #[arg(short = 'y', long)]
         yes: bool,
+    },
+    /// Diagnose the project, toolchain, and runtime setup
+    Doctor {
+        /// Skip network checks (do not query crates.io / npm for the latest version)
+        #[arg(long)]
+        offline: bool,
+    },
+    /// Upgrade the project's ossido crate and npm dependencies to a newer version
+    Upgrade {
+        /// Target version to upgrade to (e.g. 0.1.5). Defaults to the latest published version.
+        #[arg(long, value_name = "X.Y.Z")]
+        version: Option<String>,
+        /// Report the available upgrade without modifying any files
+        #[arg(long, visible_alias = "check")]
+        dry_run: bool,
+        /// Skip the interactive confirmation (non-interactive / CI)
+        #[arg(short = 'y', long)]
+        yes: bool,
+        /// Do not run `cargo update` / package-manager install after rewriting manifests
+        #[arg(long)]
+        no_install: bool,
     },
 }
 
@@ -164,6 +185,31 @@ pub fn app() -> std::io::Result<()> {
                 output: output.map(OutputMode::from),
                 path_alias: alias,
                 yes,
+            });
+        }
+        Actions::Doctor { offline } => {
+            let span = span!(Level::TRACE, "DOCTOR");
+            let _guard = span.enter();
+
+            // `run` renders the full report, then we exit with its code so a
+            // failure is scriptable without truncating the output.
+            let code = doctor::run(doctor::DoctorOptions { offline });
+            std::process::exit(code);
+        }
+        Actions::Upgrade {
+            version,
+            dry_run,
+            yes,
+            no_install,
+        } => {
+            let span = span!(Level::TRACE, "UPGRADE");
+            let _guard = span.enter();
+
+            upgrade::run(upgrade::UpgradeOptions {
+                target_version: version,
+                dry_run,
+                yes,
+                no_install,
             });
         }
     }
