@@ -150,6 +150,22 @@ jobs:
       - name: Build
         run: bun run build
 
+      # Resume support: registry versions are immutable, so when a partially-
+      # published release is re-run, packages that already made it out must be
+      # skipped rather than re-published (which would fail the whole run).
+      - name: Check npm for an existing publish
+        id: published
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${NAME}@${VERSION} is already on npm - skipping publish"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Pack with bun so `workspace:*` interlinks become concrete versions (npm
       # cannot rewrite them); dist is already built above so skip prepack scripts.
       - name: Pack
@@ -160,6 +176,7 @@ jobs:
       # No NODE_AUTH_TOKEN: npm uses the OIDC trusted publisher. Provenance is
       # generated automatically on GitHub Actions.
       - name: Publish to npm
+        if: steps.published.outputs.exists == 'false'
         working-directory: packages/${{ matrix.package }}
         run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
 
@@ -204,9 +221,29 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: bun scripts/set-version.ts "${TAG#v}"
 
+      # Resume support: crates.io versions are immutable, so a re-run of a
+      # partially-published release must skip crates that already made it out.
+      # The API requires a descriptive User-Agent (their data-access policy).
+      - name: Check crates.io for an existing publish
+        id: published
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG#v}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -A "ossido-release-workflow (github.com/ossido-labs/ossido)" \
+            "https://crates.io/api/v1/crates/${{ matrix.crate }}/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ matrix.crate }}@${VERSION} is already on crates.io - skipping publish"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # `--allow-dirty`: the version-stamp step above edits Cargo.toml in the
       # working tree without committing, which cargo otherwise refuses to package.
       - name: Publish
+        if: steps.published.outputs.exists == 'false'
         run: cargo publish -p ${{ matrix.crate }} --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -352,7 +389,12 @@ jobs:
 
       # Stamp the crate version so the binary's `--version` / `crate_version!()`
       # (used by `ossido new` to pin templates) reports the release version.
+      # `shell: bash` is required: this matrix includes windows-latest, whose
+      # default shell is PowerShell — there `"${TAG#v}"` is not a strip-prefix
+      # expansion but a lookup of a variable literally named `TAG#v`, which
+      # expands to "" and fails set-version's semver check.
       - name: Set version from release tag
+        shell: bash
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: bun scripts/set-version.ts "${TAG#v}"
@@ -431,12 +473,27 @@ jobs:
         if: matrix.exe == 'ossido'
         run: chmod +x npm/platforms/${{ matrix.pkg }}/bin/ossido
 
+      # Resume support: skip platform packages a previous partial run published.
+      - name: Check npm for an existing publish
+        id: published
+        working-directory: npm/platforms/${{ matrix.pkg }}
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${NAME}@${VERSION} is already on npm - skipping publish"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Pack
         id: pack
         working-directory: npm/platforms/${{ matrix.pkg }}
         run: echo "tarball=$(bun pm pack --quiet --ignore-scripts | tail -1)" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
+        if: steps.published.outputs.exists == 'false'
         working-directory: npm/platforms/${{ matrix.pkg }}
         run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
 
@@ -466,12 +523,27 @@ jobs:
       - name: Ensure npm supports trusted publishing
         run: npm install -g npm@^11.5.1
 
+      # Resume support: skip if a previous partial run already published it.
+      - name: Check npm for an existing publish
+        id: published
+        working-directory: packages/ossido-cli
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${NAME}@${VERSION} is already on npm - skipping publish"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Pack
         id: pack
         working-directory: packages/ossido-cli
         run: echo "tarball=$(bun pm pack --quiet --ignore-scripts | tail -1)" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
+        if: steps.published.outputs.exists == 'false'
         working-directory: packages/ossido-cli
         run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
 
@@ -499,12 +571,27 @@ jobs:
       - name: Ensure npm supports trusted publishing
         run: npm install -g npm@^11.5.1
 
+      # Resume support: skip if a previous partial run already published it.
+      - name: Check npm for an existing publish
+        id: published
+        working-directory: packages/create-ossido
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${NAME}@${VERSION} is already on npm - skipping publish"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Pack
         id: pack
         working-directory: packages/create-ossido
         run: echo "tarball=$(bun pm pack --quiet --ignore-scripts | tail -1)" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
+        if: steps.published.outputs.exists == 'false'
         working-directory: packages/create-ossido
         run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
 
