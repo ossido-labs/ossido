@@ -21,7 +21,7 @@ describe('createJsonConfig', () => {
         browser: { enabled: true, level: 'info' as const },
       },
       dev: { criticalCss: true },
-      ssr: { renderThreads: null },
+      ssr: { renderThreads: null, warmupRenders: null },
       output: 'server' as const,
       viewTransitions: false,
     };
@@ -44,7 +44,7 @@ describe('createJsonConfig', () => {
         browser: { enabled: true, level: 'info' as const },
       },
       dev: { criticalCss: true },
-      ssr: { renderThreads: null },
+      ssr: { renderThreads: null, warmupRenders: null },
       output: 'server' as const,
       viewTransitions: false,
     };
@@ -67,7 +67,7 @@ describe('createJsonConfig', () => {
         browser: { enabled: true, level: 'info' as const },
       },
       dev: { criticalCss: true },
-      ssr: { renderThreads: null },
+      ssr: { renderThreads: null, warmupRenders: null },
       output: 'server' as const,
       viewTransitions: false,
     };
