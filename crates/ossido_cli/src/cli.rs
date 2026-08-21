@@ -69,6 +69,9 @@ enum Actions {
         /// Skip the interactive wizard, accepting defaults and the given flags
         #[arg(short = 'y', long)]
         yes: bool,
+        /// Do not install the JS dependencies after scaffolding
+        #[arg(long)]
+        no_install: bool,
     },
     /// Diagnose the project, toolchain, and runtime setup
     Doctor {
@@ -171,6 +174,7 @@ pub fn app() -> std::io::Result<()> {
             output,
             alias,
             yes,
+            no_install,
         } => {
             let span = span!(Level::TRACE, "NEW");
 
@@ -185,6 +189,7 @@ pub fn app() -> std::io::Result<()> {
                 output: output.map(OutputMode::from),
                 path_alias: alias,
                 yes,
+                no_install,
             });
         }
         Actions::Doctor { offline } => {
