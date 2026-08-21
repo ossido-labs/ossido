@@ -1,6 +1,6 @@
 [package]
 name = "ossido_internal"
-version = "0.1.4"
+version = "0.1.6"
 edition = "2024"
 authors = ["Chris Schofield <chris@childishforces.com>"]
 description = "Superfast React fullstack framework"
