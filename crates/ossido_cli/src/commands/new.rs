@@ -3,7 +3,7 @@ use std::fs::{self, File, create_dir};
 use std::io::prelude::*;
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use clap::crate_version;
 use colored::Colorize;
@@ -11,6 +11,7 @@ use regex::Regex;
 use reqwest::blocking;
 use reqwest::blocking::Client;
 use serde::Deserialize;
+use spinners::{Spinner, Spinners};
 use tracing::trace;
 
 use super::scaffold::{self, BASE_TEMPLATE, Feature, OutputMode};
@@ -31,6 +32,8 @@ pub struct NewOptions {
     pub path_alias: Option<String>,
     /// Skip the interactive wizard and take everything from flags/defaults.
     pub yes: bool,
+    /// Skip the JS dependency install after scaffolding (`--no-install`).
+    pub no_install: bool,
 }
 
 /// The resolved answers (from the wizard or from flags) that drive scaffolding.
@@ -40,6 +43,92 @@ struct Selection {
     output: OutputMode,
     /// Prefix of a `src` path alias, or `None`.
     path_alias: Option<String>,
+    /// The package manager to install JS dependencies with, or `None` when no
+    /// supported one is on `PATH`.
+    package_manager: Option<PackageManager>,
+}
+
+/// A JS package manager the scaffolder can install dependencies with, in
+/// default-preference order (the first available wins when nothing else picks).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum PackageManager {
+    Bun,
+    Npm,
+    Pnpm,
+    Yarn,
+}
+
+impl PackageManager {
+    const ALL: [PackageManager; 4] = [Self::Bun, Self::Npm, Self::Pnpm, Self::Yarn];
+
+    fn bin(self) -> &'static str {
+        match self {
+            Self::Bun => "bun",
+            Self::Npm => "npm",
+            Self::Pnpm => "pnpm",
+            Self::Yarn => "yarn",
+        }
+    }
+}
+
+/// Build a command for a JS package-manager binary. On Windows the launchers
+/// are `.cmd` shims, which `Command::new` cannot spawn directly — go through
+/// `cmd /C`.
+fn pm_command(bin: &str) -> Command {
+    #[cfg(target_os = "windows")]
+    {
+        let mut command = Command::new("cmd");
+        command.args(["/C", bin]);
+        command
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Command::new(bin)
+    }
+}
+
+/// The supported package managers present on `PATH`, probed with `--version`.
+fn available_package_managers() -> Vec<PackageManager> {
+    PackageManager::ALL
+        .iter()
+        .copied()
+        .filter(|pm| {
+            pm_command(pm.bin())
+                .arg("--version")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false)
+        })
+        .collect()
+}
+
+/// The package manager that launched this scaffold — `bun create ossido`,
+/// `npm create ossido`, etc. all set `npm_config_user_agent` (e.g.
+/// `"bun/1.4.0 npm/? node/v24 …"`), so the wizard can preselect it.
+fn package_manager_from_user_agent(user_agent: &str) -> Option<PackageManager> {
+    PackageManager::ALL
+        .iter()
+        .copied()
+        .find(|pm| user_agent.starts_with(&format!("{}/", pm.bin())))
+}
+
+/// Pick a package manager without prompting: the one that launched the
+/// scaffold if it is available, else the first available by preference order.
+fn default_package_manager(available: &[PackageManager]) -> Option<PackageManager> {
+    let user_agent = env::var("npm_config_user_agent").ok();
+    default_package_manager_with_agent(user_agent.as_deref(), available)
+}
+
+fn default_package_manager_with_agent(
+    user_agent: Option<&str>,
+    available: &[PackageManager],
+) -> Option<PackageManager> {
+    user_agent
+        .and_then(package_manager_from_user_agent)
+        .filter(|pm| available.contains(pm))
+        .or_else(|| available.first().copied())
 }
 
 #[derive(Deserialize, Debug)]
@@ -90,6 +179,15 @@ fn create_file(path: PathBuf, content: String) -> std::io::Result<()> {
     Ok(())
 }
 
+/// How the JS dependency install ended, driving the outro's next-steps hints.
+enum InstallOutcome {
+    Installed(PackageManager),
+    Failed(PackageManager),
+    /// `--no-install`, a test run, or no supported package manager on `PATH`
+    /// (the latter carries `None`).
+    Skipped(Option<PackageManager>),
+}
+
 pub fn create_new_project(options: NewOptions) {
     // Fail fast: reuse the doctor's Rust-toolchain and JS-runtime checks so we
     // never scaffold a project into an environment that cannot build it.
@@ -97,32 +195,143 @@ pub fn create_new_project(options: NewOptions) {
         return;
     }
 
+    let available = available_package_managers();
+    // The integration tests scaffold against a mock GitHub — never let them
+    // (or `--no-install`) run a real registry install.
+    let skip_install = options.no_install || env::var("__INTERNAL_OSSIDO_TEST").is_ok();
+
     // An explicit `--template` keeps the classic behaviour: download that example
-    // verbatim, with no wizard and no feature overlays.
+    // verbatim, with no wizard and no feature overlays (and so no package-manager
+    // prompt — the default resolution applies).
     if let Some(template) = options.template.clone() {
         let folder = options
             .folder_name
             .clone()
             .unwrap_or_else(|| ".".to_string());
-        let folder_path = scaffold_download(&folder, &template, options.head);
-        generate_dot_ossido(&folder_path);
-        outro(folder);
+        let folder_path = run_step("Creating the project", || {
+            scaffold_download(&folder, &template, options.head)
+        });
+        run_step("Bootstrapping (.ossido)", || {
+            generate_dot_ossido(&folder_path);
+        });
+        let install = run_install(
+            &folder_path,
+            default_package_manager(&available),
+            skip_install,
+        );
+        outro(folder, &install);
         return;
     }
 
     // Otherwise compose the base template with the selected features.
-    let Some(selection) = resolve_selection(&options) else {
+    let Some(selection) = resolve_selection(&options, &available) else {
         // The user cancelled the wizard.
         return;
     };
 
     // Tailwind swaps the base template; other features patch onto it.
     let base = scaffold::base_template_for(&selection.features);
-    let folder_path = scaffold_download(&selection.folder, base, options.head);
-    apply_overlays(&folder_path, &selection);
-    generate_dot_ossido(&folder_path);
+    let folder_path = run_step("Creating the project", || {
+        let folder_path = scaffold_download(&selection.folder, base, options.head);
+        apply_overlays(&folder_path, &selection);
+        folder_path
+    });
+    run_step("Bootstrapping (.ossido)", || {
+        generate_dot_ossido(&folder_path);
+    });
+    let install = run_install(&folder_path, selection.package_manager, skip_install);
 
-    outro(selection.folder);
+    outro(selection.folder, &install);
+}
+
+/// Run one scaffolding stage behind a spinner, persisting a ✔ line when it
+/// completes (matching the `ossido upgrade` progress style). A stage that
+/// cannot continue exits the process from within, leaving the spinner line —
+/// its error output follows immediately below, so the failed stage is obvious.
+fn run_step<T>(message: &str, stage: impl FnOnce() -> T) -> T {
+    let mut progress = StepProgress::start(message);
+    let out = stage();
+    progress.done(&"✔".green().to_string(), message);
+    out
+}
+
+/// A progress line for one scaffolding stage: an animated spinner on a
+/// terminal, a plain persisted line when output is piped (tests, CI) — the
+/// spinner's redraw frames would otherwise flood captured logs.
+struct StepProgress {
+    spinner: Option<Spinner>,
+}
+
+impl StepProgress {
+    fn start(message: &str) -> Self {
+        let spinner = io::stdout()
+            .is_terminal()
+            .then(|| Spinner::new(Spinners::Dots, message.into()));
+        Self { spinner }
+    }
+
+    fn done(&mut self, symbol: &str, message: &str) {
+        match self.spinner.as_mut() {
+            Some(spinner) => spinner.stop_and_persist(symbol, message.into()),
+            None => println!("{symbol} {message}"),
+        }
+    }
+}
+
+/// Install the scaffolded project's JS dependencies (unless skipped), returning
+/// the outcome for the outro. A failed install is a warning, not an abort — the
+/// project itself is complete and the user can install manually.
+fn run_install(
+    folder_path: &Path,
+    package_manager: Option<PackageManager>,
+    skip: bool,
+) -> InstallOutcome {
+    let Some(pm) = package_manager else {
+        println!(
+            "{} no JS package manager found (looked for bun, npm, pnpm, yarn) — skipping the dependency install",
+            "!".yellow()
+        );
+        return InstallOutcome::Skipped(None);
+    };
+    if skip {
+        return InstallOutcome::Skipped(Some(pm));
+    }
+
+    let message = format!("Installing JS dependencies ({})", pm.bin());
+    let mut progress = StepProgress::start(&message);
+    // Capture output so the install runs quietly behind the spinner; surface
+    // the tail of it only when the install fails.
+    let output = pm_command(pm.bin())
+        .arg("install")
+        .current_dir(folder_path)
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            progress.done(&"✔".green().to_string(), &message);
+            InstallOutcome::Installed(pm)
+        }
+        Ok(out) => {
+            progress.done(
+                &"!".yellow().to_string(),
+                &format!("{} install failed", pm.bin()),
+            );
+            // The interesting error is at the end; don't flood the terminal.
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let tail: Vec<&str> = stderr.lines().rev().take(15).collect();
+            for line in tail.iter().rev() {
+                eprintln!("  {line}");
+            }
+            InstallOutcome::Failed(pm)
+        }
+        Err(err) => {
+            progress.done(
+                &"!".yellow().to_string(),
+                &format!("could not run {} install: {err}", pm.bin()),
+            );
+            InstallOutcome::Failed(pm)
+        }
+    }
 }
 
 /// Run the doctor's Rust-toolchain and JS-runtime checks before scaffolding.
@@ -149,11 +358,11 @@ fn ensure_toolchain_ready() -> bool {
 
 /// Resolve the feature/output selection either interactively (the wizard) or,
 /// when running non-interactively (`--yes` or no TTY), straight from the flags.
-fn resolve_selection(options: &NewOptions) -> Option<Selection> {
+fn resolve_selection(options: &NewOptions, available: &[PackageManager]) -> Option<Selection> {
     if options.yes || !io::stdout().is_terminal() {
-        return Some(selection_from_flags(options));
+        return Some(selection_from_flags(options, available));
     }
-    run_wizard(options)
+    run_wizard(options, available)
 }
 
 /// Whether a feature is preselected by a CLI flag (`--tailwind`, `--mdx`, …).
@@ -165,7 +374,7 @@ fn feature_preselected(options: &NewOptions, key: &str) -> bool {
     }
 }
 
-fn selection_from_flags(options: &NewOptions) -> Selection {
+fn selection_from_flags(options: &NewOptions, available: &[PackageManager]) -> Selection {
     let features = scaffold::ALL_FEATURES
         .iter()
         .copied()
@@ -180,12 +389,15 @@ fn selection_from_flags(options: &NewOptions) -> Selection {
         features,
         output: options.output.unwrap_or(OutputMode::Server),
         path_alias: options.path_alias.clone(),
+        // Non-interactive: no prompt — the launching package manager (or the
+        // first available) wins.
+        package_manager: default_package_manager(available),
     }
 }
 
 /// The interactive scaffolding wizard. Returns `None` if the user cancels
 /// (e.g. Ctrl-C), in which case scaffolding is aborted cleanly.
-fn run_wizard(options: &NewOptions) -> Option<Selection> {
+fn run_wizard(options: &NewOptions, available: &[PackageManager]) -> Option<Selection> {
     let _ = cliclack::intro("Create a new Ossido app");
 
     let folder = match &options.folder_name {
@@ -240,11 +452,28 @@ fn run_wizard(options: &NewOptions) -> Option<Selection> {
         None
     };
 
+    // Which of the detected package managers should install the dependencies.
+    // One (or none) available needs no question; the launching package manager
+    // (`bun create ossido` → bun) is the preselected answer.
+    let package_manager = match available {
+        [] => None,
+        [only] => Some(*only),
+        _ => {
+            let mut select = cliclack::select("Which package manager should install dependencies?")
+                .initial_value(default_package_manager(available)?);
+            for pm in available {
+                select = select.item(*pm, pm.bin(), "");
+            }
+            Some(select.interact().ok()?)
+        }
+    };
+
     Some(Selection {
         folder,
         features,
         output,
         path_alias,
+        package_manager,
     })
 }
 
@@ -639,24 +868,83 @@ fn init_new_git_repo(folder_path: &Path) {
     }
 }
 
-fn outro(folder_name: String) {
-    println!("Success! 🎉");
+fn outro(folder_name: String, install: &InstallOutcome) {
+    let pm_bin = match install {
+        InstallOutcome::Installed(pm)
+        | InstallOutcome::Failed(pm)
+        | InstallOutcome::Skipped(Some(pm)) => pm.bin(),
+        InstallOutcome::Skipped(None) => "npm",
+    };
+
+    println!("\n{} 🎉", "Ready!".green().bold());
 
     if folder_name != "." {
         println!("\nGo to the project directory:");
         println!("cd {folder_name}/");
     }
 
-    println!("\nInstall the dependencies:");
-    println!("npm install");
+    // Dependencies are installed by the scaffold; only point at a manual
+    // install when that didn't happen.
+    if !matches!(install, InstallOutcome::Installed(_)) {
+        println!("\nInstall the dependencies:");
+        println!("{pm_bin} install");
+    }
 
     println!("\nRun the local environment:");
-    println!("ossido dev");
+    println!("{pm_bin} run dev");
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detects_the_launching_package_manager_from_the_user_agent() {
+        // The `npm_config_user_agent` shapes each manager sets for `create` runs.
+        assert_eq!(
+            package_manager_from_user_agent("bun/1.4.0 npm/? node/v24.3.0 darwin arm64"),
+            Some(PackageManager::Bun)
+        );
+        assert_eq!(
+            package_manager_from_user_agent(
+                "npm/11.6.0 node/v24.14.1 darwin arm64 workspaces/false"
+            ),
+            Some(PackageManager::Npm)
+        );
+        assert_eq!(
+            package_manager_from_user_agent("pnpm/9.12.0 npm/? node/v22.1.0 linux x64"),
+            Some(PackageManager::Pnpm)
+        );
+        assert_eq!(
+            package_manager_from_user_agent("yarn/1.22.22 npm/? node/v20.0.0 linux x64"),
+            Some(PackageManager::Yarn)
+        );
+        // Unknown agents (or a plain `ossido new` with no agent) fall through.
+        assert_eq!(package_manager_from_user_agent("deno/2.0.0"), None);
+        assert_eq!(package_manager_from_user_agent(""), None);
+    }
+
+    #[test]
+    fn default_package_manager_prefers_the_agent_then_availability_order() {
+        let available = [PackageManager::Pnpm, PackageManager::Npm];
+        // The launching manager wins when it is available…
+        assert_eq!(
+            default_package_manager_with_agent(Some("npm/11.6.0 node/v24"), &available),
+            Some(PackageManager::Npm)
+        );
+        // …an unavailable one falls back to the first available…
+        assert_eq!(
+            default_package_manager_with_agent(Some("bun/1.4.0"), &available),
+            Some(PackageManager::Pnpm)
+        );
+        // …as does no agent at all; and nothing available means no manager.
+        assert_eq!(
+            default_package_manager_with_agent(None, &available),
+            Some(PackageManager::Pnpm)
+        );
+        assert_eq!(default_package_manager_with_agent(None, &[]), None);
+    }
+
     #[test]
     fn generate_valid_content_url_from_head() {
         let expected = format!(
