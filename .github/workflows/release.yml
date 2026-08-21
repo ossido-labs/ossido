@@ -508,6 +508,16 @@ jobs:
         with:
           bun-version: 1.4.0
 
+      # Node via setup-node, like every other npm job (the rest get it through
+      # the install-node-dependencies composite): setup-node's tool-cache
+      # install is user-owned, so the npm self-update below needs no
+      # privileges. The runner image's system node lives in root-owned
+      # /usr/local, where an unprivileged `npm install -g` fails with EACCES.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
       - name: Ensure npm supports trusted publishing
         run: npm install -g npm@^11.5.1
 
