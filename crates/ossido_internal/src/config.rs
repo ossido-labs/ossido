@@ -69,6 +69,12 @@ pub struct SsrConfig {
     /// var overrides this.
     #[serde(rename = "renderThreads", default)]
     pub render_threads: Option<usize>,
+    /// Number of throwaway warm-up renders each render-pool thread performs at
+    /// server start so V8's tiering compilers optimise the render path before
+    /// traffic arrives. `None` (unset) resolves to the runtime default (3); the
+    /// `OSSIDO_SSR_WARMUP_RENDERS` env var overrides this. `0` disables warm-up.
+    #[serde(rename = "warmupRenders", default)]
+    pub warmup_renders: Option<u32>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -161,18 +167,29 @@ mod tests {
     }
 
     #[test]
+    fn deserializes_ssr_warmup_renders() {
+        let config: Config = serde_json::from_str(
+            r#"{ "server": { "host": "localhost", "port": 3000, "origin": null }, "ssr": { "warmupRenders": 10 } }"#,
+        )
+        .unwrap();
+        assert_eq!(config.ssr.warmup_renders, Some(10));
+    }
+
+    #[test]
     fn ssr_defaults_when_absent_or_null() {
         let base = r#"{ "server": { "host": "localhost", "port": 3000, "origin": null }"#;
 
         // Missing `ssr` entirely.
         let config: Config = serde_json::from_str(&format!("{base} }}")).unwrap();
         assert_eq!(config.ssr.render_threads, None);
+        assert_eq!(config.ssr.warmup_renders, None);
 
-        // Present but `renderThreads: null` (the shape the JS normalizer emits).
+        // Present but nulled fields (the shape the JS normalizer emits).
         let config: Config = serde_json::from_str(&format!(
-            "{base}, \"ssr\": {{ \"renderThreads\": null }} }}"
+            "{base}, \"ssr\": {{ \"renderThreads\": null, \"warmupRenders\": null }} }}"
         ))
         .unwrap();
         assert_eq!(config.ssr.render_threads, None);
+        assert_eq!(config.ssr.warmup_renders, None);
     }
 }

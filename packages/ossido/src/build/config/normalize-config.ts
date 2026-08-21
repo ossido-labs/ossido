@@ -95,6 +95,8 @@ export const normalizeConfig = (config: OssidoConfig): InternalOssidoConfig => {
       // `null` = auto: the Rust runtime uses the machine's available
       // parallelism (resolving it here would bake in the build machine's cores).
       renderThreads: config.ssr?.renderThreads ?? null,
+      // `null` = runtime default (3 warm-up renders per pool thread).
+      warmupRenders: config.ssr?.warmupRenders ?? null,
     },
     output: config.output ?? 'server',
     viewTransitions: config.viewTransitions ?? false,

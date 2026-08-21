@@ -32,7 +32,7 @@ describe('normalizeConfig', () => {
         browser: { enabled: true, level: 'info' },
       },
       dev: { criticalCss: true },
-      ssr: { renderThreads: null },
+      ssr: { renderThreads: null, warmupRenders: null },
       output: 'server',
       viewTransitions: false,
     });
@@ -58,7 +58,7 @@ describe('normalizeConfig', () => {
         browser: { enabled: true, level: 'info' },
       },
       dev: { criticalCss: true },
-      ssr: { renderThreads: null },
+      ssr: { renderThreads: null, warmupRenders: null },
       output: 'server',
       viewTransitions: false,
     });
@@ -206,7 +206,7 @@ describe('normalizeConfig', () => {
     it('should default renderThreads to null (auto)', () => {
       expect(normalizeConfig({})).toStrictEqual(
         expect.objectContaining({
-          ssr: { renderThreads: null },
+          ssr: { renderThreads: null, warmupRenders: null },
         }),
       );
     });
@@ -216,7 +216,17 @@ describe('normalizeConfig', () => {
 
       expect(normalizeConfig(config)).toStrictEqual(
         expect.objectContaining({
-          ssr: { renderThreads: 4 },
+          ssr: { renderThreads: 4, warmupRenders: null },
+        }),
+      );
+    });
+
+    it('should honour warmupRenders set by the user', () => {
+      const config: OssidoConfig = { ssr: { warmupRenders: 10 } };
+
+      expect(normalizeConfig(config)).toStrictEqual(
+        expect.objectContaining({
+          ssr: { renderThreads: null, warmupRenders: 10 },
         }),
       );
     });

@@ -142,5 +142,5 @@
 mod icu;
 mod ssr;
 
-pub use ssr::{Ssr, SsrError, StreamSink, Streaming};
+pub use ssr::{ModuleBuild, Ssr, SsrError, StreamSink, Streaming};
 pub use v8;

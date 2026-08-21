@@ -45,6 +45,24 @@ enum StreamMsg {
     Done(Result<(), SsrError>),
 }
 
+/// A [`StreamSink`](ossido_ssr::StreamSink) forwarding each chunk into a
+/// streaming job's channel. Overriding `write_chunk_owned` moves the `String`
+/// the V8 bridge already marshalled straight into the channel — no per-chunk
+/// copy on the render thread.
+struct ChannelSink(mpsc::UnboundedSender<StreamMsg>);
+
+impl ossido_ssr::StreamSink for ChannelSink {
+    fn write_chunk(&mut self, chunk: &str) {
+        self.write_chunk_owned(chunk.to_string());
+    }
+
+    fn write_chunk_owned(&mut self, chunk: String) {
+        // `send` only fails if the async side dropped the receiver (client
+        // disconnected); rendering then simply completes unread.
+        let _ = self.0.send(StreamMsg::Chunk(chunk));
+    }
+}
+
 static POOL: OnceLock<Sender<Job>> = OnceLock::new();
 
 /// Log a failed render so a 500 is never silent: the terminal shows *why*
@@ -86,6 +104,29 @@ fn guarded<T>(
 }
 
 const SSR_THREADS_ENV: &str = "OSSIDO_SSR_THREADS";
+const SSR_WARMUP_ENV: &str = "OSSIDO_SSR_WARMUP_RENDERS";
+
+/// Warm-up renders per pool thread before serving traffic. Repeated renders
+/// let V8's tiering compilers (Sparkplug → Maglev → TurboFan) optimise the
+/// bundle's hot render path — the first real requests then hit optimised code
+/// instead of paying interpreter-speed renders (~4× slower in our benches).
+/// Diminishing returns past a handful; renders are virtual-time so each costs
+/// one page render, not wall-clock timer waits.
+const DEFAULT_WARMUP_RENDERS: u32 = 3;
+
+fn warmup_renders() -> u32 {
+    // Resolution mirrors `pool_size()`: env var > config > default. `0` is
+    // valid here (disable warm-up entirely).
+    let from_env = std::env::var(SSR_WARMUP_ENV)
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok());
+
+    let from_config = crate::config::GLOBAL_CONFIG
+        .get()
+        .and_then(|config| config.ssr.warmup_renders);
+
+    from_env.or(from_config).unwrap_or(DEFAULT_WARMUP_RENDERS)
+}
 
 fn pool_size() -> usize {
     // 1. `OSSIDO_SSR_THREADS` env var — a runtime escape hatch that wins.
@@ -111,6 +152,7 @@ fn pool_size() -> usize {
 fn sender() -> &'static Sender<Job> {
     POOL.get_or_init(|| {
         let (tx, rx) = unbounded::<Job>();
+        let warmup = warmup_renders();
         for index in 0..pool_size() {
             let rx = rx.clone();
             std::thread::Builder::new()
@@ -119,6 +161,10 @@ fn sender() -> &'static Sender<Job> {
                     // Pre-warm: compile + cache this thread's isolate now (a
                     // throwaway render) so the first *real* request skips the
                     // bundle read + V8 compile — the dominant one-off SSR cost.
+                    // Repeated warm-up renders (see `warmup_renders`) then let
+                    // V8 tier the render path up to optimised code. A count of
+                    // `0` skips warm-up entirely — the isolate then compiles
+                    // lazily on this thread's first real request.
                     //
                     // Guarded by `catch_unwind` so a warm-up that can't complete
                     // (dev before the first build, or a missing prod bundle)
@@ -127,7 +173,9 @@ fn sender() -> &'static Sender<Job> {
                     // compiles lazily once the bundle exists); in prod the bundle
                     // is present by the time the server starts.
                     if let Err(panic) = std::panic::catch_unwind(|| {
-                        let _ = Js::render_to_string(None);
+                        for _ in 0..warmup {
+                            let _ = Js::render_to_string(None);
+                        }
                     }) {
                         // Surface the panic instead of swallowing it: in prod a
                         // failed warm-up usually means a broken server bundle,
@@ -155,19 +203,14 @@ fn sender() -> &'static Sender<Job> {
                             }
                             Job::Stream(payload, chunks) => {
                                 // Forward each chunk as it is produced, then the
-                                // terminal result. `send` only fails if the async
-                                // side dropped the receiver (client disconnected),
-                                // in which case rendering simply completes unread.
-                                // The sink closure owns a clone of the sender; the
-                                // original stays for the terminal `Done`. `ossido_ssr`
-                                // lends each chunk as a borrowed `&str`, so own it
-                                // (`to_string`) to move it across the channel.
-                                let tx = chunks.clone();
-                                let result = guarded(|| {
-                                    Js::render_stream(Some(&payload), move |chunk: &str| {
-                                        let _ = tx.send(StreamMsg::Chunk(chunk.to_string()));
-                                    })
-                                });
+                                // terminal result. The sink owns a clone of the
+                                // sender; the original stays for the terminal
+                                // `Done`. `ChannelSink` takes each chunk as the
+                                // owned `String` the V8 bridge marshalled, so
+                                // nothing is re-copied on this thread.
+                                let sink = ChannelSink(chunks.clone());
+                                let result =
+                                    guarded(|| Js::render_stream(Some(&payload), sink));
                                 log_render_error(result.as_ref().err());
                                 let _ = chunks.send(StreamMsg::Done(result));
                             }

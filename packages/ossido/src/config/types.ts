@@ -165,6 +165,17 @@ export interface OssidoConfigSsr {
    * runtime with the `OSSIDO_SSR_THREADS` environment variable.
    */
   renderThreads?: number;
+
+  /**
+   * Number of throwaway warm-up renders each render-pool thread performs at
+   * server start, before serving traffic. Repeated renders let V8's tiering
+   * compilers (Sparkplug → Maglev → TurboFan) optimise the hot render path, so
+   * the first real requests hit already-optimised code instead of paying the
+   * interpreter-speed first render. Defaults to `3`; set `0` to disable.
+   * Overridable at runtime with the `OSSIDO_SSR_WARMUP_RENDERS` environment
+   * variable.
+   */
+  warmupRenders?: number;
 }
 
 /** Development-only tweaks. */
