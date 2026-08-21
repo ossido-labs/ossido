@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 pub mod mock_github_endpoint;
+pub mod mock_registry;
 pub mod temp_ossido_project;
 
 /// Normalizes generated Rust source for formatting-insensitive comparison.

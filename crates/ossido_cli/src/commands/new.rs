@@ -1,11 +1,12 @@
 use std::env;
-use std::fs::{self, File, OpenOptions, create_dir};
+use std::fs::{self, File, create_dir};
 use std::io::prelude::*;
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use clap::crate_version;
+use colored::Colorize;
 use regex::Regex;
 use reqwest::blocking;
 use reqwest::blocking::Client;
@@ -13,6 +14,7 @@ use serde::Deserialize;
 use tracing::trace;
 
 use super::scaffold::{self, BASE_TEMPLATE, Feature, OutputMode};
+use super::{doctor, manifest};
 use crate::mode::Mode;
 use crate::source_builder::SourceBuilder;
 
@@ -89,6 +91,12 @@ fn create_file(path: PathBuf, content: String) -> std::io::Result<()> {
 }
 
 pub fn create_new_project(options: NewOptions) {
+    // Fail fast: reuse the doctor's Rust-toolchain and JS-runtime checks so we
+    // never scaffold a project into an environment that cannot build it.
+    if !ensure_toolchain_ready() {
+        return;
+    }
+
     // An explicit `--template` keeps the classic behaviour: download that example
     // verbatim, with no wizard and no feature overlays.
     if let Some(template) = options.template.clone() {
@@ -115,6 +123,28 @@ pub fn create_new_project(options: NewOptions) {
     generate_dot_ossido(&folder_path);
 
     outro(selection.folder);
+}
+
+/// Run the doctor's Rust-toolchain and JS-runtime checks before scaffolding.
+/// A hard failure (no rustc / no JS runtime, or a rustc too old for edition 2024)
+/// prints the fix — install rustup, or Bun for the JS runtime — and aborts before
+/// anything is downloaded. Warnings (e.g. bun-only, or a `.nvmrc` mismatch) do not
+/// block. Runs from the current directory, which is correct even for a not-yet-
+/// created project folder: the checks probe `PATH`, not the target folder.
+fn ensure_toolchain_ready() -> bool {
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let checks = doctor::toolchain_checks(&cwd);
+    if doctor::any_failed(&checks) {
+        eprintln!(
+            "{}",
+            "Cannot scaffold — your environment is missing a prerequisite:"
+                .red()
+                .bold()
+        );
+        doctor::render(&checks);
+        return false;
+    }
+    true
 }
 
 /// Resolve the feature/output selection either interactively (the wizard) or,
@@ -436,8 +466,13 @@ fn scaffold_download(folder: &str, template: &str, select_head: Option<bool>) ->
         }
     }
 
-    update_package_json_version(&folder_path).expect("Failed to update package.json version");
-    update_cargo_toml_version(&folder_path).expect("Failed to update Cargo.toml version");
+    // Pin every `@ossido-labs/*` interlink and the `ossido` crate path dep to
+    // this CLI's version — the packages are versioned together, and
+    // `workspace:*` / the path dep are only valid inside the monorepo.
+    manifest::rewrite_package_json(&folder_path, crate_version!())
+        .unwrap_or_else(|err| exit_with_error(&format!("Failed to update package.json: {err}")));
+    manifest::rewrite_cargo_toml(&folder_path, crate_version!())
+        .unwrap_or_else(|err| exit_with_error(&format!("Failed to update Cargo.toml: {err}")));
 
     let project_name = derive_project_name(folder, &current_dir);
     set_manifest_names(&folder_path, &project_name);
@@ -594,52 +629,6 @@ fn create_directories(
     }
     Ok(())
 }
-fn update_package_json_version(folder_path: &Path) -> io::Result<()> {
-    let v = crate_version!();
-    let package_json_path = folder_path.join(PathBuf::from("package.json"));
-    let package_json = fs::read_to_string(&package_json_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to read package.json: {err}")));
-    // Pin every `@ossido-labs/*` interlink (ossido, ossido-eslint-plugin,
-    // ossido-mdx, …) to this CLI's version — the packages are versioned
-    // together. `workspace:*` is only valid inside the monorepo, so leaving any
-    // behind would break `npm install` in the scaffolded app.
-    let workspace_dep = Regex::new(r#""(@ossido-labs/[^"]+)":\s*"workspace:\*""#)
-        .expect("valid workspace-dep regex");
-    let package_json = workspace_dep
-        .replace_all(&package_json, format!("\"${{1}}\": \"{v}\""))
-        .into_owned();
-
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(package_json_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to open package.json: {err}")));
-
-    file.write_all(package_json.as_bytes())
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to write to package.json: {err}")));
-
-    Ok(())
-}
-
-fn update_cargo_toml_version(folder_path: &Path) -> io::Result<()> {
-    let v = crate_version!();
-    let cargo_toml_path = folder_path.join(PathBuf::from("Cargo.toml"));
-    let cargo_toml = fs::read_to_string(&cargo_toml_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to read Cargo.toml: {err}")));
-    let cargo_toml = cargo_toml.replace("{ path = \"../../crates/ossido/\" }", &format!("\"{v}\""));
-
-    let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(cargo_toml_path)
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to open Cargo.toml: {err}")));
-
-    file.write_all(cargo_toml.as_bytes())
-        .unwrap_or_else(|err| exit_with_error(&format!("Failed to write to Cargo.toml: {err}")));
-
-    Ok(())
-}
-
 fn init_new_git_repo(folder_path: &Path) {
     if let Ok(output) = Command::new("git").arg("init").arg(folder_path).output() {
         if !output.status.success() {
