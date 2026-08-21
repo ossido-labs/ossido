@@ -355,8 +355,13 @@ jobs:
               cross: false,
               features: '',
             }
+          # darwin-x64 cross-compiles on the arm64 runner: macos-13 (the last
+          # Intel runner) is retired, and Xcode's toolchain builds x86_64 from
+          # Apple Silicon natively — `--target` plus the rustup target (added by
+          # setup-rust-toolchain) is all it needs. The v8 crate downloads its
+          # prebuilt static library per --target, so nothing compiles V8.
           - {
-              runner: macos-13,
+              runner: macos-latest,
               target: x86_64-apple-darwin,
               pkg: darwin-x64,
               exe: ossido,
