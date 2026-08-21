@@ -30,6 +30,9 @@ path = "src/lib.rs"
 
 [dependencies]
 v8 = "135.1.0"
+# Faster (non-DoS-resistant) hasher for the internal export map — keys are
+# bundle export names, not attacker-controlled input.
+rustc-hash = "2"
 
 [dev-dependencies]
 # Only the `svelte` integration test parses a rendered JSON payload.

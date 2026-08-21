@@ -14,3 +14,12 @@ exclude = [
   "examples/with-tailwind",
   "e2e/fixtures/base",
 ]
+
+# Trade compile time for run-time performance: whole-program LTO and a single
+# codegen unit let LLVM optimise across crate boundaries (the SSR render path
+# spans ossido → ossido_ssr → channel/axum plumbing). V8 itself is a prebuilt
+# static archive and is unaffected. No `panic = "abort"` — the render pool's
+# `catch_unwind` recovery depends on unwinding.
+[profile.release]
+lto = "fat"
+codegen-units = 1

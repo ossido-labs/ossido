@@ -23,10 +23,12 @@ export interface InternalOssidoConfigDev {
 
 /**
  * Fully-resolved SSR config. `renderThreads` is `null` when unset — the Rust
- * runtime then defaults it to the machine's available parallelism.
+ * runtime then defaults it to the machine's available parallelism. Likewise
+ * `warmupRenders` is `null` when unset (runtime default: 3).
  */
 export interface InternalOssidoConfigSsr {
   renderThreads: number | null;
+  warmupRenders: number | null;
 }
 
 export interface InternalOssidoConfig extends Omit<

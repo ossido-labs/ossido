@@ -19,7 +19,21 @@ const DEV_PUBLIC_DIR: &str = "public";
 const PROD_PUBLIC_DIR: &str = "out/client";
 
 pub fn ossido_internal_init_v8_platform() {
-    Ssr::create_platform();
+    // `--no-lazy-feedback-allocation`: allocate type-feedback vectors on first
+    // call instead of after V8's lazy heuristic, so the tiering compilers
+    // (Sparkplug → Maglev → TurboFan) start optimising the render path from the
+    // very first requests. The memory cost is negligible for a handful of
+    // long-lived render-pool isolates.
+    //
+    // `OSSIDO_V8_FLAGS` is appended *after* the defaults so user flags win
+    // (for conflicting V8 flags, the later one takes effect). Unknown flags are
+    // warned about and ignored by V8, so passthrough is safe.
+    let mut flags = String::from("--no-lazy-feedback-allocation");
+    if let Ok(extra) = std::env::var("OSSIDO_V8_FLAGS") {
+        flags.push(' ');
+        flags.push_str(&extra);
+    }
+    Ssr::create_platform_with_flags(Some(&flags));
 }
 
 #[derive(Debug)]

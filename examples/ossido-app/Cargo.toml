@@ -11,3 +11,10 @@ path = ".ossido/main.rs"
 ossido = { path = "../../crates/ossido" }
 serde = { version = "1.0.202", features = ["derive"] }
 tower-http = { version = "0.6.8", features = ["full"]}
+
+# Trade compile time for run-time performance in production builds. No
+# `panic = "abort"` — ossido's SSR render pool relies on unwinding to recover
+# from a failed render.
+[profile.release]
+lto = "fat"
+codegen-units = 1

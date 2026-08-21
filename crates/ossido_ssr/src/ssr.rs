@@ -1,8 +1,10 @@
 #![allow(clippy::question_mark)]
-// TODO: replace hashmap with more performant https://nnethercote.github.io/perf-book/hashing.html
-use std::collections::HashMap;
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::ffi::c_void;
 use std::fmt;
+
+use rustc_hash::FxHashMap;
 
 /// This enum holds all the possible Ssr error states.
 #[derive(Debug, PartialEq, Eq)]
@@ -71,6 +73,29 @@ struct Timer {
     callback: v8::Global<v8::Function>,
 }
 
+// Order timers by (due, seq) — the firing order — ignoring the callback, so a
+// `BinaryHeap<Reverse<Timer>>` pops the earliest-scheduled timer first without
+// re-sorting the whole queue every generation. `seq` is unique per queue, so
+// the total order is well-defined even for equal (or NaN-free) `due` values.
+impl PartialEq for Timer {
+    fn eq(&self, other: &Self) -> bool {
+        self.due.total_cmp(&other.due).is_eq() && self.seq == other.seq
+    }
+}
+impl Eq for Timer {}
+impl PartialOrd for Timer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Timer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.due
+            .total_cmp(&other.due)
+            .then(self.seq.cmp(&other.seq))
+    }
+}
+
 /// A native, virtual-time macrotask queue backing `setTimeout` /`setImmediate` /
 /// `clearTimeout` (and, transitively, `MessageChannel` delivery) inside the
 /// isolate — the same shape a real embedded-V8 runtime (e.g. Deno) uses, but on
@@ -81,7 +106,12 @@ struct Timer {
 /// [`TIMER_SLOT`] so the native timer callbacks and the drain can reach it.
 #[derive(Default)]
 struct TimerQueue {
-    tasks: Vec<Timer>,
+    /// Min-heap on (due, seq) via [`Reverse`]: the next timer to fire is
+    /// `peek()`, with no per-generation re-sort.
+    tasks: BinaryHeap<Reverse<Timer>>,
+    /// Ids cancelled by `clearTimeout`, dropped lazily as they surface at the
+    /// head of the heap. An id that never fires (already ran, or bogus) stays
+    /// until [`reset_macrotasks`] clears the set at the next render.
     cleared: std::collections::HashSet<u32>,
     virtual_now: f64,
     next_id: u32,
@@ -126,12 +156,12 @@ fn set_timeout_callback(
     queue.next_id = queue.next_id.wrapping_add(1);
     let seq = queue.seq;
     queue.seq += 1;
-    queue.tasks.push(Timer {
+    queue.tasks.push(Reverse(Timer {
         id,
         due: queue.virtual_now + delay,
         seq,
         callback,
-    });
+    }));
 
     rv.set(v8::Integer::new(scope, id as i32).into());
 }
@@ -197,39 +227,38 @@ fn run_macrotasks(scope: &mut v8::HandleScope) -> bool {
             return false;
         };
 
-        if !queue.cleared.is_empty() {
-            let TimerQueue { tasks, cleared, .. } = &mut *queue;
-            tasks.retain(|timer| !cleared.contains(&timer.id));
-            cleared.clear();
+        // Drop cancelled timers as they surface at the head, so the earliest
+        // *live* timer is the peek. (The heap is a min-heap on (due, seq).)
+        while let Some(Reverse(head)) = queue.tasks.peek() {
+            if queue.cleared.remove(&head.id) {
+                queue.tasks.pop();
+            } else {
+                break;
+            }
         }
-        if queue.tasks.is_empty() {
+        let Some(Reverse(head)) = queue.tasks.peek() else {
             return false;
-        }
+        };
 
-        queue.tasks.sort_by(|a, b| {
-            a.due
-                .partial_cmp(&b.due)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then(a.seq.cmp(&b.seq))
-        });
-        let earliest = queue.tasks[0].due;
-        if earliest > queue.virtual_now {
-            queue.virtual_now = earliest;
+        if head.due > queue.virtual_now {
+            queue.virtual_now = head.due;
         }
         let now = queue.virtual_now;
 
-        // Take the generation due at `now`; a fired timer may enqueue more, which
-        // stays for the next call.
-        let mut remaining = Vec::with_capacity(queue.tasks.len());
+        // Take the generation due at `now`; a fired timer may enqueue more,
+        // which lands in the heap for the next call.
         let mut due = Vec::new();
-        for timer in queue.tasks.drain(..) {
-            if timer.due <= now {
+        while let Some(Reverse(head)) = queue.tasks.peek() {
+            if head.due > now {
+                break;
+            }
+            let Some(Reverse(timer)) = queue.tasks.pop() else {
+                break;
+            };
+            if !queue.cleared.remove(&timer.id) {
                 due.push(timer.callback);
-            } else {
-                remaining.push(timer);
             }
         }
-        queue.tasks = remaining;
         due
     };
 
@@ -318,6 +347,14 @@ fn pump_until(
 pub trait StreamSink {
     /// Handle one chunk emitted by the bundle (via the writer global).
     fn write_chunk(&mut self, chunk: &str);
+
+    /// Owned variant of [`StreamSink::write_chunk`]. The V8 bridge already
+    /// marshals each chunk into an owned `String`, so a sink that needs
+    /// ownership anyway (e.g. to send the chunk across a channel) can override
+    /// this and skip a second copy. The default delegates to `write_chunk`.
+    fn write_chunk_owned(&mut self, chunk: String) {
+        self.write_chunk(&chunk);
+    }
 }
 
 impl<F: FnMut(&str)> StreamSink for F {
@@ -372,7 +409,9 @@ fn stream_write_callback(
     // nested render installs its own slot value and restores ours, never
     // touching this pointee.
     let sink = unsafe { &mut *ptr };
-    sink.write_chunk(&chunk);
+    // `chunk` is already an owned marshal of the V8 string; hand over ownership
+    // so sinks that forward it (channels) need no second copy.
+    sink.write_chunk_owned(chunk);
 }
 
 /// A streaming render session over an [`Ssr`] isolate, created by
@@ -435,6 +474,33 @@ impl<'s, 'i> Streaming<'_, 's, 'i> {
     }
 }
 
+/// The result of building an [`Ssr`] from an ES module via
+/// [`Ssr::from_module_with_cache`]: the isolate itself plus the V8 **code
+/// cache** outcome (serialized Ignition bytecode + metadata that lets a later
+/// build skip the parse+compile of the same source).
+pub struct ModuleBuild<'s, 'i> {
+    pub ssr: Ssr<'s, 'i>,
+    /// Cache bytes serialized from a fresh eager compile (the produce path).
+    /// `None` when a supplied cache was consumed, or when V8 declined to
+    /// serialize the script.
+    pub produced_cache: Option<Vec<u8>>,
+    /// The supplied cache was rejected (stale V8 version/flags, corrupt bytes)
+    /// and the module was transparently recompiled from source instead —
+    /// [`ModuleBuild::ssr`] is still fully valid. Callers should drop the stale
+    /// cache so a later cold build regenerates it.
+    pub cache_rejected: bool,
+}
+
+/// How [`Ssr::build_module`] treats the V8 code cache for the module compile.
+enum CacheMode<'a> {
+    /// Plain compile: no cache produced or consumed ([`Ssr::from_module`]).
+    None,
+    /// Compile eagerly and serialize a fresh code cache.
+    Produce,
+    /// Compile consuming a previously produced code cache.
+    Consume(&'a [u8]),
+}
+
 /// This struct holds all the necessary v8 utilities to
 /// execute Javascript code.
 /// It cannot be shared across threads.
@@ -442,7 +508,7 @@ impl<'s, 'i> Streaming<'_, 's, 'i> {
 pub struct Ssr<'s, 'i> {
     isolate: *mut v8::OwnedIsolate,
     handle_scope: *mut v8::HandleScope<'s, ()>,
-    fn_map: HashMap<String, v8::Local<'s, v8::Function>>,
+    fn_map: FxHashMap<String, v8::Local<'s, v8::Function>>,
     scope: *mut v8::ContextScope<'i, v8::HandleScope<'s>>,
     /// The writer global installed by [`Ssr::streaming`], if any — so repeated
     /// `streaming` calls on this isolate don't re-allocate the V8 function.
@@ -477,6 +543,20 @@ where
     /// any call to V8. The Ssr module needs this function call before any other
     /// operation. It cannot be called more than once per process.
     pub fn create_platform() {
+        Self::create_platform_with_flags(None);
+    }
+
+    /// Like [`Ssr::create_platform`], but first hands `flags` (a space-separated
+    /// V8 command-line flag string, e.g. `"--no-lazy-feedback-allocation"`) to
+    /// V8. Flags must be set before initialization — this is the only point in
+    /// the process where they can take effect. Unknown flags are warned about
+    /// and ignored by V8, so passing through user-supplied flags is safe. When
+    /// two flags conflict, the later one wins.
+    pub fn create_platform_with_flags(flags: Option<&str>) {
+        if let Some(flags) = flags {
+            v8::V8::set_flags_from_string(flags);
+        }
+
         let platform = v8::new_default_platform(0, false).make_shared();
         v8::V8::initialize_platform(platform);
         v8::V8::initialize();
@@ -535,7 +615,7 @@ where
             }
         };
 
-        let mut fn_map: HashMap<String, v8::Local<v8::Function>> = HashMap::new();
+        let mut fn_map: FxHashMap<String, v8::Local<v8::Function>> = FxHashMap::default();
 
         if let Some(props) = object.get_own_property_names(scope, Default::default()) {
             // Replaces a `Some(props).iter()...collect()` that iterated the
@@ -593,6 +673,45 @@ where
     /// Named function exports become callable entry points, looked up by name in
     /// [`Ssr::render`] exactly like the script path.
     pub fn from_module(source: String) -> Result<Self, SsrError> {
+        // Plain compile (no cache produced or consumed), preserving the
+        // pre-code-cache behaviour for existing callers.
+        Self::build_module(source, CacheMode::None).map(|build| build.ssr)
+    }
+
+    /// Like [`Ssr::from_module`], but produces or consumes a V8 **code cache**
+    /// so the parse+compile of a large bundle is paid once rather than per
+    /// isolate:
+    ///
+    /// * `code_cache: None` — compile the source **eagerly** (every function
+    ///   body is compiled up front instead of lazily on first call) and
+    ///   serialize the bytecode into [`ModuleBuild::produced_cache`]. Eager
+    ///   compilation makes the cache complete — a lazy compile would serialize
+    ///   stubs for uncalled functions.
+    /// * `code_cache: Some(bytes)` — compile consuming a cache previously
+    ///   produced from the **same source** on the same V8 version/flags,
+    ///   skipping parse+compile. A mismatched cache is never an error: V8
+    ///   transparently falls back to compiling from source and this reports
+    ///   [`ModuleBuild::cache_rejected`] so the caller can discard the stale
+    ///   bytes.
+    ///
+    /// **The caller owns cache↔source pairing.** V8's own sanity check is
+    /// shallow — version tag, flags and source *length* — so a cache produced
+    /// from different source of the same length is silently accepted and the
+    /// *cached* code runs. Key stored caches by the exact source contents
+    /// (hash or equivalent) and never consume a cache that might not match.
+    pub fn from_module_with_cache(
+        source: String,
+        code_cache: Option<&[u8]>,
+    ) -> Result<ModuleBuild<'s, 'i>, SsrError> {
+        match code_cache {
+            Some(bytes) => Self::build_module(source, CacheMode::Consume(bytes)),
+            None => Self::build_module(source, CacheMode::Produce),
+        }
+    }
+
+    /// Shared ES-module build behind [`Ssr::from_module`] /
+    /// [`Ssr::from_module_with_cache`]; only the compile step varies by `cache`.
+    fn build_module(source: String, cache: CacheMode<'_>) -> Result<ModuleBuild<'s, 'i>, SsrError> {
         let isolate = Box::into_raw(Box::new(v8::Isolate::new(v8::CreateParams::default())));
 
         let handle_scope = unsafe { Box::into_raw(Box::new(v8::HandleScope::new(&mut *isolate))) };
@@ -628,11 +747,62 @@ where
             true,  // is_module
             None,  // host_defined_options
         );
-        let mut module_source = v8::script_compiler::Source::new(code, Some(&origin));
+        let mut produced_cache: Option<Vec<u8>> = None;
+        let mut cache_rejected = false;
 
-        let module = match v8::script_compiler::compile_module(scope, &mut module_source) {
-            Some(val) => val,
-            None => return Err(SsrError::InvalidJs("Failed to compile the module")),
+        let module = match cache {
+            CacheMode::None => {
+                let mut module_source = v8::script_compiler::Source::new(code, Some(&origin));
+                match v8::script_compiler::compile_module(scope, &mut module_source) {
+                    Some(val) => val,
+                    None => return Err(SsrError::InvalidJs("Failed to compile the module")),
+                }
+            }
+            CacheMode::Produce => {
+                let mut module_source = v8::script_compiler::Source::new(code, Some(&origin));
+                let module = match v8::script_compiler::compile_module2(
+                    scope,
+                    &mut module_source,
+                    v8::script_compiler::CompileOptions::EagerCompile,
+                    v8::script_compiler::NoCacheReason::NoReason,
+                ) {
+                    Some(val) => val,
+                    None => return Err(SsrError::InvalidJs("Failed to compile the module")),
+                };
+                // Serialize immediately after the compile, before
+                // `instantiate_module` — the point at which the unbound script
+                // is complete and untouched by evaluation state (the same
+                // ordering deno_core uses). `create_code_cache` returning
+                // `None` (unserialisable script) just means no cache.
+                produced_cache = module
+                    .get_unbound_module_script(scope)
+                    .create_code_cache()
+                    .map(|data| data.to_vec());
+                module
+            }
+            CacheMode::Consume(bytes) => {
+                // `CachedData::new` borrows `bytes` (it does not copy); the
+                // borrow is safe here because `bytes` outlives this whole call.
+                let cached = v8::script_compiler::CachedData::new(bytes);
+                let mut module_source =
+                    v8::script_compiler::Source::new_with_cached_data(code, Some(&origin), cached);
+                let module = match v8::script_compiler::compile_module2(
+                    scope,
+                    &mut module_source,
+                    v8::script_compiler::CompileOptions::ConsumeCodeCache,
+                    v8::script_compiler::NoCacheReason::NoReason,
+                ) {
+                    Some(val) => val,
+                    None => return Err(SsrError::InvalidJs("Failed to compile the module")),
+                };
+                // A rejected cache is not an error: V8 falls back to a full
+                // parse+compile and the module is valid. Report it so the
+                // caller can discard the stale bytes.
+                cache_rejected = module_source
+                    .get_cached_data()
+                    .is_none_or(|data| data.rejected());
+                module
+            }
         };
 
         // The bundle is inlined, so instantiation resolves no imports.
@@ -685,7 +855,7 @@ where
             None => return Err(SsrError::InvalidJs("The module namespace is not an object")),
         };
 
-        let mut fn_map: HashMap<String, v8::Local<v8::Function>> = HashMap::new();
+        let mut fn_map: FxHashMap<String, v8::Local<v8::Function>> = FxHashMap::default();
 
         if let Some(props) = object.get_own_property_names(scope, Default::default()) {
             for i in 0..props.length() {
@@ -716,13 +886,17 @@ where
             }
         }
 
-        Ok(Ssr {
-            isolate,
-            handle_scope,
-            fn_map,
-            scope: scope_ptr,
-            stream_writer: None,
-            timer_queue,
+        Ok(ModuleBuild {
+            ssr: Ssr {
+                isolate,
+                handle_scope,
+                fn_map,
+                scope: scope_ptr,
+                stream_writer: None,
+                timer_queue,
+            },
+            produced_cache,
+            cache_rejected,
         })
     }
 
@@ -768,9 +942,8 @@ where
 
         let mut rendered = String::new();
 
-        // TODO: transform this into an iterator
-        for key in self.fn_map.keys() {
-            let mut result = match self.fn_map[key].call(scope, undef, &[params]) {
+        for func in self.fn_map.values() {
+            let mut result = match func.call(scope, undef, &[params]) {
                 Some(val) => val,
                 None => return Err(SsrError::FailedJsExecution("Failed to call function")),
             };
@@ -803,7 +976,7 @@ where
                 }
             };
 
-            rendered = format!("{}{}", rendered, result.to_rust_string_lossy(scope));
+            rendered.push_str(&result.to_rust_string_lossy(scope));
         }
 
         Ok(rendered)
@@ -1134,6 +1307,80 @@ mod tests {
         let mut js = Ssr::from_module(source).unwrap();
         assert_eq!(js.render("first", None).unwrap(), "<html>first</html>");
         assert_eq!(js.render("second", None).unwrap(), "<html>clean</html>");
+    }
+
+    #[test]
+    fn code_cache_round_trip_renders_identically() {
+        init_test();
+
+        let source = r##"
+            const prefix = "<html>";
+            export function renderFn(payload) { return prefix + (payload || "empty") + "</html>"; }
+        "##
+        .to_string();
+
+        // Produce: eager compile serializes a cache.
+        let produced = Ssr::from_module_with_cache(source.clone(), None).unwrap();
+        assert!(!produced.cache_rejected);
+        let cache = produced
+            .produced_cache
+            .expect("eager compile should produce a code cache");
+        assert!(!cache.is_empty());
+        let mut cold = produced.ssr;
+
+        // Consume: same source + fresh cache must be accepted, not re-produced.
+        let consumed = Ssr::from_module_with_cache(source, Some(&cache)).unwrap();
+        assert!(!consumed.cache_rejected, "fresh cache must not be rejected");
+        assert!(consumed.produced_cache.is_none());
+        let mut warm = consumed.ssr;
+
+        // Isolates are dropped in reverse creation order (`warm` then `cold`)
+        // as rusty_v8 requires — reverse declaration order does that here.
+        assert_eq!(
+            warm.render("renderFn", Some("X")).unwrap(),
+            cold.render("renderFn", Some("X")).unwrap(),
+        );
+        assert_eq!(warm.render("renderFn", None).unwrap(), "<html>empty</html>");
+    }
+
+    #[test]
+    fn garbage_code_cache_is_rejected_but_still_renders() {
+        init_test();
+
+        let source = r##"export function renderFn() { return "<html>ok</html>"; }"##;
+        let garbage = vec![0xA5u8; 128];
+
+        let build = Ssr::from_module_with_cache(source.to_string(), Some(&garbage)).unwrap();
+        assert!(build.cache_rejected, "garbage bytes must be rejected");
+        assert!(build.produced_cache.is_none());
+
+        // Rejection is transparent: V8 recompiled from source and the isolate works.
+        let mut ssr = build.ssr;
+        assert_eq!(ssr.render("renderFn", None).unwrap(), "<html>ok</html>");
+    }
+
+    #[test]
+    fn mismatched_source_code_cache_is_rejected_but_still_renders() {
+        init_test();
+
+        // V8's sanity check only compares source LENGTH (plus version/flags) —
+        // a same-length different source would be silently accepted, which is
+        // why callers must key caches by source contents (see the
+        // `from_module_with_cache` docs). Different lengths ARE detected.
+        let source_a = r##"export function renderFn() { return "<html>A</html>"; }"##.to_string();
+        let source_b =
+            r##"export function renderFn() { return "<html>BBBB</html>"; }"##.to_string();
+
+        let produced = Ssr::from_module_with_cache(source_a, None).unwrap();
+        let cache = produced.produced_cache.expect("cache should be produced");
+        drop(produced.ssr);
+
+        // A different-length source must reject the cache — and the render
+        // must reflect the *supplied* source, not the cached one.
+        let build = Ssr::from_module_with_cache(source_b, Some(&cache)).unwrap();
+        assert!(build.cache_rejected);
+        let mut ssr = build.ssr;
+        assert_eq!(ssr.render("renderFn", None).unwrap(), "<html>BBBB</html>");
     }
 
     #[test]

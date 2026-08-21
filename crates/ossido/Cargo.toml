@@ -64,3 +64,7 @@ serial_test = "4.0.1"
 [[bench]]
 name = "streaming_vs_buffered"
 harness = false
+
+[[bench]]
+name = "compile_code_cache"
+harness = false
