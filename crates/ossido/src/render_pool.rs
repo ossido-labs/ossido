@@ -209,8 +209,7 @@ fn sender() -> &'static Sender<Job> {
                                 // owned `String` the V8 bridge marshalled, so
                                 // nothing is re-copied on this thread.
                                 let sink = ChannelSink(chunks.clone());
-                                let result =
-                                    guarded(|| Js::render_stream(Some(&payload), sink));
+                                let result = guarded(|| Js::render_stream(Some(&payload), sink));
                                 log_render_error(result.as_ref().err());
                                 let _ = chunks.send(StreamMsg::Done(result));
                             }

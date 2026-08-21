@@ -141,7 +141,9 @@ fn cached_data_version_tag() -> u32 {
 /// Disk persistence escape hatch: `OSSIDO_SSR_DISK_CACHE=0` disables it (the
 /// in-process cache still works).
 fn disk_cache_enabled() -> bool {
-    std::env::var("OSSIDO_SSR_DISK_CACHE").map(|v| v != "0").unwrap_or(true)
+    std::env::var("OSSIDO_SSR_DISK_CACHE")
+        .map(|v| v != "0")
+        .unwrap_or(true)
 }
 
 /// Content fingerprint for the disk header. Hash stability across builds is
@@ -275,8 +277,8 @@ fn compile_with_shared_cache(
     }
 
     // The produce call consumes `source`; hash it first for the disk header.
-    let header = (disk && disk_cache_enabled())
-        .then(|| (source.len() as u64, source_fingerprint(&source)));
+    let header =
+        (disk && disk_cache_enabled()).then(|| (source.len() as u64, source_fingerprint(&source)));
     let build = Ssr::from_module_with_cache(source, None)?;
     if let Some(produced) = build.produced_cache {
         if let Some((source_len, fingerprint)) = header {

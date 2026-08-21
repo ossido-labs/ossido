@@ -1367,8 +1367,7 @@ mod tests {
         // a same-length different source would be silently accepted, which is
         // why callers must key caches by source contents (see the
         // `from_module_with_cache` docs). Different lengths ARE detected.
-        let source_a =
-            r##"export function renderFn() { return "<html>A</html>"; }"##.to_string();
+        let source_a = r##"export function renderFn() { return "<html>A</html>"; }"##.to_string();
         let source_b =
             r##"export function renderFn() { return "<html>BBBB</html>"; }"##.to_string();
 
