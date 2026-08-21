@@ -49,13 +49,22 @@ jobs:
         run: bun run build
 
       # Pack with bun (rewrites `workspace:*` -> concrete versions, which npm
-      # cannot do), then validate the tarball with `npm publish --dry-run`. The
-      # dry run also fails fast if the version already exists on the registry.
+      # cannot do), then validate the tarball with `npm publish --dry-run`. On a
+      # fresh release the dry run also fails fast if the version already exists;
+      # on a RESUMED partially-published release an existing version is expected
+      # — the dry-run publish is skipped (the tarball still packs, and the real
+      # publish job skips the same package the same way).
       - name: Pack and validate
         working-directory: packages/${{ matrix.package }}
         run: |
           TARBALL=$(bun pm pack --quiet --ignore-scripts | tail -1)
-          npm publish "./$TARBALL" --dry-run --access public
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
+            echo "::notice::${NAME}@${VERSION} is already on npm - skipping dry-run publish"
+          else
+            npm publish "./$TARBALL" --dry-run --access public
+          fi
 
   publish_crates_dry_run:
     name: Crates publish (dry run)
@@ -82,12 +91,36 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: bun scripts/set-version.ts "${TAG#v}"
 
+      # Resume support: when every workspace crate's version is already on
+      # crates.io (a resumed partially-published release), there is nothing
+      # left to validate — skip the dry run entirely. Keep the crate list in
+      # sync with the publish_crates matrix. The API requires a descriptive
+      # User-Agent (crates.io data-access policy).
+      - name: Check crates.io for existing publishes
+        id: published
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG#v}"
+          ALL=true
+          for crate in ossido_macros ossido_internal ossido_ssr ossido ossido_cli; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -A "ossido-release-workflow (github.com/ossido-labs/ossido)" \
+              "https://crates.io/api/v1/crates/${crate}/${VERSION}")
+            if [ "$STATUS" != "200" ]; then ALL=false; fi
+          done
+          if [ "$ALL" = "true" ]; then
+            echo "::notice::all workspace crates already on crates.io at ${VERSION} - skipping dry run"
+          fi
+          echo "all=$ALL" >> "$GITHUB_OUTPUT"
+
       # `--workspace` (not per-crate `-p`) so cargo resolves the bumped
       # interdependency versions from the local workspace — a per-crate dry run
       # would fail to resolve e.g. `ossido_internal = "<new>"` from crates.io
       # before it is published. `--no-verify` skips the compile (covered by Rust
       # CI); `--allow-dirty` includes the uncommitted version stamp.
       - name: Publish (dry run)
+        if: steps.published.outputs.all == 'false'
         run: cargo publish --workspace --dry-run --no-verify --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -290,12 +323,20 @@ jobs:
 
       # Validate the tarball shape of the meta + create-ossido + every platform
       # package (platform binaries are absent here; `files` just omits them).
+      # Resume support: a package already on npm at this version (from a prior
+      # partial run) skips its dry-run publish — the tarball still packs.
       - name: Pack and validate
         run: |
           for dir in packages/ossido-cli packages/create-ossido npm/platforms/*/; do
             echo "::group::$dir"
             TARBALL=$(cd "$dir" && bun pm pack --quiet --ignore-scripts | tail -1)
-            (cd "$dir" && npm publish "./$TARBALL" --dry-run --access public)
+            NAME=$(node -p "require('./$dir/package.json').name")
+            VERSION=$(node -p "require('./$dir/package.json').version")
+            if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
+              echo "::notice::${NAME}@${VERSION} is already on npm - skipping dry-run publish"
+            else
+              (cd "$dir" && npm publish "./$TARBALL" --dry-run --access public)
+            fi
             echo "::endgroup::"
           done
 
