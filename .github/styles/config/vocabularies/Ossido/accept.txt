@@ -100,8 +100,10 @@ globals
 macrotask
 microtask
 codex
+codec
 codecs
 embedder
+embedders
 prebaking
 timerless
 async
