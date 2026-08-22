@@ -1,6 +1,6 @@
 {
   "name": "@ossido-labs/cli-win32-x64-msvc",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Prebuilt ossido CLI binary for Windows x64.",
   "homepage": "https://ossido.dev",
   "repository": {
