@@ -215,6 +215,109 @@ fn set_global_fn(
     }
 }
 
+/// `__ossido_encode_utf8(string) -> Uint8Array` — the native backend of the
+/// runtime's `TextEncoder`. V8 writes the UTF-8 bytes directly (C++ speed);
+/// a pure-JS polyfill costs milliseconds per megabyte, which dominates large
+/// SSR documents (React encodes every chunk it emits into the byte stream).
+fn encode_utf8_callback(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let Some(string) = args.get(0).to_string(scope) else {
+        return;
+    };
+    let len = string.utf8_length(scope);
+    let mut bytes = vec![0u8; len];
+    string.write_utf8_v2(scope, &mut bytes, v8::WriteFlags::kReplaceInvalidUtf8, None);
+    let store = v8::ArrayBuffer::new_backing_store_from_vec(bytes).make_shared();
+    let buffer = v8::ArrayBuffer::with_backing_store(scope, &store);
+    if let Some(array) = v8::Uint8Array::new(scope, buffer, 0, len) {
+        rv.set(array.into());
+    }
+}
+
+/// `__ossido_decode_utf8(bytesLike) -> string` — the native backend of the
+/// runtime's `TextDecoder`. Accepts any ArrayBufferView (respecting its
+/// offset/length window) or a whole ArrayBuffer; invalid sequences decode
+/// lossily (U+FFFD), matching `TextDecoder`'s non-fatal default.
+fn decode_utf8_callback(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let arg = args.get(0);
+    let mut bytes: Vec<u8>;
+    if let Ok(view) = v8::Local::<v8::ArrayBufferView>::try_from(arg) {
+        bytes = vec![0u8; view.byte_length()];
+        view.copy_contents(&mut bytes);
+    } else if let Ok(buffer) = v8::Local::<v8::ArrayBuffer>::try_from(arg) {
+        let store = buffer.get_backing_store();
+        bytes = store.iter().map(|cell| cell.get()).collect();
+    } else {
+        return;
+    }
+
+    let text = String::from_utf8_lossy(&bytes);
+    if let Some(string) = v8::String::new(scope, &text) {
+        rv.set(string.into());
+    }
+}
+
+/// The `TextEncoder`/`TextDecoder` classes installed over the native codec
+/// callbacks. Deliberately minimal — utf-8 only, no `stream`/`fatal` options —
+/// the same surface the common JS polyfills expose (they throw on those options
+/// too), so bundles behave identically, just at native speed. Bundled polyfills
+/// guard with `scope.TextEncoder = scope.TextEncoder || …`, so these natives
+/// (installed before the bundle evaluates) win.
+const TEXT_CODEC_BOOTSTRAP: &str = r#"
+(function () {
+  "use strict";
+  function unsupported(option, method) {
+    throw new Error("Failed to " + method + ": the '" + option + "' option is unsupported.");
+  }
+  class TextEncoder {
+    get encoding() { return "utf-8"; }
+    encode(input, options) {
+      if (options && options.stream) unsupported("stream", "encode");
+      return __ossido_encode_utf8(input === undefined ? "" : String(input));
+    }
+  }
+  class TextDecoder {
+    constructor(label, options) {
+      var utf8 = ["utf-8", "utf8", "unicode-1-1-utf-8"];
+      if (label !== undefined && utf8.indexOf(String(label).toLowerCase()) === -1) {
+        throw new RangeError("The encoding label provided ('" + label + "') is invalid.");
+      }
+      if (options && options.fatal) unsupported("fatal", "construct 'TextDecoder'");
+      this.fatal = false;
+      this.ignoreBOM = false;
+    }
+    get encoding() { return "utf-8"; }
+    decode(input, options) {
+      if (options && options.stream) unsupported("stream", "decode");
+      if (input === undefined) return "";
+      return __ossido_decode_utf8(input);
+    }
+  }
+  globalThis.TextEncoder = TextEncoder;
+  globalThis.TextDecoder = TextDecoder;
+})();
+"#;
+
+/// Install native UTF-8 `TextEncoder`/`TextDecoder` globals: two Rust-backed
+/// codec functions plus a small bootstrap script defining the classes. Must run
+/// before the bundle evaluates so conditional polyfills keep the natives.
+fn install_text_codecs(scope: &mut v8::HandleScope) {
+    set_global_fn(scope, "__ossido_encode_utf8", encode_utf8_callback);
+    set_global_fn(scope, "__ossido_decode_utf8", decode_utf8_callback);
+    if let Some(code) = v8::String::new(scope, TEXT_CODEC_BOOTSTRAP) {
+        if let Some(script) = v8::Script::compile(scope, code, None) {
+            let _ = script.run(scope);
+        }
+    }
+}
+
 /// Run one generation of due timers (the macrotask drain): fire every timer due
 /// at the current virtual time, advancing the clock to the earliest pending
 /// timer when nothing is due yet. Returns whether any timer ran — the progress
@@ -591,6 +694,10 @@ where
 
         let scope = unsafe { &mut *scope_ptr };
 
+        // Native `TextEncoder`/`TextDecoder` before the bundle runs, so its
+        // conditional polyfills keep them.
+        install_text_codecs(scope);
+
         let code = match v8::String::new(scope, &format!("{source};{entry_point}")) {
             Some(val) => val,
             None => return Err(SsrError::InvalidJs("Strings are needed")),
@@ -817,6 +924,11 @@ where
         // `MessageChannel` delivery, which uses it) is available to the bundle —
         // including at top-level-await time.
         let timer_queue = install_timers(scope, isolate);
+
+        // Native `TextEncoder`/`TextDecoder` before the bundle runs, so its
+        // conditional polyfills keep them (pure-JS codecs are the dominant
+        // per-render cost on large documents).
+        install_text_codecs(scope);
 
         // For a module with top-level await, `evaluate` returns a promise that
         // settles when the whole module (including its awaits) is done. Drive
@@ -1381,6 +1493,56 @@ mod tests {
         assert!(build.cache_rejected);
         let mut ssr = build.ssr;
         assert_eq!(ssr.render("renderFn", None).unwrap(), "<html>BBBB</html>");
+    }
+
+    #[test]
+    fn native_text_codecs_round_trip() {
+        init_test();
+
+        let source = r##"
+            export function renderFn() {
+                const encoder = new TextEncoder();
+                const decoder = new TextDecoder();
+                const input = "héllo wörld — 日本語 🎉";
+                const bytes = encoder.encode(input);
+                const roundTrip = decoder.decode(bytes);
+                // A subarray view must decode through its window, not the
+                // whole buffer ("h" is 1 byte, so [1..] starts at "é").
+                const tail = decoder.decode(bytes.subarray(1));
+                const checks = [
+                    roundTrip === input,
+                    decoder.decode(bytes.buffer) === input,
+                    input.startsWith("h") && ("h" + tail) === input,
+                    encoder.encode("").length === 0,
+                    decoder.decode(new Uint8Array(0)) === "",
+                    new TextEncoder().encoding === "utf-8",
+                ];
+                return checks.every(Boolean) ? "ok" : "FAIL:" + JSON.stringify(checks);
+            }
+        "##
+        .to_string();
+
+        let mut js = Ssr::from_module(source).unwrap();
+        assert_eq!(js.render("renderFn", None).unwrap(), "ok");
+    }
+
+    #[test]
+    fn native_text_codecs_survive_conditional_polyfills() {
+        init_test();
+
+        // The polyfill guard pattern every bundle uses: an existing global wins.
+        let source = r##"
+            const scope = globalThis;
+            const before = scope.TextEncoder;
+            scope.TextEncoder = scope.TextEncoder || function Polyfill() {};
+            export function renderFn() {
+                return scope.TextEncoder === before ? "native kept" : "clobbered";
+            }
+        "##
+        .to_string();
+
+        let mut js = Ssr::from_module(source).unwrap();
+        assert_eq!(js.render("renderFn", None).unwrap(), "native kept");
     }
 
     #[test]
