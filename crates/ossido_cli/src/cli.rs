@@ -93,6 +93,9 @@ enum Actions {
         /// Do not run `cargo update` / package-manager install after rewriting manifests
         #[arg(long)]
         no_install: bool,
+        /// Offer prerelease beta builds as upgrade targets
+        #[arg(long)]
+        include_beta: bool,
     },
 }
 
@@ -206,6 +209,7 @@ pub fn app() -> std::io::Result<()> {
             dry_run,
             yes,
             no_install,
+            include_beta,
         } => {
             let span = span!(Level::TRACE, "UPGRADE");
             let _guard = span.enter();
@@ -215,6 +219,7 @@ pub fn app() -> std::io::Result<()> {
                 dry_run,
                 yes,
                 no_install,
+                include_beta,
             });
         }
     }

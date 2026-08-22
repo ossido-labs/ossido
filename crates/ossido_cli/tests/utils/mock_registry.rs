@@ -14,6 +14,16 @@ pub struct RegistryMock {
 impl RegistryMock {
     /// Start a server that reports `latest` as the newest ossido on both registries.
     pub async fn new(latest: &str) -> Self {
+        Self::with_dist_tags(latest, None).await
+    }
+
+    /// Like [`RegistryMock::new`], but the npm side also carries a `beta`
+    /// dist-tag (the release workflow's prerelease channel).
+    pub async fn with_beta(latest: &str, beta: &str) -> Self {
+        Self::with_dist_tags(latest, Some(beta)).await
+    }
+
+    async fn with_dist_tags(latest: &str, beta: Option<&str>) -> Self {
         let server = MockServer::start().await;
 
         Mock::given(method("GET"))
@@ -27,12 +37,16 @@ impl RegistryMock {
             .mount(&server)
             .await;
 
+        let dist_tags = match beta {
+            Some(beta) => format!("{{\"latest\":\"{latest}\",\"beta\":\"{beta}\"}}"),
+            None => format!("{{\"latest\":\"{latest}\"}}"),
+        };
         Mock::given(method("GET"))
             .and(path("/@ossido-labs/ossido"))
-            .respond_with(ResponseTemplate::new(200).set_body_raw(
-                format!("{{\"dist-tags\":{{\"latest\":\"{latest}\"}}}}"),
-                "application/json",
-            ))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_raw(format!("{{\"dist-tags\":{dist_tags}}}"), "application/json"),
+            )
             .mount(&server)
             .await;
 

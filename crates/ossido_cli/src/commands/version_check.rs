@@ -33,6 +33,9 @@ struct NpmResponse {
 #[derive(Deserialize)]
 struct NpmDistTags {
     latest: String,
+    /// The `beta` dist-tag the release workflow assigns to prerelease builds
+    /// (`X.Y.Z-beta.<timestamp>Z`). Absent until a beta has been published.
+    beta: Option<String>,
 }
 
 /// A blocking client with a real User-Agent — crates.io rejects requests that
@@ -80,6 +83,20 @@ pub fn latest_npm_version(client: &Client, base: &str) -> Option<String> {
     Some(body.dist_tags.latest)
 }
 
+/// Latest beta (`X.Y.Z-beta.<timestamp>Z`) of `@ossido-labs/ossido`, or `None`
+/// when no beta is published (or on any failure). npm is authoritative here:
+/// the release workflow assigns the `beta` dist-tag there, while crates.io has
+/// no tag concept.
+pub fn npm_beta_version(client: &Client, base: &str) -> Option<String> {
+    let url = format!("{base}/@ossido-labs/ossido");
+    let res = client.get(url).send().ok()?;
+    if !res.status().is_success() {
+        return None;
+    }
+    let body: NpmResponse = res.json().ok()?;
+    body.dist_tags.beta
+}
+
 /// The version both commands should treat as "latest". crates.io first, npm
 /// fallback. `offline` short-circuits to `None` without touching the network.
 pub fn latest_version(offline: bool) -> Option<String> {
@@ -89,6 +106,17 @@ pub fn latest_version(offline: bool) -> Option<String> {
     let client = client()?;
     let (crates_base, npm_base) = registry_bases();
     latest_crate_version(&client, &crates_base).or_else(|| latest_npm_version(&client, &npm_base))
+}
+
+/// The newest published beta, or `None` when there is none. `offline`
+/// short-circuits without touching the network.
+pub fn latest_beta_version(offline: bool) -> Option<String> {
+    if offline {
+        return None;
+    }
+    let client = client()?;
+    let (_, npm_base) = registry_bases();
+    npm_beta_version(&client, &npm_base)
 }
 
 /// A `major.minor.patch` version for ordering. Pre-release / build metadata is
@@ -182,6 +210,23 @@ mod tests {
         assert!(!is_behind("0.1.4", "0.1.4"));
         assert!(!is_behind("0.2.0", "0.1.4"));
         assert!(!is_behind("garbage", "0.1.4"));
+    }
+
+    #[test]
+    fn parses_npm_dist_tags_with_and_without_beta() {
+        let with: NpmResponse = serde_json::from_str(
+            r#"{"dist-tags":{"latest":"0.1.7","beta":"0.1.8-beta.20260822034020Z"}}"#,
+        )
+        .unwrap();
+        assert_eq!(with.dist_tags.latest, "0.1.7");
+        assert_eq!(
+            with.dist_tags.beta.as_deref(),
+            Some("0.1.8-beta.20260822034020Z")
+        );
+
+        let without: NpmResponse =
+            serde_json::from_str(r#"{"dist-tags":{"latest":"0.1.7"}}"#).unwrap();
+        assert_eq!(without.dist_tags.beta, None);
     }
 
     #[test]

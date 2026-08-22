@@ -3,10 +3,85 @@ name: Publish on npm and crates
 on:
   release:
     types: [published]
+  # Manual beta release: publishes every crate and npm package at
+  # `<version>-beta.<UTC timestamp>Z`, npm dist-tagged `beta` (so `latest`
+  # never moves) — see the `resolve` job.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Base semver for the beta (X.Y.Z — the -beta.<timestamp>Z suffix is appended)'
+        required: true
+        type: string
 
 jobs:
+  # Resolve the version this run publishes, once, so every job agrees:
+  #  * release event — the tag name (a leading `v` is tolerated and stripped).
+  #  * manual dispatch (beta) — `<input>-beta.<UTC timestamp>Z`. The single
+  #    timestamp comes from this job's outputs, so all jobs stamp the same
+  #    version; a fresh timestamp per dispatch also means a re-run never
+  #    collides with an earlier partial beta on the immutable registries.
+  resolve:
+    name: Resolve release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      dist_tag: ${{ steps.resolve.outputs.dist_tag }}
+    steps:
+      - name: Resolve
+        id: resolve
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if ! echo "$INPUT_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::version must be bare semver (X.Y.Z), got '$INPUT_VERSION'"
+              exit 1
+            fi
+            VERSION="${INPUT_VERSION}-beta.$(date -u +%Y%m%d%H%M%S)Z"
+            DIST_TAG="beta"
+          else
+            VERSION="${TAG#v}"
+            DIST_TAG="latest"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "::notice::releasing $VERSION (npm dist-tag: $DIST_TAG)"
+
+  # Betas have no GitHub release, but the published CLI pins its scaffold
+  # templates to the git tag matching its crate version — push that tag for
+  # the dispatched commit. Authenticated as the release app (ruleset bypass),
+  # like the version-bump commit.
+  tag_beta:
+    name: Tag beta commit
+    if: github.event_name == 'workflow_dispatch'
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Mint release app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Push the beta tag
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          git tag "$VERSION"
+          git push origin "refs/tags/$VERSION"
+
   publish_npm_dry_run:
     name: NPM publish (dry run) - ${{ matrix.package }}
+    needs: resolve
     runs-on: ubuntu-latest
 
     strategy:
@@ -40,9 +115,9 @@ jobs:
       # grafting the package onto the root manifest.
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          bun scripts/set-version.ts "${TAG#v}"
+          bun scripts/set-version.ts "$VERSION"
           bun install --lockfile-only
 
       - name: Build
@@ -68,6 +143,7 @@ jobs:
 
   publish_crates_dry_run:
     name: Crates publish (dry run)
+    needs: resolve
     runs-on: ubuntu-latest
 
     steps:
@@ -88,8 +164,8 @@ jobs:
       # with the release tag version before packaging.
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: bun scripts/set-version.ts "${TAG#v}"
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: bun scripts/set-version.ts "$VERSION"
 
       # Resume support: when every workspace crate's version is already on
       # crates.io (a resumed partially-published release), there is nothing
@@ -99,9 +175,8 @@ jobs:
       - name: Check crates.io for existing publishes
         id: published
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          VERSION="${TAG#v}"
           ALL=true
           for crate in ossido_macros ossido_internal ossido_ssr ossido ossido_cli; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -127,7 +202,7 @@ jobs:
 
   publish_npm:
     name: NPM publish - ${{ matrix.package }}
-    needs: [publish_npm_dry_run, publish_crates_dry_run]
+    needs: [resolve, publish_npm_dry_run, publish_crates_dry_run]
     runs-on: ubuntu-latest
 
     # npm trusted publishing (OIDC): npm authenticates to the registry with a
@@ -166,9 +241,9 @@ jobs:
       # grafting the package onto the root manifest.
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          bun scripts/set-version.ts "${TAG#v}"
+          bun scripts/set-version.ts "$VERSION"
           bun install --lockfile-only
 
       # Trusted publishing (OIDC) needs npm >= 11.5.1. Node 24 already ships
@@ -211,11 +286,11 @@ jobs:
       - name: Publish to npm
         if: steps.published.outputs.exists == 'false'
         working-directory: packages/${{ matrix.package }}
-        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public --tag ${{ needs.resolve.outputs.dist_tag }}
 
   publish_crates:
     name: Crates publish - ${{ matrix.crate }}
-    needs: [publish_npm_dry_run, publish_crates_dry_run]
+    needs: [resolve, publish_npm_dry_run, publish_crates_dry_run]
     runs-on: ubuntu-latest
 
     strategy:
@@ -251,8 +326,8 @@ jobs:
       # with the release tag version before publishing.
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: bun scripts/set-version.ts "${TAG#v}"
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: bun scripts/set-version.ts "$VERSION"
 
       # Resume support: crates.io versions are immutable, so a re-run of a
       # partially-published release must skip crates that already made it out.
@@ -260,9 +335,8 @@ jobs:
       - name: Check crates.io for an existing publish
         id: published
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          VERSION="${TAG#v}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -A "ossido-release-workflow (github.com/ossido-labs/ossido)" \
             "https://crates.io/api/v1/crates/${{ matrix.crate }}/${VERSION}")
@@ -287,6 +361,7 @@ jobs:
 
   publish_cli_dry_run:
     name: CLI npm packages (dry run)
+    needs: resolve
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -297,18 +372,18 @@ jobs:
 
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          bun scripts/set-version.ts "${TAG#v}"
+          bun scripts/set-version.ts "$VERSION"
           bun install --lockfile-only
 
       # Fail fast if set-version missed the meta-package's optionalDependencies
       # (they must all equal the release version, or installs resolve stale binaries).
       - name: Assert optionalDependencies are pinned to the release version
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          VERSION="${TAG#v}" node -e '
+          node -e '
             const p = require("./packages/ossido-cli/package.json");
             const bad = Object.entries(p.optionalDependencies || {})
               .filter(([, v]) => v !== process.env.VERSION);
@@ -342,7 +417,13 @@ jobs:
 
   build_cli_binaries:
     name: Build ossido binary - ${{ matrix.pkg }}
-    needs: [publish_npm_dry_run, publish_crates_dry_run, publish_cli_dry_run]
+    needs:
+      [
+        resolve,
+        publish_npm_dry_run,
+        publish_crates_dry_run,
+        publish_cli_dry_run,
+      ]
     strategy:
       fail-fast: true
       matrix:
@@ -444,14 +525,14 @@ jobs:
       # Stamp the crate version so the binary's `--version` / `crate_version!()`
       # (used by `ossido new` to pin templates) reports the release version.
       # `shell: bash` is required: this matrix includes windows-latest, whose
-      # default shell is PowerShell — there `"${TAG#v}"` is not a strip-prefix
-      # expansion but a lookup of a variable literally named `TAG#v`, which
-      # expands to "" and fails set-version's semver check.
+      # default shell is PowerShell — there env vars read as `$env:VERSION`,
+      # so a bare `"$VERSION"` expands to "" and fails set-version's semver
+      # check.
       - name: Set version from release tag
         shell: bash
         env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: bun scripts/set-version.ts "${TAG#v}"
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: bun scripts/set-version.ts "$VERSION"
 
       - name: Install cross
         if: matrix.cross
@@ -482,7 +563,7 @@ jobs:
 
   publish_cli_platforms:
     name: NPM publish platform - ${{ matrix.pkg }}
-    needs: [build_cli_binaries]
+    needs: [resolve, build_cli_binaries]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -523,8 +604,8 @@ jobs:
 
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: bun scripts/set-version.ts "${TAG#v}"
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: bun scripts/set-version.ts "$VERSION"
 
       - name: Download binary artifact
         uses: actions/download-artifact@v4
@@ -559,13 +640,13 @@ jobs:
       - name: Publish to npm
         if: steps.published.outputs.exists == 'false'
         working-directory: npm/platforms/${{ matrix.pkg }}
-        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public --tag ${{ needs.resolve.outputs.dist_tag }}
 
   publish_cli_meta:
     name: NPM publish - ossido-cli (meta)
     # Publish the meta-package after its platform packages so an install right
     # after release can always resolve the matching binary.
-    needs: [publish_cli_platforms]
+    needs: [resolve, publish_cli_platforms]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -579,9 +660,9 @@ jobs:
 
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          bun scripts/set-version.ts "${TAG#v}"
+          bun scripts/set-version.ts "$VERSION"
           bun install --lockfile-only
 
       - name: Ensure npm supports trusted publishing
@@ -609,11 +690,11 @@ jobs:
       - name: Publish to npm
         if: steps.published.outputs.exists == 'false'
         working-directory: packages/ossido-cli
-        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public --tag ${{ needs.resolve.outputs.dist_tag }}
 
   publish_create_ossido:
     name: NPM publish - create-ossido
-    needs: [publish_cli_meta]
+    needs: [resolve, publish_cli_meta]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -627,9 +708,9 @@ jobs:
 
       - name: Set version from release tag
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          bun scripts/set-version.ts "${TAG#v}"
+          bun scripts/set-version.ts "$VERSION"
           bun install --lockfile-only
 
       - name: Ensure npm supports trusted publishing
@@ -657,13 +738,16 @@ jobs:
       - name: Publish to npm
         if: steps.published.outputs.exists == 'false'
         working-directory: packages/create-ossido
-        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public
+        run: npm publish "./${{ steps.pack.outputs.tarball }}" --access public --tag ${{ needs.resolve.outputs.dist_tag }}
 
   commit_version_bump:
     name: Commit version bump
-    # Only record the versions once everything actually published.
+    # Only record the versions once everything actually published — and only
+    # for stable releases: a beta must not stamp its throwaway version onto main.
+    if: github.event_name == 'release'
     needs:
       [
+        resolve,
         publish_npm,
         publish_crates,
         publish_cli_platforms,
@@ -710,9 +794,8 @@ jobs:
       # Cargo.lock is git-ignored, so it needs no commit.
       - name: Stamp version and commit
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          VERSION="${TAG#v}"
           bun scripts/set-version.ts "$VERSION"
           bun install --lockfile-only
           git config user.name "github-actions[bot]"
