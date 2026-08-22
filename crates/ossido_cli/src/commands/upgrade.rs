@@ -20,6 +20,9 @@ pub struct UpgradeOptions {
     pub yes: bool,
     /// Do not run `cargo update` / the package-manager install (`--no-install`).
     pub no_install: bool,
+    /// Offer prerelease beta builds as upgrade targets (`--include-beta`).
+    /// Without it, betas are never shown or resolved.
+    pub include_beta: bool,
 }
 
 pub fn run(opts: UpgradeOptions) {
@@ -97,6 +100,7 @@ fn current_version(cwd: &Path) -> Option<String> {
 #[derive(Clone, PartialEq, Eq)]
 enum TargetChoice {
     Latest(String),
+    Beta(String),
     Custom,
 }
 
@@ -109,16 +113,25 @@ fn resolve_target(opts: &UpgradeOptions, _current: Option<&str>) -> Option<Strin
     }
 
     let latest = version_check::latest_version(false);
+    // Betas exist only behind the flag — never fetched, shown, or resolved
+    // without it.
+    let beta = if opts.include_beta {
+        version_check::latest_beta_version(false)
+    } else {
+        None
+    };
 
-    // Non-interactive: take the latest, or bail with guidance.
+    // Non-interactive: take the newest beta when asked for one, else the
+    // latest stable, or bail with guidance.
     if opts.yes || !std::io::stdin().is_terminal() {
-        if latest.is_none() {
+        let resolved = beta.or(latest);
+        if resolved.is_none() {
             eprintln!(
                 "{} could not determine the latest version; pass --version X.Y.Z",
                 "error:".red()
             );
         }
-        return latest;
+        return resolved;
     }
 
     let _ = cliclack::intro("Upgrade ossido");
@@ -126,10 +139,17 @@ fn resolve_target(opts: &UpgradeOptions, _current: Option<&str>) -> Option<Strin
     if let Some(l) = &latest {
         select = select.item(TargetChoice::Latest(l.clone()), format!("Latest ({l})"), "");
     }
+    if let Some(b) = &beta {
+        select = select.item(
+            TargetChoice::Beta(b.clone()),
+            format!("Latest beta ({b})"),
+            "prerelease",
+        );
+    }
     select = select.item(TargetChoice::Custom, "Enter a specific version", "");
 
     match select.interact().ok()? {
-        TargetChoice::Latest(v) => Some(v),
+        TargetChoice::Latest(v) | TargetChoice::Beta(v) => Some(v),
         TargetChoice::Custom => cliclack::input("Target version (X.Y.Z)")
             .interact()
             .ok()
@@ -250,6 +270,7 @@ mod tests {
             dry_run: false,
             yes: true,
             no_install: true,
+            include_beta: false,
         };
         assert_eq!(
             resolve_target(&opts, Some("0.1.4")).as_deref(),
