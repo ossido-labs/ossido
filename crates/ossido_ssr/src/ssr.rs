@@ -1,10 +1,12 @@
 #![allow(clippy::question_mark)]
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
 use std::ffi::c_void;
 use std::fmt;
 
 use rustc_hash::FxHashMap;
+
+use crate::globals::install_runtime_globals;
+use crate::globals::text_codecs::{install_decoder_registry, DecoderRegistry};
+use crate::globals::timers::{install_timers, reset_macrotasks, run_macrotasks, TimerQueue};
 
 /// This enum holds all the possible Ssr error states.
 #[derive(Debug, PartialEq, Eq)]
@@ -60,339 +62,6 @@ const MAX_IDLE_ROUNDS: u32 = 16;
 /// Hard ceiling on total rounds so a pathological generator that always
 /// enqueues one more macrotask still terminates.
 const MAX_TOTAL_ROUNDS: u32 = 1_000_000;
-
-/// Isolate data slot holding the pointer to this isolate's [`TimerQueue`].
-const TIMER_SLOT: u32 = 1;
-
-/// One scheduled timer (a `setTimeout`/`setImmediate` callback).
-struct Timer {
-    id: u32,
-    /// Virtual due time (ms). Timers fire in `due` then insertion order.
-    due: f64,
-    seq: u64,
-    callback: v8::Global<v8::Function>,
-}
-
-// Order timers by (due, seq) — the firing order — ignoring the callback, so a
-// `BinaryHeap<Reverse<Timer>>` pops the earliest-scheduled timer first without
-// re-sorting the whole queue every generation. `seq` is unique per queue, so
-// the total order is well-defined even for equal (or NaN-free) `due` values.
-impl PartialEq for Timer {
-    fn eq(&self, other: &Self) -> bool {
-        self.due.total_cmp(&other.due).is_eq() && self.seq == other.seq
-    }
-}
-impl Eq for Timer {}
-impl PartialOrd for Timer {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for Timer {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.due
-            .total_cmp(&other.due)
-            .then(self.seq.cmp(&other.seq))
-    }
-}
-
-/// A native, virtual-time macrotask queue backing `setTimeout` /`setImmediate` /
-/// `clearTimeout` (and, transitively, `MessageChannel` delivery) inside the
-/// isolate — the same shape a real embedded-V8 runtime (e.g. Deno) uses, but on
-/// a **virtual clock**: draining jumps time to the earliest pending timer so
-/// `setTimeout(fn, 500)` fires instantly and static generation stays fast.
-///
-/// Owned (boxed) by the [`Ssr`]; a raw pointer is stashed in the isolate's
-/// [`TIMER_SLOT`] so the native timer callbacks and the drain can reach it.
-#[derive(Default)]
-struct TimerQueue {
-    /// Min-heap on (due, seq) via [`Reverse`]: the next timer to fire is
-    /// `peek()`, with no per-generation re-sort.
-    tasks: BinaryHeap<Reverse<Timer>>,
-    /// Ids cancelled by `clearTimeout`, dropped lazily as they surface at the
-    /// head of the heap. An id that never fires (already ran, or bogus) stays
-    /// until [`reset_macrotasks`] clears the set at the next render.
-    cleared: std::collections::HashSet<u32>,
-    virtual_now: f64,
-    next_id: u32,
-    seq: u64,
-}
-
-/// Borrow the isolate's [`TimerQueue`] via [`TIMER_SLOT`], if installed.
-fn timer_queue<'a>(scope: &mut v8::HandleScope) -> Option<&'a mut TimerQueue> {
-    let ptr = scope.get_data(TIMER_SLOT) as *mut TimerQueue;
-    if ptr.is_null() {
-        None
-    } else {
-        // Safety: the pointer is the address of the `Box<TimerQueue>` the `Ssr`
-        // owns for this isolate's lifetime; it is single-threaded and cleared in
-        // `Drop` before the isolate is freed.
-        Some(unsafe { &mut *ptr })
-    }
-}
-
-/// `setTimeout(cb, delay?)` / `setImmediate(cb)` — enqueue a callback and return
-/// its numeric id. A missing / non-finite delay is treated as `0`.
-fn set_timeout_callback(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    let Ok(func) = v8::Local::<v8::Function>::try_from(args.get(0)) else {
-        return;
-    };
-    let delay = args
-        .get(1)
-        .number_value(scope)
-        .filter(|delay| delay.is_finite())
-        .map(|delay| delay.max(0.0))
-        .unwrap_or(0.0);
-    let callback = v8::Global::new(scope, func);
-
-    let Some(queue) = timer_queue(scope) else {
-        return;
-    };
-    let id = queue.next_id;
-    queue.next_id = queue.next_id.wrapping_add(1);
-    let seq = queue.seq;
-    queue.seq += 1;
-    queue.tasks.push(Reverse(Timer {
-        id,
-        due: queue.virtual_now + delay,
-        seq,
-        callback,
-    }));
-
-    rv.set(v8::Integer::new(scope, id as i32).into());
-}
-
-/// `clearTimeout(id)` / `clearImmediate(id)` — cancel a pending timer.
-fn clear_timeout_callback(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    _rv: v8::ReturnValue,
-) {
-    let Some(id) = args.get(0).number_value(scope) else {
-        return;
-    };
-    if id.is_finite() && id >= 0.0 {
-        if let Some(queue) = timer_queue(scope) {
-            queue.cleared.insert(id as u32);
-        }
-    }
-}
-
-/// Install the native timer globals and the isolate's [`TimerQueue`]. Must run
-/// before the bundle executes so `setTimeout` exists when it does. Returns the
-/// queue pointer for the [`Ssr`] to own and free.
-fn install_timers(scope: &mut v8::HandleScope, isolate: *mut v8::OwnedIsolate) -> *mut TimerQueue {
-    let queue = Box::into_raw(Box::new(TimerQueue::default()));
-    unsafe { (*isolate).set_data(TIMER_SLOT, queue as *mut c_void) };
-
-    // `setImmediate(cb)` is `setTimeout(cb)` with no delay (→ 0); the same
-    // callback handles both. Likewise `clearImmediate` == `clearTimeout`.
-    set_global_fn(scope, "setTimeout", set_timeout_callback);
-    set_global_fn(scope, "setImmediate", set_timeout_callback);
-    set_global_fn(scope, "clearTimeout", clear_timeout_callback);
-    set_global_fn(scope, "clearImmediate", clear_timeout_callback);
-
-    queue
-}
-
-/// Define a native function on the context's global object.
-fn set_global_fn(
-    scope: &mut v8::HandleScope,
-    name: &str,
-    callback: impl v8::MapFnTo<v8::FunctionCallback>,
-) {
-    let context = scope.get_current_context();
-    let global = context.global(scope);
-    if let (Some(name), Some(function)) = (
-        v8::String::new(scope, name),
-        v8::Function::new(scope, callback),
-    ) {
-        global.set(scope, name.into(), function.into());
-    }
-}
-
-/// `__ossido_encode_utf8(string) -> Uint8Array` — the native backend of the
-/// runtime's `TextEncoder`. V8 writes the UTF-8 bytes directly (C++ speed);
-/// a pure-JS polyfill costs milliseconds per megabyte, which dominates large
-/// SSR documents (React encodes every chunk it emits into the byte stream).
-fn encode_utf8_callback(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    let Some(string) = args.get(0).to_string(scope) else {
-        return;
-    };
-    let len = string.utf8_length(scope);
-    let mut bytes = vec![0u8; len];
-    string.write_utf8_v2(scope, &mut bytes, v8::WriteFlags::kReplaceInvalidUtf8, None);
-    let store = v8::ArrayBuffer::new_backing_store_from_vec(bytes).make_shared();
-    let buffer = v8::ArrayBuffer::with_backing_store(scope, &store);
-    if let Some(array) = v8::Uint8Array::new(scope, buffer, 0, len) {
-        rv.set(array.into());
-    }
-}
-
-/// `__ossido_decode_utf8(bytesLike) -> string` — the native backend of the
-/// runtime's `TextDecoder`. Accepts any ArrayBufferView (respecting its
-/// offset/length window) or a whole ArrayBuffer; invalid sequences decode
-/// lossily (U+FFFD), matching `TextDecoder`'s non-fatal default.
-fn decode_utf8_callback(
-    scope: &mut v8::HandleScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    let arg = args.get(0);
-    let mut bytes: Vec<u8>;
-    if let Ok(view) = v8::Local::<v8::ArrayBufferView>::try_from(arg) {
-        bytes = vec![0u8; view.byte_length()];
-        view.copy_contents(&mut bytes);
-    } else if let Ok(buffer) = v8::Local::<v8::ArrayBuffer>::try_from(arg) {
-        let store = buffer.get_backing_store();
-        bytes = store.iter().map(|cell| cell.get()).collect();
-    } else {
-        return;
-    }
-
-    let text = String::from_utf8_lossy(&bytes);
-    if let Some(string) = v8::String::new(scope, &text) {
-        rv.set(string.into());
-    }
-}
-
-/// The `TextEncoder`/`TextDecoder` classes installed over the native codec
-/// callbacks. Deliberately minimal — utf-8 only, no `stream`/`fatal` options —
-/// the same surface the common JS polyfills expose (they throw on those options
-/// too), so bundles behave identically, just at native speed. Bundled polyfills
-/// guard with `scope.TextEncoder = scope.TextEncoder || …`, so these natives
-/// (installed before the bundle evaluates) win.
-const TEXT_CODEC_BOOTSTRAP: &str = r#"
-(function () {
-  "use strict";
-  function unsupported(option, method) {
-    throw new Error("Failed to " + method + ": the '" + option + "' option is unsupported.");
-  }
-  class TextEncoder {
-    get encoding() { return "utf-8"; }
-    encode(input, options) {
-      if (options && options.stream) unsupported("stream", "encode");
-      return __ossido_encode_utf8(input === undefined ? "" : String(input));
-    }
-  }
-  class TextDecoder {
-    constructor(label, options) {
-      var utf8 = ["utf-8", "utf8", "unicode-1-1-utf-8"];
-      if (label !== undefined && utf8.indexOf(String(label).toLowerCase()) === -1) {
-        throw new RangeError("The encoding label provided ('" + label + "') is invalid.");
-      }
-      if (options && options.fatal) unsupported("fatal", "construct 'TextDecoder'");
-      this.fatal = false;
-      this.ignoreBOM = false;
-    }
-    get encoding() { return "utf-8"; }
-    decode(input, options) {
-      if (options && options.stream) unsupported("stream", "decode");
-      if (input === undefined) return "";
-      return __ossido_decode_utf8(input);
-    }
-  }
-  globalThis.TextEncoder = TextEncoder;
-  globalThis.TextDecoder = TextDecoder;
-})();
-"#;
-
-/// Install native UTF-8 `TextEncoder`/`TextDecoder` globals: two Rust-backed
-/// codec functions plus a small bootstrap script defining the classes. Must run
-/// before the bundle evaluates so conditional polyfills keep the natives.
-fn install_text_codecs(scope: &mut v8::HandleScope) {
-    set_global_fn(scope, "__ossido_encode_utf8", encode_utf8_callback);
-    set_global_fn(scope, "__ossido_decode_utf8", decode_utf8_callback);
-    if let Some(code) = v8::String::new(scope, TEXT_CODEC_BOOTSTRAP) {
-        if let Some(script) = v8::Script::compile(scope, code, None) {
-            let _ = script.run(scope);
-        }
-    }
-}
-
-/// Run one generation of due timers (the macrotask drain): fire every timer due
-/// at the current virtual time, advancing the clock to the earliest pending
-/// timer when nothing is due yet. Returns whether any timer ran — the progress
-/// signal for [`pump_until`]'s bounded guard. A timer that enqueues more work
-/// runs on a later generation, so the host can re-pump microtasks between
-/// generations (a real event-loop turn).
-fn run_macrotasks(scope: &mut v8::HandleScope) -> bool {
-    let due: Vec<v8::Global<v8::Function>> = {
-        let Some(queue) = timer_queue(scope) else {
-            return false;
-        };
-
-        // Drop cancelled timers as they surface at the head, so the earliest
-        // *live* timer is the peek. (The heap is a min-heap on (due, seq).)
-        while let Some(Reverse(head)) = queue.tasks.peek() {
-            if queue.cleared.remove(&head.id) {
-                queue.tasks.pop();
-            } else {
-                break;
-            }
-        }
-        let Some(Reverse(head)) = queue.tasks.peek() else {
-            return false;
-        };
-
-        if head.due > queue.virtual_now {
-            queue.virtual_now = head.due;
-        }
-        let now = queue.virtual_now;
-
-        // Take the generation due at `now`; a fired timer may enqueue more,
-        // which lands in the heap for the next call.
-        let mut due = Vec::new();
-        while let Some(Reverse(head)) = queue.tasks.peek() {
-            if head.due > now {
-                break;
-            }
-            let Some(Reverse(timer)) = queue.tasks.pop() else {
-                break;
-            };
-            if !queue.cleared.remove(&timer.id) {
-                due.push(timer.callback);
-            }
-        }
-        due
-    };
-
-    if due.is_empty() {
-        return false;
-    }
-
-    for callback in &due {
-        // A `TryCatch` contains (and clears on drop) any exception a timer
-        // throws, so it can't leave a pending exception that poisons the next
-        // call — which is also what makes draining safe *during* a module's
-        // top-level-await evaluation.
-        let try_catch = &mut v8::TryCatch::new(scope);
-        let function = v8::Local::new(try_catch, callback);
-        let undefined = v8::undefined(try_catch).into();
-        let _ = function.call(try_catch, undefined, &[]);
-    }
-    true
-}
-
-/// Drop any queued timers before a render so leftover work from a prior
-/// aborted/panicked render on a pool-reused isolate can't run during this one.
-fn reset_macrotasks(scope: &mut v8::HandleScope) {
-    if let Some(queue) = timer_queue(scope) {
-        queue.tasks.clear();
-        queue.cleared.clear();
-        queue.virtual_now = 0.0;
-        queue.seq = 0;
-        // `next_id` stays monotonic — ids need not be reused across renders.
-    }
-}
 
 /// Drive an async operation to completion by alternately pumping V8 microtasks
 /// and one macrotask generation — a real event-loop turn — until `pending()`
@@ -620,6 +289,9 @@ pub struct Ssr<'s, 'i> {
     /// The native timer queue (see [`install_timers`]), or null for `Ssr::from`
     /// (classic-script) isolates, which have no timers and run microtask-only.
     timer_queue: *mut TimerQueue,
+    /// The streaming-decoder registry backing `TextDecoder`'s `{stream: true}`
+    /// state (see [`install_decoder_registry`]). Owned here, freed on drop.
+    decoder_registry: *mut DecoderRegistry,
 }
 
 impl Drop for Ssr<'_, '_> {
@@ -630,6 +302,9 @@ impl Drop for Ssr<'_, '_> {
             // the isolate is still alive.
             if !self.timer_queue.is_null() {
                 let _ = Box::from_raw(self.timer_queue);
+            }
+            if !self.decoder_registry.is_null() {
+                let _ = Box::from_raw(self.decoder_registry);
             }
             let _ = Box::from_raw(self.scope);
             let _ = Box::from_raw(self.handle_scope);
@@ -694,9 +369,10 @@ where
 
         let scope = unsafe { &mut *scope_ptr };
 
-        // Native `TextEncoder`/`TextDecoder` before the bundle runs, so its
-        // conditional polyfills keep them.
-        install_text_codecs(scope);
+        // The registered native globals (text codecs, …) before the bundle
+        // runs, so its conditional polyfills keep them.
+        install_runtime_globals(scope);
+        let decoder_registry = install_decoder_registry(isolate);
 
         let code = match v8::String::new(scope, &format!("{source};{entry_point}")) {
             Some(val) => val,
@@ -765,6 +441,7 @@ where
             stream_writer: None,
             // Classic-script (IIFE) bundles have no timers: microtask-only.
             timer_queue: std::ptr::null_mut(),
+            decoder_registry,
         })
     }
 
@@ -925,10 +602,11 @@ where
         // including at top-level-await time.
         let timer_queue = install_timers(scope, isolate);
 
-        // Native `TextEncoder`/`TextDecoder` before the bundle runs, so its
-        // conditional polyfills keep them (pure-JS codecs are the dominant
-        // per-render cost on large documents).
-        install_text_codecs(scope);
+        // The registered native globals (text codecs, …) before the bundle
+        // runs, so its conditional polyfills keep them (pure-JS codecs are the
+        // dominant per-render cost on large documents).
+        install_runtime_globals(scope);
+        let decoder_registry = install_decoder_registry(isolate);
 
         // For a module with top-level await, `evaluate` returns a promise that
         // settles when the whole module (including its awaits) is done. Drive
@@ -1006,6 +684,7 @@ where
                 scope: scope_ptr,
                 stream_writer: None,
                 timer_queue,
+                decoder_registry,
             },
             produced_cache,
             cache_rejected,
@@ -1543,6 +1222,297 @@ mod tests {
 
         let mut js = Ssr::from_module(source).unwrap();
         assert_eq!(js.render("renderFn", None).unwrap(), "native kept");
+    }
+
+    /// Run a JS snippet that returns an array of `[label, boolean]` check
+    /// pairs (or a promise of one — the render pump drives it) and assert
+    /// every check passed, reporting the failed labels.
+    fn assert_js_checks(body: &str) {
+        init_test();
+        let source = format!(
+            r#"export async function renderFn() {{
+                const checks = await (() => {{ {body} }})();
+                const failed = checks.filter(([, ok]) => !ok).map(([name]) => name);
+                return failed.length === 0 ? "ok" : "FAILED: " + failed.join(", ");
+            }}"#
+        );
+        let mut js = Ssr::from_module(source).unwrap();
+        assert_eq!(js.render("renderFn", None).unwrap(), "ok");
+    }
+
+    #[test]
+    fn text_encoder_encode_into() {
+        assert_js_checks(
+            r#"
+            const enc = new TextEncoder();
+
+            // Plenty of room: everything encodes; read counts UTF-16 units.
+            const big = new Uint8Array(64);
+            const a = enc.encodeInto("héllo", big);
+
+            // Surrogate pair: 🎉 is 2 UTF-16 units, 4 UTF-8 bytes.
+            const pair = new Uint8Array(8);
+            const b = enc.encodeInto("🎉", pair);
+
+            // Truncation never splits a code point: é needs 2 bytes; with only
+            // 1 byte left after "h", it must stop after "h".
+            const tight = new Uint8Array(2);
+            const c = enc.encodeInto("hé", tight);
+
+            // The written window lands at the view's offset.
+            const backing = new Uint8Array(8);
+            const offset = new Uint8Array(backing.buffer, 4, 4);
+            const d = enc.encodeInto("hi", offset);
+
+            return [
+              ["read counts units", a.read === 5],
+              ["written utf8 bytes", a.written === 6],
+              ["pair read", b.read === 2],
+              ["pair written", b.written === 4],
+              ["no split write", c.written === 1],
+              ["no split read", c.read === 1],
+              ["offset write", d.written === 2 && backing[4] === 104 && backing[5] === 105],
+              ["offset untouched", backing[0] === 0],
+            ];
+            "#,
+        );
+    }
+
+    #[test]
+    fn text_decoder_supports_whatwg_labels() {
+        assert_js_checks(
+            r#"
+            // latin1 is a windows-1252 label per the Encoding Standard, and the
+            // 0x80–0x9F range must decode via the windows-1252 table (€ at 0x80),
+            // NOT as ISO-8859-1 control characters.
+            const cp1252 = new TextDecoder("latin1");
+            const euro = cp1252.decode(new Uint8Array([0x80]));
+
+            // windows-1251 (Cyrillic): "Привет" one byte per letter.
+            const cyrillic = new TextDecoder("windows-1251")
+              .decode(new Uint8Array([0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2]));
+
+            // utf-16le with its BOM consumed by default.
+            const utf16 = new TextDecoder("utf-16le")
+              .decode(new Uint8Array([0xff, 0xfe, 0x68, 0x00, 0x69, 0x00]));
+
+            // shift_jis: "日本" as 2-byte sequences.
+            const sjis = new TextDecoder("shift_jis")
+              .decode(new Uint8Array([0x93, 0xfa, 0x96, 0x7b]));
+
+            let unknownLabelThrows = false;
+            try { new TextDecoder("not-a-real-encoding"); }
+            catch (e) { unknownLabelThrows = e instanceof RangeError; }
+
+            return [
+              ["canonical name", cp1252.encoding === "windows-1252"],
+              ["cp1252 euro", euro === "€"],
+              ["windows-1251", cyrillic === "Привет"],
+              ["utf-16le", utf16 === "hi"],
+              ["shift_jis", sjis === "日本"],
+              ["unknown label RangeError", unknownLabelThrows],
+            ];
+            "#,
+        );
+    }
+
+    #[test]
+    fn text_decoder_fatal_and_bom() {
+        assert_js_checks(
+            r#"
+            const invalid = new Uint8Array([0x68, 0xff, 0x69]); // h <bad> i
+
+            // Non-fatal: U+FFFD replacement.
+            const lossy = new TextDecoder().decode(invalid);
+
+            // Fatal: TypeError.
+            let fatalThrows = false;
+            try { new TextDecoder("utf-8", { fatal: true }).decode(invalid); }
+            catch (e) { fatalThrows = e instanceof TypeError; }
+
+            // BOM removed by default, preserved with ignoreBOM.
+            const withBom = new Uint8Array([0xef, 0xbb, 0xbf, 0x68, 0x69]);
+            const stripped = new TextDecoder().decode(withBom);
+            const kept = new TextDecoder("utf-8", { ignoreBOM: true }).decode(withBom);
+
+            const flags = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+
+            return [
+              ["lossy replacement", lossy === "h�i"],
+              ["fatal TypeError", fatalThrows],
+              ["bom stripped", stripped === "hi"],
+              ["bom kept", kept === "﻿hi"],
+              ["fatal getter", flags.fatal === true],
+              ["ignoreBOM getter", flags.ignoreBOM === true],
+            ];
+            "#,
+        );
+    }
+
+    #[test]
+    fn text_decoder_streams_across_chunk_boundaries() {
+        assert_js_checks(
+            r#"
+            // 🎉 (4 UTF-8 bytes) split across three stream chunks.
+            const bytes = new TextEncoder().encode("a🎉b");
+            const dec = new TextDecoder();
+            let out = "";
+            out += dec.decode(bytes.subarray(0, 2), { stream: true });
+            out += dec.decode(bytes.subarray(2, 4), { stream: true });
+            out += dec.decode(bytes.subarray(4));
+
+            // A dangling partial sequence at end-of-stream becomes U+FFFD…
+            const dangling = new TextDecoder();
+            let d = dangling.decode(new Uint8Array([0xe6, 0x97]), { stream: true });
+            d += dangling.decode();
+
+            // …and throws in fatal mode.
+            const fatal = new TextDecoder("utf-8", { fatal: true });
+            fatal.decode(new Uint8Array([0xe6, 0x97]), { stream: true });
+            let eofThrows = false;
+            try { fatal.decode(); } catch (e) { eofThrows = e instanceof TypeError; }
+
+            // The instance is reusable for a fresh stream afterwards.
+            const reuse = dec.decode(new TextEncoder().encode("again"));
+
+            // Streaming BOM handling: BOM split across chunks still stripped.
+            const bomStream = new TextDecoder();
+            let s = bomStream.decode(new Uint8Array([0xef, 0xbb]), { stream: true });
+            s += bomStream.decode(new Uint8Array([0xbf, 0x68]), { stream: true });
+            s += bomStream.decode();
+
+            return [
+              ["split code point", out === "a\u{1f389}b"],
+              ["dangling replaced", d === "�"],
+              ["dangling fatal throws", eofThrows],
+              ["decoder reusable", reuse === "again"],
+              ["streamed bom stripped", s === "h"],
+            ];
+            "#,
+        );
+    }
+
+    #[test]
+    fn native_message_channel_delivers_asynchronously() {
+        assert_js_checks(
+            r#"
+            // The exact shape React's Fizz renderer relies on: postMessage on
+            // one port, delivery on the other via a macrotask, never
+            // synchronously.
+            return new Promise((resolve) => {
+                const order = [];
+                const channel = new MessageChannel();
+                channel.port1.onmessage = (event) => {
+                    order.push("delivered:" + event.data);
+                    resolve([
+                        ["macrotask ordering", order.join(",") === "posted,delivered:42"],
+                        ["MessageEvent", event instanceof MessageEvent && event instanceof Event],
+                        ["event type", event.type === "message"],
+                        ["event target", event.target === channel.port1],
+                    ]);
+                };
+                channel.port2.postMessage(42);
+                order.push("posted");
+            });
+            "#,
+        );
+    }
+
+    #[test]
+    fn native_message_channel_listeners_and_close() {
+        assert_js_checks(
+            r#"
+            return new Promise((resolve) => {
+                const channel = new MessageChannel();
+                let viaListener = null;
+                channel.port1.addEventListener("message", (e) => { viaListener = e.data; });
+
+                const closed = new MessageChannel();
+                let closedDelivered = false;
+                closed.port1.onmessage = () => { closedDelivered = true; };
+                closed.port1.close();
+                closed.port2.postMessage("dropped");
+
+                channel.port2.postMessage("x");
+                setTimeout(() => {
+                    resolve([
+                        ["addEventListener delivery", viaListener === "x"],
+                        ["closed port drops", closedDelivered === false],
+                    ]);
+                }, 1);
+            });
+            "#,
+        );
+    }
+
+    #[test]
+    fn native_url_search_params() {
+        assert_js_checks(
+            r#"
+            // Constructor forms.
+            const fromString = new URLSearchParams("?a=1&b=two%20words&a=3&plus=a+b");
+            const fromPairs = new URLSearchParams([["k", "v"], ["k", "w"]]);
+            const fromRecord = new URLSearchParams({ x: "1", y: "2" });
+            const fromCopy = new URLSearchParams(fromPairs);
+            fromCopy.append("k", "z");
+
+            // Mutation semantics: set replaces the first entry in place and
+            // drops the rest; delete/has accept a value filter.
+            const mutate = new URLSearchParams("a=1&b=2&a=3");
+            mutate.set("a", "9");
+            const setShape = mutate.toString();
+            mutate.delete("b", "nope");
+            const valueFilteredKept = mutate.has("b");
+            mutate.delete("b", "2");
+
+            const sorted = new URLSearchParams("c=3&a=1&b=2&a=0");
+            sorted.sort();
+
+            let iterated = "";
+            for (const [k, v] of fromString) iterated += k + "=" + v + ";";
+
+            return [
+                ["get", fromString.get("a") === "1"],
+                ["getAll", fromString.getAll("a").join(",") === "1,3"],
+                ["percent decode", fromString.get("b") === "two words"],
+                ["plus is space", fromString.get("plus") === "a b"],
+                ["missing is null", fromString.get("nope") === null],
+                ["pairs init", fromPairs.getAll("k").join(",") === "v,w"],
+                ["record init", fromRecord.toString() === "x=1&y=2"],
+                ["copy is a copy", fromCopy.size === 3 && fromPairs.size === 2],
+                ["set in place", setShape === "a=9&b=2"],
+                ["delete value filter", valueFilteredKept === true && !mutate.has("b")],
+                ["stable sort", sorted.toString() === "a=1&a=0&b=2&c=3"],
+                ["iteration", iterated === "a=1;b=two words;a=3;plus=a b;"],
+                ["size", fromString.size === 4],
+                ["serialize escapes", new URLSearchParams([["a b", "c&d"]]).toString() === "a+b=c%26d"],
+                ["round trip", new URLSearchParams(fromString.toString()).get("b") === "two words"],
+            ];
+            "#,
+        );
+    }
+
+    #[test]
+    fn native_queue_microtask_and_global_alias() {
+        assert_js_checks(
+            r#"
+            return new Promise((resolve) => {
+                const order = [];
+                queueMicrotask(() => order.push("micro"));
+                order.push("sync");
+                setTimeout(() => {
+                    let typeErrorThrown = false;
+                    try { queueMicrotask(null); } catch (e) { typeErrorThrown = e instanceof TypeError; }
+                    resolve([
+                        // Microtasks run after sync code, before macrotasks.
+                        ["ordering", order.join(",") === "sync,micro"],
+                        ["non-callable throws", typeErrorThrown],
+                        ["global alias", global === globalThis],
+                    ]);
+                }, 0);
+            });
+            "#,
+        );
     }
 
     #[test]
