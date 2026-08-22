@@ -139,6 +139,7 @@
 //!        .body(result)
 //! }
 //!```
+mod globals;
 mod icu;
 mod ssr;
 

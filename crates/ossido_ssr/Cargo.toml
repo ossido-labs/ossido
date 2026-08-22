@@ -19,6 +19,8 @@ categories = ["web-programming"]
 # `icudtl.dat` is embedded via `include_bytes!`, so it must ship in the package.
 include = [
     "src/*.rs",
+    "src/globals/*.rs",
+    "src/globals/README.md",
     "src/icudtl.dat",
     "Cargo.toml",
     "LICENSE",
@@ -33,6 +35,9 @@ v8 = "135.1.0"
 # Faster (non-DoS-resistant) hasher for the internal export map — keys are
 # bundle export names, not attacker-controlled input.
 rustc-hash = "2"
+encoding_rs = "0.8.35"
+simdutf8 = "0.1.5"
+form_urlencoded = "1.2.2"
 
 [dev-dependencies]
 # Only the `svelte` integration test parses a rendered JSON payload.
