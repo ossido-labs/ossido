@@ -68,3 +68,7 @@ harness = false
 [[bench]]
 name = "compile_code_cache"
 harness = false
+
+[[bench]]
+name = "react_render"
+harness = false
