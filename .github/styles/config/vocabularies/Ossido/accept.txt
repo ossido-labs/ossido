@@ -41,6 +41,7 @@ Vite
 Rollup
 Tailwind
 Hunspell
+React
 
 # --- Languages / formats ---
 TypeScript
@@ -95,3 +96,7 @@ devDependency
 sublicense
 unpublishes
 uplink
+globals
+macrotask
+microtask
+codex
