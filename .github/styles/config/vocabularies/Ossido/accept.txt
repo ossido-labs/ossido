@@ -101,3 +101,6 @@ macrotask
 microtask
 codex
 embedder
+prebaking
+timerless
+async
