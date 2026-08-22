@@ -417,7 +417,13 @@ jobs:
 
   build_cli_binaries:
     name: Build ossido binary - ${{ matrix.pkg }}
-    needs: [resolve, publish_npm_dry_run, publish_crates_dry_run, publish_cli_dry_run]
+    needs:
+      [
+        resolve,
+        publish_npm_dry_run,
+        publish_crates_dry_run,
+        publish_cli_dry_run,
+      ]
     strategy:
       fail-fast: true
       matrix:
