@@ -1,6 +1,6 @@
 {
   "name": "@ossido-labs/cli-darwin-x64",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "description": "Prebuilt ossido CLI binary for macOS x64.",
   "homepage": "https://ossido.dev",
   "repository": {

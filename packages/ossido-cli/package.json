@@ -1,6 +1,6 @@
 {
   "name": "@ossido-labs/ossido-cli",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "description": "The ossido CLI (ossido dev / build / new), distributed as a prebuilt native binary.",
   "homepage": "https://ossido.dev",
   "repository": {
@@ -29,13 +29,13 @@
     "framework"
   ],
   "optionalDependencies": {
-    "@ossido-labs/cli-darwin-arm64": "0.1.4",
-    "@ossido-labs/cli-darwin-x64": "0.1.4",
-    "@ossido-labs/cli-win32-x64-msvc": "0.1.4",
-    "@ossido-labs/cli-linux-x64-gnu": "0.1.4",
-    "@ossido-labs/cli-linux-arm64-gnu": "0.1.4",
-    "@ossido-labs/cli-linux-x64-musl": "0.1.4",
-    "@ossido-labs/cli-linux-arm64-musl": "0.1.4",
-    "@ossido-labs/cli-linux-arm-gnueabihf": "0.1.4"
+    "@ossido-labs/cli-darwin-arm64": "0.1.6",
+    "@ossido-labs/cli-darwin-x64": "0.1.6",
+    "@ossido-labs/cli-win32-x64-msvc": "0.1.6",
+    "@ossido-labs/cli-linux-x64-gnu": "0.1.6",
+    "@ossido-labs/cli-linux-arm64-gnu": "0.1.6",
+    "@ossido-labs/cli-linux-x64-musl": "0.1.6",
+    "@ossido-labs/cli-linux-arm64-musl": "0.1.6",
+    "@ossido-labs/cli-linux-arm-gnueabihf": "0.1.6"
   }
 }
