@@ -1,6 +1,6 @@
 {
   "name": "create-ossido",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Scaffold a new ossido app (npm create ossido@latest).",
   "homepage": "https://ossido.dev",
   "repository": {
@@ -29,6 +29,6 @@
     "fullstack"
   ],
   "dependencies": {
-    "@ossido-labs/ossido-cli": "0.1.6"
+    "@ossido-labs/ossido-cli": "0.1.7"
   }
 }
