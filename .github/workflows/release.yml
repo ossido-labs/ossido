@@ -131,6 +131,10 @@ jobs:
       # publish job skips the same package the same way).
       - name: Pack and validate
         working-directory: packages/${{ matrix.package }}
+        env:
+          # npm requires an explicit tag for prerelease versions even in a
+          # dry run.
+          DIST_TAG: ${{ needs.resolve.outputs.dist_tag }}
         run: |
           TARBALL=$(bun pm pack --quiet --ignore-scripts | tail -1)
           NAME=$(node -p "require('./package.json').name")
@@ -138,7 +142,7 @@ jobs:
           if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
             echo "::notice::${NAME}@${VERSION} is already on npm - skipping dry-run publish"
           else
-            npm publish "./$TARBALL" --dry-run --access public
+            npm publish "./$TARBALL" --dry-run --access public --tag "$DIST_TAG"
           fi
 
   publish_crates_dry_run:
@@ -401,6 +405,10 @@ jobs:
       # Resume support: a package already on npm at this version (from a prior
       # partial run) skips its dry-run publish — the tarball still packs.
       - name: Pack and validate
+        env:
+          # npm requires an explicit tag for prerelease versions even in a
+          # dry run.
+          DIST_TAG: ${{ needs.resolve.outputs.dist_tag }}
         run: |
           for dir in packages/ossido-cli packages/create-ossido npm/platforms/*/; do
             echo "::group::$dir"
@@ -410,7 +418,7 @@ jobs:
             if npm view "${NAME}@${VERSION}" version > /dev/null 2>&1; then
               echo "::notice::${NAME}@${VERSION} is already on npm - skipping dry-run publish"
             else
-              (cd "$dir" && npm publish "./$TARBALL" --dry-run --access public)
+              (cd "$dir" && npm publish "./$TARBALL" --dry-run --access public --tag "$DIST_TAG")
             fi
             echo "::endgroup::"
           done
