@@ -418,4 +418,41 @@ export const DEV_ERROR_STYLES = `
 .ossido-err-corner-dot--top-right { top: 5px; right: 5px; }
 .ossido-err-corner-dot--bottom-left { bottom: 5px; left: 5px; }
 .ossido-err-corner-dot--bottom-right { bottom: 5px; right: 5px; }
+
+/* Rust dev-server restarting: pulse the bolt until the rebuilt server is up. */
+.ossido-err-fab--restarting svg {
+  animation: ossido-err-fab-pulse 1s ease-in-out infinite;
+  color: var(--ossido-color-accent);
+}
+@keyframes ossido-err-fab-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Transient notice bubble next to the indicator (e.g. full-reload forensics). */
+.ossido-err-notice {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid var(--ossido-color-border-strong);
+  border-radius: var(--ossido-radius-md);
+  background: var(--ossido-color-bg);
+  color: var(--ossido-color-text);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  white-space: normal;
+  width: max-content;
+  cursor: pointer;
+}
+.ossido-err-indicator--top-left .ossido-err-notice,
+.ossido-err-indicator--top-right .ossido-err-notice {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+.ossido-err-indicator--top-left .ossido-err-notice,
+.ossido-err-indicator--bottom-left .ossido-err-notice { left: 0; }
+.ossido-err-indicator--top-right .ossido-err-notice,
+.ossido-err-indicator--bottom-right .ossido-err-notice { right: 0; }
 `;

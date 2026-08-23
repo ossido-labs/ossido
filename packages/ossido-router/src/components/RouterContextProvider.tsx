@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  startTransition,
+} from 'react';
 import type { ReactNode } from 'react';
 
 import type { Router } from '../router';
@@ -8,6 +14,7 @@ import { fromUrlToParsedLocation } from '../utils/from-url-to-parsed-location';
 import { matchRoute } from '../utils/match-route';
 import { runCommit, VIEW_TRANSITIONS_ENABLED } from '../utils/view-transition';
 import { buildResourceKey, getOrCreateResource } from '../data/resourceCache';
+import { registerPropsRefetch } from '../data/propsRefetch';
 
 import {
   RouterContext,
@@ -182,6 +189,17 @@ export function RouterContextProvider({
   const retry = useCallback((): void => {
     setNavigationId((id) => id + 1);
   }, []);
+
+  // Dev-only: expose the refetch to non-React callers (the dev menu's
+  // "Refresh props", the `ossido:rust-ready` HMR listener) via the bridge. The
+  // transition keeps the current page rendered until the fresh props resolve —
+  // same behaviour as `useRouter().refetchProps()`.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    return registerPropsRefetch((): void => {
+      startTransition(retry);
+    });
+  }, [retry]);
 
   /**
    * Listen browser navigation events. The browser has already updated the URL,

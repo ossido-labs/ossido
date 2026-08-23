@@ -244,6 +244,17 @@ const developmentCSRWatch = (): void => {
             host: config.server.host,
             port: config.server.port + 1,
             strictPort: true,
+            // The browser's HMR websocket connects straight to this Vite dev
+            // server instead of through the Rust server's `/vite-server/`
+            // proxy. The proxy dies with every Rust rebuild (any `.rs` edit),
+            // and Vite's client reacts to the dropped socket by polling
+            // `__vite_ping` and hard-reloading the page. A direct connection
+            // keeps HMR alive across Rust restarts, letting `.rs` edits refresh
+            // route props in place. `dev.hmrThroughProxy` opts back into the
+            // proxied (reload-on-rebuild) behaviour for single-port setups.
+            ...(config.dev?.hmrThroughProxy
+              ? {}
+              : { hmr: { clientPort: config.server.port + 1 } }),
           },
           build: {
             manifest: true,
