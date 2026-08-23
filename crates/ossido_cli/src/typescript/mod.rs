@@ -6,6 +6,7 @@ pub mod parser;
 mod route_props;
 mod types_jar;
 pub mod utils;
+mod ws_events;
 
 pub use actions::{ActionDef, collect_actions, render_actions_client};
 pub use api_routes::{collect_api_routes, render_api_routes};
@@ -13,3 +14,4 @@ pub use env_struct::{EnvStruct, collect_environment, render_env_module};
 pub use file_types::*;
 pub use route_props::{collect_layout_props, collect_route_props, render_route_props};
 pub use types_jar::*;
+pub use ws_events::{collect_ws_events, render_ws_events};

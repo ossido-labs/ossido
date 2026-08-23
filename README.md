@@ -6,8 +6,10 @@
   <p><strong>The full-stack React framework powered by a Rust backend — built for usability and performance.</strong></p>
 
   <p>
-    <a href="https://crates.io/crates/ossido_cli"><img src="https://img.shields.io/crates/v/ossido_cli?logo=rust&label=crates.io&color=E43717" alt="crates.io version"></a>
-    <a href="https://www.npmjs.com/package/@ossido-labs/ossido"><img src="https://img.shields.io/npm/v/@ossido-labs/ossido?logo=npm&label=npm&color=CB3837" alt="npm version"></a>
+    <!-- GitHub releases (not crates.io) as the version source: betas publish
+         prerelease versions to the registries but never create a GitHub
+         release, and shields' registry badges cannot exclude prereleases. -->
+    <a href="https://github.com/ossido-labs/ossido/releases"><img src="https://img.shields.io/github/v/release/ossido-labs/ossido?logo=github&label=release&color=E43717" alt="latest release"></a>
     <a href="https://github.com/ossido-labs/ossido/actions/workflows/rust-ci.yml"><img src="https://github.com/ossido-labs/ossido/actions/workflows/rust-ci.yml/badge.svg" alt="Rust CI"></a>
     <a href="https://github.com/ossido-labs/ossido/actions/workflows/typescript-ci.yml"><img src="https://github.com/ossido-labs/ossido/actions/workflows/typescript-ci.yml/badge.svg" alt="TypeScript CI"></a>
     <a href="./LICENSE.md"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>

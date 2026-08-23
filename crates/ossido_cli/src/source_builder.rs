@@ -6,13 +6,14 @@ use clap::crate_version;
 use tracing::error;
 
 use crate::app::{App, MIDDLEWARE_FILENAME, ROUTES_FOLDER_PATH};
+use crate::macro_attr::is_ossido_attr;
 use crate::mode::Mode;
 use crate::route::AxumInfo;
 use crate::route_directory_info::RouteDirectoryInfo;
 use crate::typescript::{
     ActionDef, EnvStruct, TypesJar, collect_actions, collect_api_routes, collect_environment,
-    collect_layout_props, collect_route_props, render_actions_client, render_api_routes,
-    render_env_module, render_route_props,
+    collect_layout_props, collect_route_props, collect_ws_events, render_actions_client,
+    render_api_routes, render_env_module, render_route_props, render_ws_events,
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -78,6 +79,22 @@ fn format_rust_source(source: &str) -> String {
     }
 }
 
+/// Whether a Rust source file declares a `#[ossido::ws]` handler function.
+/// Parses the AST (robust to comments/strings); an unparseable file yields
+/// `false` and the subsequent compile surfaces the syntax error.
+fn file_declares_ws(content: &str) -> bool {
+    let Ok(file) = syn::parse_file(content) else {
+        return false;
+    };
+    file.items.iter().any(|item| match item {
+        syn::Item::Fn(func) => func
+            .attrs
+            .iter()
+            .any(|attr| is_ossido_attr(attr.path(), "ws")),
+        _ => false,
+    })
+}
+
 // Struct to build the source code
 // on both "dev" and "build" commands
 #[derive(Clone, Debug)]
@@ -135,7 +152,65 @@ impl SourceBuilder {
         Ok(())
     }
 
+    /// Whether the project defines its single `#[ossido::ws]` handler in
+    /// `src/ws.rs`.
+    fn has_ws_handler(&self) -> bool {
+        std::fs::read_to_string(self.base_path.join("src/ws.rs"))
+            .ok()
+            .map(|content| file_declares_ws(&content))
+            .unwrap_or(false)
+    }
+
+    /// Fail the build if a `#[ws]` handler appears anywhere under `src/routes` —
+    /// the single WebSocket handler must live in `src/ws.rs`.
+    fn enforce_ws_handler_location(&self) {
+        let Some(pattern) = self
+            .base_path
+            .join("src/routes/**/*.rs")
+            .to_str()
+            .map(str::to_string)
+        else {
+            return;
+        };
+        let Ok(entries) = glob::glob(&pattern) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            if std::fs::read_to_string(&entry)
+                .map(|content| file_declares_ws(&content))
+                .unwrap_or(false)
+            {
+                recoverable_error(&format!(
+                    "A #[ossido::ws] handler must live in src/ws.rs, not under src/routes. Found one in: {}",
+                    entry.display()
+                ));
+            }
+        }
+    }
+
+    /// `#[path] mod` declaration for the root WebSocket handler, if present.
+    fn create_ws_module(&self) -> String {
+        if self.has_ws_handler() {
+            "#[path=\"../src/ws.rs\"]\nmod ossido_ws;\n".to_string()
+        } else {
+            String::new()
+        }
+    }
+
+    /// A `Router` merge registering the single WebSocket route, if present. The
+    /// upgrade handler is a GET; `get` is fully-qualified so it needs no import.
+    fn create_ws_route(&self) -> String {
+        if self.has_ws_handler() {
+            ".merge(Router::new().route(\"/__ossido/ws\", ossido::axum::routing::get(ossido_ws::ossido_internal_ws)))\n".to_string()
+        } else {
+            String::new()
+        }
+    }
+
     fn generate_axum_source(&self) -> String {
+        // The single WebSocket handler must live at the project root.
+        self.enforce_ws_handler_location();
+
         let Self { app, mode, .. } = &self;
         // Server actions live in `actions.rs` / `*.actions.rs` files under
         // `src/routes` — discovered here so they can be module-declared, routed,
@@ -176,18 +251,20 @@ impl SourceBuilder {
             .replace(
                 "// ROUTE_BUILDER\n",
                 &format!(
-                    "{}{}",
+                    "{}{}{}",
                     self.create_routes_declaration(&app.route_directory_info),
                     self.create_actions_routes(&actions),
+                    self.create_ws_route(),
                 ),
             )
             .replace(
                 "// MODULE_IMPORTS\n",
                 &format!(
-                    "{}{}{}",
+                    "{}{}{}{}",
                     self.create_modules_declaration(&app.route_directory_info),
                     self.create_composite_handlers(),
                     self.create_actions_modules(&actions),
+                    self.create_ws_module(),
                 ),
             )
             .replace("/*VERSION*/", crate_version!())
@@ -311,9 +388,13 @@ fn __ossido_environment() -> &'static __ossido_environment_mod::{struct_name} {{
             .map(|env| render_env_module(&env))
             .unwrap_or_default();
 
-        // Both ambient module augmentations are appended after the
+        // The `@ossido-labs/ossido/ws` global event maps — merged into the empty
+        // interfaces the `ws` module declares (like the API routes map).
+        let ws_events = render_ws_events(&collect_ws_events(&self.base_path));
+
+        // The ambient global augmentations are appended after the
         // `@ossido-labs/ossido/types` block, in the `trailing` slot.
-        let trailing = format!("{api_routes}{env_module}");
+        let trailing = format!("{api_routes}{env_module}{ws_events}");
 
         // The importable, typed server-action functions (`.ossido/actions.ts`)
         // — a real module (not just an ambient declaration) so user code can

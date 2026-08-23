@@ -15,6 +15,7 @@ export default defineBuildConfig({
     './src/env/index.ts',
     './src/ssr/index.ts',
     './src/hydration/index.tsx',
+    './src/ws/index.ts',
   ],
   target: 'es2022',
 });

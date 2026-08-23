@@ -1,6 +1,6 @@
 use syn::{Attribute, Meta};
 
-use crate::symbols::{PROPS_TRAIT, TYPE_TRAIT};
+use crate::symbols::{CLIENT_WS_EVENT, PROPS_TRAIT, SERVER_WS_EVENT, TYPE_TRAIT};
 
 /// Whether a struct/enum should have a TypeScript type generated for it — i.e.
 /// it carries the `#[Type]` or `#[Props]` attribute macro (`Props` implies
@@ -12,7 +12,10 @@ pub fn has_derive_type(attrs: &[Attribute]) -> bool {
         // The macro's path (last segment) is the marker; `derive`/`serde`/`doc`
         // and friends fall through to the legacy check below.
         if let Some(segment) = attr.path().segments.last()
-            && (segment.ident == TYPE_TRAIT || segment.ident == PROPS_TRAIT)
+            && (segment.ident == TYPE_TRAIT
+                || segment.ident == PROPS_TRAIT
+                || segment.ident == SERVER_WS_EVENT
+                || segment.ident == CLIENT_WS_EVENT)
         {
             return true;
         }
