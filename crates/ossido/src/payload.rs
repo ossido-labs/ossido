@@ -43,7 +43,7 @@ pub struct Payload<'a> {
         rename(serialize = "publicEnv"),
         skip_serializing_if = "Option::is_none"
     )]
-    public_env: Option<&'a RawValue>,
+    public_env: Option<Box<RawValue>>,
     /// Present only when a handler panicked (dev mode). The client seeds the
     /// route's data resource as rejected so the error overlay renders.
     #[serde(

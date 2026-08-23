@@ -9,10 +9,11 @@ const require = createRequire(import.meta.url);
  * Resolve the workspace `@ossido-labs/ossido-cli` launcher via Node module
  * resolution — independent of where bun hoists the `.bin` symlink (which is not
  * reliably at the repo root in CI) — and run it with `node` (so it also does not
- * depend on the shim's executable bit). In the monorepo no per-platform binary
- * package is installed, so the launcher falls back to the local
- * `target/{release,debug}/ossido` build (produced by `e2e-test-setup.js`).
- * `OSSIDO_BINARY_PATH` still overrides everything. */
+ * depend on the shim's executable bit). Inside the monorepo the launcher
+ * prefers the local `target/{release,debug}/ossido` build (produced by
+ * `e2e-test-setup.js`) over the installed *published* platform packages, whose
+ * generated code can lag the workspace crates. `OSSIDO_BINARY_PATH` still
+ * overrides everything. */
 export const ossidoBin = process.env.OSSIDO_BINARY_PATH
   ? process.env.OSSIDO_BINARY_PATH
   : `node ${require.resolve('@ossido-labs/ossido-cli/bin/ossido.js')}`;

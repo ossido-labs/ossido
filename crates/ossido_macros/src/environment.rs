@@ -78,17 +78,17 @@ pub fn environment_attr(_args: TokenStream, item: TokenStream) -> TokenStream {
 
         if is_option(&field.ty) {
             from_env_inits.push(quote! {
-                #ident: match ::std::env::var(#env_var) {
-                    ::core::result::Result::Ok(__value) => ::core::option::Option::Some(
+                #ident: match __ossido_lookup(#env_var) {
+                    ::core::option::Option::Some(__value) => ::core::option::Option::Some(
                         __value.parse().unwrap_or_else(|_| ::core::panic!(#invalid_msg))
                     ),
-                    ::core::result::Result::Err(_) => ::core::option::Option::None,
+                    ::core::option::Option::None => ::core::option::Option::None,
                 },
             });
         } else {
             from_env_inits.push(quote! {
-                #ident: ::std::env::var(#env_var)
-                    .unwrap_or_else(|_| ::core::panic!(#missing_msg))
+                #ident: __ossido_lookup(#env_var)
+                    .unwrap_or_else(|| ::core::panic!(#missing_msg))
                     .parse()
                     .unwrap_or_else(|_| ::core::panic!(#invalid_msg)),
             });
@@ -122,12 +122,24 @@ pub fn environment_attr(_args: TokenStream, item: TokenStream) -> TokenStream {
         #input
 
         impl #name {
-            /// Read and parse every field from the OS environment. Panics on a
-            /// missing/invalid required (non-`Option`) variable.
-            pub fn from_env() -> Self {
+            /// Read and parse every field through `__ossido_lookup` (env var name
+            /// → value). Panics on a missing/invalid required (non-`Option`)
+            /// variable. Backs both [`from_env`](Self::from_env) and the dev
+            /// hot-reload path, which supplies values from the re-read `.env`
+            /// files instead of the OS environment.
+            #[doc(hidden)]
+            pub fn __ossido_from_lookup(
+                __ossido_lookup: impl Fn(&str) -> ::core::option::Option<::std::string::String>,
+            ) -> Self {
                 Self {
                     #(#from_env_inits)*
                 }
+            }
+
+            /// Read and parse every field from the OS environment. Panics on a
+            /// missing/invalid required (non-`Option`) variable.
+            pub fn from_env() -> Self {
+                Self::__ossido_from_lookup(|__ossido_key| ::std::env::var(__ossido_key).ok())
             }
 
             /// JSON object of only the public fields — registered with the
