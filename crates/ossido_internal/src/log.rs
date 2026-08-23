@@ -60,7 +60,9 @@ pub enum Level {
 }
 
 impl Level {
-    fn label(self) -> &'static str {
+    /// The uppercase console label (`TRACE` … `ERROR`), also used as OTel
+    /// severity text by the telemetry log sink.
+    pub fn label(self) -> &'static str {
         match self {
             Level::Trace => "TRACE",
             Level::Debug => "DEBUG",
@@ -137,6 +139,40 @@ fn active_format() -> LogFormat {
     FORMAT.get().copied().unwrap_or_default()
 }
 
+/// A single log record as seen by an installed [`LogSink`] — the structured
+/// form of a line *about* to be printed, regardless of the console format.
+pub struct LogSinkRecord<'a> {
+    pub level: Level,
+    pub source: Source,
+    pub message: &'a str,
+    /// The request path, when the record is scoped to a request.
+    pub path: Option<&'a str>,
+    /// The structured report, when the record is a rich error.
+    pub error: Option<&'a ErrorReport>,
+    /// Additional key/value attributes supplied by the caller.
+    pub extra_attrs: &'a [(&'a str, &'a str)],
+}
+
+/// A secondary destination for every log record (e.g. an OpenTelemetry
+/// exporter). Console output is unaffected — the sink observes records *in
+/// addition* to printing, never instead of it.
+pub trait LogSink: Send + Sync {
+    fn emit(&self, record: &LogSinkRecord);
+}
+
+static SINK: OnceLock<Box<dyn LogSink>> = OnceLock::new();
+
+/// Install a process-wide [`LogSink`]. Idempotent — the first call wins.
+pub fn set_sink(sink: Box<dyn LogSink>) {
+    let _ = SINK.set(sink);
+}
+
+fn sink_emit(record: &LogSinkRecord) {
+    if let Some(sink) = SINK.get() {
+        sink.emit(record);
+    }
+}
+
 static DEBUG: OnceLock<bool> = OnceLock::new();
 
 /// Enable/disable request-lifecycle debug tracing for this process (from the
@@ -192,6 +228,16 @@ pub fn debug_trace(level: Level, header: &str, path: &str, spans: &[TraceSpan]) 
             );
         }
     }
+    // The waterfall's sub-task timings are not forwarded: when telemetry is on
+    // they are already exported as real spans by the instrumented call sites.
+    sink_emit(&LogSinkRecord {
+        level,
+        source: Source::Backend,
+        message: header,
+        path: Some(path),
+        error: None,
+        extra_attrs: &[],
+    });
 }
 
 fn now_local_hms() -> String {
@@ -265,6 +311,14 @@ pub fn backend_request(level: Level, message: impl Display, path: &str) {
             );
         }
     }
+    sink_emit(&LogSinkRecord {
+        level,
+        source: Source::Backend,
+        message: &message,
+        path: Some(path),
+        error: None,
+        extra_attrs: &[],
+    });
 }
 
 /// Log a structured error with the rich template.
@@ -273,6 +327,19 @@ pub fn error(source: Source, report: &ErrorReport) {
         LogFormat::Pretty => println!("{}", pretty_error(source, report)),
         LogFormat::Json => println!("{}", json_error(source, report)),
     }
+    let message = if report.name.is_empty() {
+        report.message.clone()
+    } else {
+        format!("{}: {}", report.name, report.message)
+    };
+    sink_emit(&LogSinkRecord {
+        level: Level::Error,
+        source,
+        message: &message,
+        path: None,
+        error: Some(report),
+        extra_attrs: &[],
+    });
 }
 
 fn emit(source: Source, level: Level, message: &str) {
@@ -280,6 +347,14 @@ fn emit(source: Source, level: Level, message: &str) {
         LogFormat::Pretty => println!("{}", pretty_line(source, level, message)),
         LogFormat::Json => println!("{}", json_line(source, level, message)),
     }
+    sink_emit(&LogSinkRecord {
+        level,
+        source,
+        message,
+        path: None,
+        error: None,
+        extra_attrs: &[],
+    });
 }
 
 fn pretty_line(source: Source, level: Level, message: &str) -> String {
@@ -673,6 +748,78 @@ mod tests {
             content: String::new(),
         };
         assert_eq!(code_frame(&location), "");
+    }
+
+    /// A sink that records every forwarded record. Installed once for the whole
+    /// test process (the sink `OnceLock` is global), so all assertions about
+    /// forwarding live in this single test.
+    struct CapturingSink(std::sync::Mutex<Vec<CapturedRecord>>);
+
+    struct CapturedRecord {
+        level: Level,
+        source: Source,
+        message: String,
+        path: Option<String>,
+        has_error: bool,
+    }
+
+    static CAPTURED: OnceLock<&'static CapturingSink> = OnceLock::new();
+
+    impl LogSink for &'static CapturingSink {
+        fn emit(&self, record: &LogSinkRecord) {
+            self.0.lock().unwrap().push(CapturedRecord {
+                level: record.level,
+                source: record.source,
+                message: record.message.to_string(),
+                path: record.path.map(str::to_string),
+                has_error: record.error.is_some(),
+            });
+        }
+    }
+
+    #[test]
+    fn sink_receives_all_emit_paths() {
+        let sink: &'static CapturingSink = CAPTURED.get_or_init(|| {
+            let sink = Box::leak(Box::new(CapturingSink(std::sync::Mutex::new(Vec::new()))));
+            set_sink(Box::new(&*sink));
+            sink
+        });
+
+        backend(Level::Info, "plain backend");
+        frontend(Level::Warn, "plain frontend");
+        backend_request(Level::Info, "scoped", "/pokemons/25");
+        error(
+            Source::Backend,
+            &ErrorReport {
+                name: "RustPanic".to_string(),
+                message: "boom".to_string(),
+                ..Default::default()
+            },
+        );
+        debug_trace(Level::Info, "GET / 200 in 1.0ms", "/", &[]);
+
+        let records = sink.0.lock().unwrap();
+        let find = |message: &str| {
+            records
+                .iter()
+                .find(|r| r.message == message)
+                .unwrap_or_else(|| panic!("no sink record for {message:?}"))
+        };
+
+        let plain = find("plain backend");
+        assert_eq!(plain.level, Level::Info);
+        assert_eq!(plain.source, Source::Backend);
+        assert_eq!(plain.path, None);
+
+        assert_eq!(find("plain frontend").source, Source::Frontend);
+        assert_eq!(find("scoped").path.as_deref(), Some("/pokemons/25"));
+
+        // Rich errors forward the combined header and carry the report.
+        let error = find("RustPanic: boom");
+        assert_eq!(error.level, Level::Error);
+        assert!(error.has_error);
+
+        assert_eq!(find("GET / 200 in 1.0ms").path.as_deref(), Some("/"));
     }
 
     #[test]

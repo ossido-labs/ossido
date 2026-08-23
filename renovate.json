@@ -8,6 +8,12 @@
       "matchDepTypes": ["devDependencies"],
       "matchPackageNames": ["oxlint", "oxfmt"],
       "groupName": "devDependencies (oxc)"
+    },
+    {
+      "description": "The opentelemetry crates and tracing-opentelemetry must be bumped in lockstep — mismatched minors produce two copies of the opentelemetry API crate.",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["opentelemetry**", "tracing-opentelemetry"],
+      "groupName": "opentelemetry"
     }
   ]
 }

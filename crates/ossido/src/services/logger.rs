@@ -9,6 +9,7 @@ use http::{Request, Response};
 use ossido_internal::log::{self, Level};
 use tokio::time::Instant;
 use tower::{Layer, Service};
+use tracing::instrument::Instrument;
 
 /// Colour an HTTP method by verb (GET green, POST blue, DELETE red, …) so the
 /// request log scans at a glance. Uncommon methods keep the default colour.
@@ -75,12 +76,18 @@ where
         let path = req.uri().path().to_string();
         let start = Instant::now();
 
+        // The request's OTel server span (disabled span when telemetry is off).
+        // The whole request future — handler, SSR, and the summary log below —
+        // runs inside it, so child spans and logs correlate to this request.
+        let span = crate::otel::request_span(&req);
+
         // Install a per-request timeline (only allocates under `DEBUG=1`) so
         // instrumented phases can record their timings into the current request.
         let timeline = crate::debug::new_timeline();
         let request = crate::debug::scope(timeline.clone(), self.inner.call(req));
 
-        Box::pin(async move {
+        let response_span = span.clone();
+        let traced = async move {
             let res = request.await;
 
             // The browser-log intake is always internal noise. The data endpoint
@@ -92,6 +99,14 @@ where
             }
 
             let status_code = res.as_ref().unwrap().status();
+
+            // As `i64`: smaller ints record via `Display` and would export as
+            // a string attribute instead of an int.
+            response_span.record("http.response.status_code", i64::from(status_code.as_u16()));
+            if status_code.is_server_error() {
+                // Per semconv, only 5xx marks a *server* span as errored.
+                response_span.record("otel.status_code", "ERROR");
+            }
 
             // Surface server/client error responses at a matching level.
             let level = if status_code.is_server_error() {
@@ -127,6 +142,8 @@ where
             }
 
             res
-        })
+        };
+
+        Box::pin(traced.instrument(span))
     }
 }

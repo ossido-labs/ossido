@@ -34,8 +34,44 @@ use crate::ssr::Js;
 /// over a oneshot; streaming jobs push each chunk (then a terminal result) over
 /// an unbounded channel the async side drains into the HTTP response.
 enum Job {
-    Buffered(String, oneshot::Sender<Result<String, SsrError>>),
-    Stream(String, mpsc::UnboundedSender<StreamMsg>),
+    Buffered(String, oneshot::Sender<Result<String, SsrError>>, JobTrace),
+    Stream(String, mpsc::UnboundedSender<StreamMsg>, JobTrace),
+}
+
+/// Carries the request's trace context across the crossbeam channel — the pool
+/// threads are plain OS threads, so the tokio-task span context does not flow
+/// there by itself. `tracing::Span` is `Send + Clone`, unlike the raw otel
+/// context guards. All spans are disabled no-ops when telemetry is off.
+struct JobTrace {
+    /// The span active at enqueue time (the request's server/handler span),
+    /// used as the explicit parent of the render-job span on the pool thread.
+    parent: tracing::Span,
+    /// Opened at enqueue, closed (dropped) when a pool thread dequeues the
+    /// job — its duration is the time spent queued behind busy threads.
+    queue_wait: tracing::Span,
+}
+
+impl JobTrace {
+    fn capture() -> Self {
+        JobTrace {
+            parent: tracing::Span::current(),
+            queue_wait: tracing::info_span!("ssr.queue_wait"),
+        }
+    }
+
+    /// Close the queue-wait span and open the render-job span for this pool
+    /// thread. Returned entered so the whole render (and the phase spans and
+    /// logs inside it) nests under the request.
+    fn start_render(self, streaming: bool) -> tracing::span::EnteredSpan {
+        drop(self.queue_wait);
+        tracing::info_span!(
+            parent: &self.parent,
+            "ssr.render_job",
+            { "ossido.ssr.streaming" } = streaming,
+            { "ossido.ssr.thread" } = std::thread::current().name(),
+        )
+        .entered()
+    }
 }
 
 /// A message on a streaming job's channel: one HTML chunk, or the terminal
@@ -196,12 +232,14 @@ fn sender() -> &'static Sender<Job> {
                     // job (recompiling only on a dev hot-reload, handled in `Js`).
                     while let Ok(job) = rx.recv() {
                         match job {
-                            Job::Buffered(payload, reply) => {
+                            Job::Buffered(payload, reply, trace) => {
+                                let _span = trace.start_render(false);
                                 let result = guarded(|| Js::render_to_string(Some(&payload)));
                                 log_render_error(result.as_ref().err());
                                 let _ = reply.send(result);
                             }
-                            Job::Stream(payload, chunks) => {
+                            Job::Stream(payload, chunks, trace) => {
+                                let _span = trace.start_render(true);
                                 // Forward each chunk as it is produced, then the
                                 // terminal result. The sink owns a clone of the
                                 // sender; the original stays for the terminal
@@ -235,7 +273,10 @@ pub fn init() {
 pub async fn render(payload: String) -> Result<String, SsrError> {
     let (reply_tx, reply_rx) = oneshot::channel();
 
-    if sender().send(Job::Buffered(payload, reply_tx)).is_err() {
+    if sender()
+        .send(Job::Buffered(payload, reply_tx, JobTrace::capture()))
+        .is_err()
+    {
         return Err(SsrError::FailedJsExecution(
             "SSR render pool is unavailable",
         ));
@@ -271,7 +312,10 @@ pub enum RenderStream {
 pub async fn render_stream(payload: String) -> RenderStream {
     let (chunk_tx, mut chunk_rx) = mpsc::unbounded_channel::<StreamMsg>();
 
-    if sender().send(Job::Stream(payload, chunk_tx)).is_err() {
+    if sender()
+        .send(Job::Stream(payload, chunk_tx, JobTrace::capture()))
+        .is_err()
+    {
         return RenderStream::Failed;
     }
 

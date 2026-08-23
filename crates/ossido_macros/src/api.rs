@@ -101,7 +101,12 @@ pub fn api_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
            #modified_request
            #logger_bindings
 
-           #fn_name(req.clone(), #argument_names).await
+           // `instrument_handler` wraps the user function in its per-handler
+           // OTel span (a no-op unless telemetry is active).
+           ossido::__otel::instrument_handler(
+               stringify!(#fn_name),
+               #fn_name(req.clone(), #argument_names),
+           ).await
         }
     }
 }

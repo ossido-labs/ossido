@@ -90,7 +90,12 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
         ) -> ossido::HandlerData {
             #props_state_binding
             #logger_bindings
-            let result = ossido::catch_handler(#fn_name(req, #argument_names))
+            // `instrument_handler` wraps the user function in its per-handler
+            // OTel span (a no-op unless telemetry is active).
+            let result = ossido::catch_handler(ossido::__otel::instrument_handler(
+                    stringify!(#fn_name),
+                    #fn_name(req, #argument_names),
+                ))
                 .await
                 .map(ossido::Response::from);
             ossido::resolve_handler(result)
@@ -118,7 +123,10 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
            // into a `Send` outcome *synchronously* here — nothing non-`Send` may
            // live across the awaits below. `req` is carried in the error variant so
            // the async error path can use it without cloning it on the hot path.
-           let outcome = match ossido::catch_handler(#fn_name(req.clone(), #argument_names)).await {
+           let outcome = match ossido::catch_handler(ossido::__otel::instrument_handler(
+               stringify!(#fn_name),
+               #fn_name(req.clone(), #argument_names),
+           )).await {
                Ok(response) => Ok(ossido::Response::from(response).into_render_job(req)),
                Err(server_error) => Err((req, server_error)),
            };
@@ -145,7 +153,10 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
 
            // Serialize the (non-`Send`) response synchronously; carry the error
            // for the async path so nothing non-`Send` lives across the await.
-           let outcome = match ossido::catch_handler(#fn_name(req.clone(), #argument_names)).await {
+           let outcome = match ossido::catch_handler(ossido::__otel::instrument_handler(
+               stringify!(#fn_name),
+               #fn_name(req.clone(), #argument_names),
+           )).await {
                Ok(response) => Ok(ossido::Response::from(response).json().into_response()),
                Err(server_error) => Err((req, server_error)),
            };
@@ -233,6 +244,20 @@ mod tests {
         assert!(out.contains("letlogger=ossido::Logger::new(&req)"));
         // Both are passed to the handler in declared order.
         assert!(out.contains("page(req.clone(),db,logger)"));
+    }
+
+    #[test]
+    fn every_entry_point_wraps_the_handler_in_its_otel_span() {
+        let out = expand(quote! {
+            async fn home(req: Request) -> Response { todo!() }
+        });
+        // All three entry points route the user function through
+        // `instrument_handler`, so each invocation carries the handler span.
+        assert_eq!(
+            out.matches("ossido::__otel::instrument_handler(stringify!(home),home(")
+                .count(),
+            3,
+        );
     }
 
     #[test]
