@@ -47,10 +47,7 @@ pub enum WsError {
     Json(serde_json::Error),
     /// [`Incoming::parse`] was asked for an event whose name does not match the
     /// frame's `event` field.
-    EventMismatch {
-        expected: &'static str,
-        got: String,
-    },
+    EventMismatch { expected: &'static str, got: String },
     /// A control/close frame was passed where a data frame was expected.
     NotADataFrame,
     /// The peer closed the connection (or the socket errored).
@@ -183,7 +180,10 @@ pub struct TypedSink {
 impl TypedSink {
     /// Send a typed server → client event.
     pub async fn send<E: ServerWsEvent>(&mut self, ev: &E) -> Result<(), WsError> {
-        self.inner.send(encode(ev)?).await.map_err(|_| WsError::Send)
+        self.inner
+            .send(encode(ev)?)
+            .await
+            .map_err(|_| WsError::Send)
     }
 
     /// Send a raw frame (escape hatch for pings, close frames, binary, …).
@@ -236,7 +236,10 @@ impl TypedSocket {
 
     /// Send a typed server → client event.
     pub async fn send_event<E: ServerWsEvent>(&mut self, ev: &E) -> Result<(), WsError> {
-        self.inner.send(encode(ev)?).await.map_err(|_| WsError::Send)
+        self.inner
+            .send(encode(ev)?)
+            .await
+            .map_err(|_| WsError::Send)
     }
 
     /// Read the next inbound data frame as an [`Incoming`] envelope.

@@ -104,7 +104,9 @@ mod tests {
     use super::*;
 
     fn expand(item: TokenStream) -> String {
-        ws_core(TokenStream::new(), item).to_string().replace(' ', "")
+        ws_core(TokenStream::new(), item)
+            .to_string()
+            .replace(' ', "")
     }
 
     #[test]
