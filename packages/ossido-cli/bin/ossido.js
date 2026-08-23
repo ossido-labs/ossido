@@ -7,11 +7,13 @@
 // and execs it, forwarding argv and propagating the exit code / signal.
 //
 // Resolution order:
-//   1. OSSIDO_BINARY_PATH env var  — explicit override (e2e, power users).
-//   2. The installed per-platform package.
-//   3. A local monorepo build (target/{release,debug}/ossido) — so the same
-//      `ossido` script works when developing inside the ossido repo, where no
-//      per-platform package is installed.
+//   1. OSSIDO_BINARY_PATH env var — explicit override (e2e, power users).
+//   2. Inside the ossido source repo: the local workspace build
+//      (target/{release,debug}/ossido). The platform packages are installed
+//      here too (optionalDependencies), but they hold the *published* binary,
+//      whose generated code can lag the workspace crates — the local build
+//      must win or fixture/example apps fail to compile.
+//   3. The installed per-platform package (the normal end-user path).
 
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
@@ -69,19 +71,18 @@ function fromPlatformPackage() {
   }
 }
 
-// (3) Monorepo dev fallback: walk up for the Cargo workspace root, prefer a
-// release build then a debug build.
-function fromLocalBuild() {
+// The ossido source repo's root, if this launcher is running from inside it —
+// detected by `crates/ossido_cli` existing above us, which only the ossido
+// repo itself has (a user's project never does). Inside the repo the LOCAL
+// build must win: the platform packages are also installed here (they are
+// optionalDependencies of this package), but they hold the *published*
+// binary, whose generated code can be arbitrarily older than the workspace's
+// `ossido` crate the fixture/example apps compile against.
+function monorepoRoot() {
   let dir = __dirname;
   for (let i = 0; i < 8; i++) {
-    if (
-      fs.existsSync(path.join(dir, "Cargo.toml")) &&
-      fs.existsSync(path.join(dir, "crates"))
-    ) {
-      for (const profile of ["release", "debug"]) {
-        const candidate = path.join(dir, "target", profile, BIN);
-        if (fs.existsSync(candidate)) return candidate;
-      }
+    if (fs.existsSync(path.join(dir, "crates", "ossido_cli", "Cargo.toml"))) {
+      return dir;
     }
     const parent = path.dirname(dir);
     if (parent === dir) break;
@@ -90,8 +91,54 @@ function fromLocalBuild() {
   return null;
 }
 
+// (3) Local workspace build. When both profiles exist, prefer the most
+// recently built one — a months-old release binary must not shadow the debug
+// build `cargo build` just produced (its generated code would lag the
+// workspace crates, failing fixture/example compiles with confusing errors).
+function fromLocalBuild() {
+  const root = monorepoRoot();
+  if (!root) return null;
+  let best = null;
+  let bestMtime = -Infinity;
+  for (const profile of ["release", "debug"]) {
+    const candidate = path.join(root, "target", profile, BIN);
+    try {
+      const mtime = fs.statSync(candidate).mtimeMs;
+      if (mtime > bestMtime) {
+        best = candidate;
+        bestMtime = mtime;
+      }
+    } catch {
+      // Profile not built.
+    }
+  }
+  return best;
+}
+
 function resolveBinary() {
-  return fromEnv() || fromPlatformPackage() || fromLocalBuild();
+  const fromEnvBinary = fromEnv();
+  if (fromEnvBinary) return fromEnvBinary;
+
+  // Inside the ossido repo: local build first (see monorepoRoot). Falling back
+  // to an installed platform package is almost certainly a version mismatch —
+  // warn loudly so a stale-codegen failure is diagnosable.
+  if (monorepoRoot()) {
+    const local = fromLocalBuild();
+    if (local) return local;
+    const published = fromPlatformPackage();
+    if (published) {
+      console.error(
+        "ossido: WARNING — running inside the ossido repo but no local build " +
+          "was found (target/{release,debug}/ossido). Falling back to the " +
+          "installed *published* binary, which may generate code that does " +
+          "not match the workspace crates. Run `cargo build` first.",
+      );
+      return published;
+    }
+    return null;
+  }
+
+  return fromPlatformPackage() || fromLocalBuild();
 }
 
 const binary = resolveBinary();
