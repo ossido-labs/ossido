@@ -76,8 +76,17 @@ interface RouteNodesResult {
   notFoundFiles: Array<SpecialFileNode>;
 }
 
+/** A route file that could not be collected, and why. */
+export interface RouteIssue {
+  file: string;
+  message: string;
+}
+
+export type RouteIssueReporter = (issue: RouteIssue) => void;
+
 async function getRouteNodes(
   config = defaultConfig,
+  onIssue?: RouteIssueReporter,
 ): Promise<RouteNodesResult> {
   const routeNodes: Array<RouteNode> = [];
   const rustHandlersNodes: Array<string> = [];
@@ -128,11 +137,20 @@ async function getRouteNodes(
             return;
           }
 
-          // Check that the route is correctly default exported
+          // Check that the route is correctly default exported. Skipping the
+          // file keeps the rest of the tree generating, but the skip must be
+          // loud — a silently missing route reads as "HMR is broken".
           if (
             isScript &&
             !isDefaultExported((await fsp.readFile(fullPath)).toString())
           ) {
+            onIssue?.({
+              file: filePath,
+              message:
+                `Route file "${filePath}" has no default export, so it was ` +
+                'skipped. Route files (page/layout) must default-export a ' +
+                'React component.',
+            });
             return;
           }
 
@@ -188,6 +206,7 @@ async function getRouteNodes(
 
 export async function routeGenerator(
   config: Config = defaultConfig,
+  onIssue?: RouteIssueReporter,
 ): Promise<void> {
   if (!isFirst) {
     isFirst = true;
@@ -213,7 +232,7 @@ export async function routeGenerator(
     loadingFiles,
     errorFiles,
     notFoundFiles,
-  } = await getRouteNodes(config);
+  } = await getRouteNodes(config, onIssue);
 
   const preRouteNodes = sortRouteNodes(beforeRouteNodes);
 

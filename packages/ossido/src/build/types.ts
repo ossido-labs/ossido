@@ -19,6 +19,7 @@ export interface InternalOssidoConfigLogging {
 /** Fully-resolved dev config (defaults filled). */
 export interface InternalOssidoConfigDev {
   criticalCss: boolean;
+  hmrThroughProxy: boolean;
 }
 
 /**

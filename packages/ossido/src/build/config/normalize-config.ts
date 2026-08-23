@@ -90,6 +90,7 @@ export const normalizeConfig = (config: OssidoConfig): InternalOssidoConfig => {
     },
     dev: {
       criticalCss: config.dev?.criticalCss ?? true,
+      hmrThroughProxy: config.dev?.hmrThroughProxy ?? false,
     },
     ssr: {
       // `null` = auto: the Rust runtime uses the machine's available

@@ -12,6 +12,7 @@ import type {
   DevOverlayCorner,
 } from './devErrorStore';
 import { DEV_OVERLAY_CORNERS, devErrorStore } from './devErrorStore';
+import { devServerStatus } from './devServerStatus';
 
 /**
  * Development-only host for the unified error overlay and its persistent dev
@@ -223,10 +224,16 @@ function DevIndicator({
   count,
   menuOpen,
   position,
+  restarting,
+  notice,
+  onRefreshProps,
 }: {
   count: number;
   menuOpen: boolean;
   position: DevOverlayCorner;
+  restarting: boolean;
+  notice: string | null;
+  onRefreshProps?: () => void;
 }): JSX.Element {
   return (
     <>
@@ -237,6 +244,16 @@ function DevIndicator({
         />
       )}
       <div className={`ossido-err-indicator ossido-err-indicator--${position}`}>
+        {notice !== null && !menuOpen && (
+          <div
+            className="ossido-err-notice"
+            role="status"
+            title="Dismiss"
+            onClick={(): void => devServerStatus.dismissNotice()}
+          >
+            {notice}
+          </div>
+        )}
         {menuOpen && (
           <div
             className={`ossido-err-menu ossido-err-menu--${position}`}
@@ -256,6 +273,20 @@ function DevIndicator({
                 <span className="ossido-err-menu-muted">None</span>
               )}
             </button>
+
+            {onRefreshProps && (
+              <button
+                type="button"
+                role="menuitem"
+                className="ossido-err-menu-item"
+                onClick={(): void => {
+                  devErrorStore.closeMenu();
+                  onRefreshProps();
+                }}
+              >
+                <span>Refresh props</span>
+              </button>
+            )}
 
             <div className="ossido-err-menu-sep" />
 
@@ -298,10 +329,15 @@ function DevIndicator({
 
         <button
           type="button"
-          className="ossido-err-fab"
+          className={
+            restarting
+              ? 'ossido-err-fab ossido-err-fab--restarting'
+              : 'ossido-err-fab'
+          }
           aria-label="Ossido dev tools"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
+          title={restarting ? 'Rust server restarting…' : undefined}
           onClick={(): void => devErrorStore.toggleMenu()}
         >
           <BoltIcon />
@@ -312,11 +348,25 @@ function DevIndicator({
   );
 }
 
-export function DevErrorOverlayHost(): JSX.Element | null {
+export function DevErrorOverlayHost({
+  onRefreshProps,
+}: {
+  /**
+   * Re-fetch the current route's server props in place (no reload). Provided by
+   * the router (which owns the data layer); the "Refresh props" menu item only
+   * renders when present.
+   */
+  onRefreshProps?: () => void;
+} = {}): JSX.Element | null {
   const state = useSyncExternalStore(
     devErrorStore.subscribe,
     devErrorStore.getSnapshot,
     devErrorStore.getServerSnapshot,
+  );
+  const serverStatus = useSyncExternalStore(
+    devServerStatus.subscribe,
+    devServerStatus.getSnapshot,
+    devServerStatus.getServerSnapshot,
   );
 
   // The indicator is a client-only portal, so it renders nothing until after
@@ -379,8 +429,16 @@ export function DevErrorOverlayHost(): JSX.Element | null {
   }
 
   // Otherwise the persistent indicator — hidden only when the user hid it for
-  // this session AND there are no errors to surface.
-  if (state.badgeHidden && count === 0) return null;
+  // this session AND there is nothing to surface (no errors, no restart in
+  // progress, no notice).
+  if (
+    state.badgeHidden &&
+    count === 0 &&
+    serverStatus.phase === 'ready' &&
+    serverStatus.notice === null
+  ) {
+    return null;
+  }
 
   return createPortal(
     <>
@@ -389,6 +447,9 @@ export function DevErrorOverlayHost(): JSX.Element | null {
         count={count}
         menuOpen={state.menuOpen}
         position={state.position}
+        restarting={serverStatus.phase === 'restarting'}
+        notice={serverStatus.notice}
+        onRefreshProps={onRefreshProps}
       />
     </>,
     document.body,

@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fs;
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -55,6 +57,85 @@ async unsafe fn start_all_processes(
     if let Ok(mut pm) = process_manager.lock() {
         pm.start_dev_processes(report, host, port).await
     }
+}
+
+/// The host a client (this CLI, the browser) should dial to reach a server
+/// bound to `host` — wildcard binds are reachable via loopback.
+fn connect_host(host: &str) -> &str {
+    match host {
+        "0.0.0.0" | "::" => "localhost",
+        other => other,
+    }
+}
+
+/// Tell the browser — via the Vite dev server's HMR channel — that the Rust
+/// dev server is restarting and, once the rebuilt server accepts connections
+/// again, that it is ready. The client reacts to "ready" by re-fetching the
+/// current route's server props in place, so a `.rs` edit updates the page
+/// without a hard reload.
+///
+/// Runs on its own OS thread (a rebuild takes seconds, and the blocking HTTP +
+/// TCP polling must stay off the watcher's async runtime). `generation`
+/// de-duplicates overlapping rebuilds: only the latest restart reports ready.
+fn notify_browser_of_rust_restart(host: String, port: u16, generation: Arc<AtomicU64>) {
+    let my_generation = generation.fetch_add(1, Ordering::SeqCst) + 1;
+
+    std::thread::spawn(move || {
+        let host = connect_host(&host).to_string();
+        let vite_base = format!("http://{}:{}", host, port + 1);
+        let client = match reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+        {
+            Ok(client) => client,
+            Err(_) => return,
+        };
+
+        // Best-effort: the Vite dev server may still be booting on the very
+        // first build; the browser simply misses the "restarting" state then.
+        let _ = client
+            .post(format!("{vite_base}/__ossido-dev/rust-restarting"))
+            .send();
+
+        let addr = (host.as_str(), port);
+
+        // Phase 1: wait for the old server to actually go down, so a
+        // still-alive listener isn't mistaken for the rebuilt one.
+        let died_deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < died_deadline {
+            if TcpStream::connect(addr).is_err() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        // Phase 2: wait for the rebuilt server to bind. Generous deadline — a
+        // cold-ish cargo rebuild can take a while; on timeout (e.g. a compile
+        // error) no "ready" is sent and the dev indicator keeps showing the
+        // restarting state until a later successful rebuild.
+        let ready_deadline = Instant::now() + Duration::from_secs(300);
+        let mut interval = Duration::from_millis(100);
+        loop {
+            if generation.load(Ordering::SeqCst) != my_generation {
+                return; // A newer rebuild superseded this one.
+            }
+            if Instant::now() >= ready_deadline {
+                return;
+            }
+            if TcpStream::connect(addr).is_ok() {
+                break;
+            }
+            std::thread::sleep(interval);
+            interval = (interval * 2).min(Duration::from_millis(500));
+        }
+
+        if generation.load(Ordering::SeqCst) != my_generation {
+            return;
+        }
+        let _ = client
+            .post(format!("{vite_base}/__ossido-dev/rust-ready"))
+            .send();
+    });
 }
 
 fn detect_existing_env_files() -> Vec<String> {
@@ -128,6 +209,12 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
             crate::route_tree::print_route_tree(&builder.app);
         }
     }
+
+    // Captured by the watch closure so `.rs` rebuilds can notify the browser
+    // (via the Vite dev server) to refresh route props once the server is back.
+    let notify_host = host.clone();
+    let notify_port = port;
+    let restart_generation = Arc::new(AtomicU64::new(0));
 
     let wx = Watchexec::new(move |mut action| {
         let process_manager = process_manager.clone();
@@ -212,6 +299,13 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
             if let Ok(mut pm) = process_manager.lock() {
                 pm.restart_process(ProcessId::RunRustDevServer);
             }
+            // Browser side: show "restarting", then refresh route props in
+            // place once the rebuilt server accepts connections.
+            notify_browser_of_rust_restart(
+                notify_host.clone(),
+                notify_port,
+                restart_generation.clone(),
+            );
         }
 
         if should_reload_ssr_bundle && let Ok(mut pm) = process_manager.lock() {
