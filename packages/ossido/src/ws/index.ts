@@ -87,7 +87,7 @@ export interface OssidoSocket {
  * handshake.
  */
 export function connect(options?: {
-  protocols?: string | string[];
+  protocols?: string | Array<string>;
 }): OssidoSocket {
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const socket = new WebSocket(
@@ -98,7 +98,7 @@ export function connect(options?: {
   return {
     raw: socket,
     on(handler) {
-      const listener = (message: MessageEvent) => {
+      const listener = (message: MessageEvent): void => {
         let parsed: ServerWsEvent;
         try {
           parsed = JSON.parse(message.data as string) as ServerWsEvent;
