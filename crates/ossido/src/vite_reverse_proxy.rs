@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use axum::body::Body;
 use axum::extract::{Path, Query};
@@ -15,6 +15,13 @@ use crate::config::GLOBAL_CONFIG;
 /// trace — they are cached serves, not plugin compilation (which takes far
 /// longer). This keeps the debug output to the requests that did real work.
 const VITE_TRACE_MIN_MS: u128 = 5;
+
+/// How long a proxied request keeps retrying while the vite dev server is
+/// unreachable (booting or restarting) before answering 502. Browsers never
+/// retry a failed module import — a single early 502 surfaces as
+/// "Importing a module script failed" and stays broken until a manual reload —
+/// so the patience has to live here, server-side.
+const VITE_RETRY_BUDGET: Duration = Duration::from_secs(5);
 
 /// Shared client so proxied requests reuse one connection pool (keep-alive to
 /// the vite server) instead of building a fresh pool per request.
@@ -55,11 +62,26 @@ pub async fn vite_reverse_proxy(
         format!("?{query_string}")
     };
 
-    match client()
-        .get(format!("{vite_url}/{path}{query_string}"))
-        .send()
-        .await
-    {
+    let url = format!("{vite_url}/{path}{query_string}");
+
+    // Retry transport failures (connection refused/reset — vite booting or
+    // restarting) within a bounded budget. HTTP error statuses come back as
+    // `Ok` and are forwarded untouched: vite's own client handles those.
+    let mut backoff = Duration::from_millis(100);
+    let result = loop {
+        match client().get(&url).send().await {
+            Ok(res) => break Ok(res),
+            Err(err) => {
+                if started.elapsed() >= VITE_RETRY_BUDGET {
+                    break Err(err);
+                }
+                tokio::time::sleep(backoff).await;
+                backoff = (backoff * 2).min(Duration::from_millis(500));
+            }
+        }
+    };
+
+    match result {
         Ok(res) => {
             // The response headers arrive once vite has finished transforming, so
             // this captures the plugin compilation time (the body then streams).

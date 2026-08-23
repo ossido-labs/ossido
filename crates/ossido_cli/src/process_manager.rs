@@ -141,6 +141,14 @@ impl ProcessManager {
         // server actually accepts connections so the caller only reports "ready"
         // once requests will succeed.
         wait_for_server_ready(host, port).await;
+
+        // Also wait for the Vite dev server (`port + 1`): on warm starts the
+        // Rust build finishes before Vite's node boot + dep optimisation, and a
+        // browser opened at "ready" would hit the `/vite-server/*` proxy while
+        // its upstream isn't listening — failed module imports the browser
+        // never retries ("Importing a module script failed"). Ready must mean
+        // BOTH servers accept connections.
+        wait_for_server_ready(host, port + 1).await;
     }
 
     pub fn log_server_address(&self, config: &Config, ready_in: std::time::Duration) {
