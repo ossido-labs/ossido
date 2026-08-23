@@ -58,6 +58,10 @@
       "types": "./dist/esm/hydration/index.d.ts",
       "default": "./dist/esm/hydration/index.js"
     },
+    "./ws": {
+      "types": "./dist/esm/ws/index.d.ts",
+      "default": "./dist/esm/ws/index.js"
+    },
     ".": {
       "types": "./dist/esm/index.d.ts",
       "default": "./dist/esm/index.js"

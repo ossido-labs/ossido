@@ -7,15 +7,19 @@ use glob::glob;
 use ossido_internal::ossido_println;
 use tracing::{error, trace};
 
-use crate::symbols::{PROPS_TRAIT, TYPE_TRAIT};
+use crate::symbols::{CLIENT_WS_EVENT, PROPS_TRAIT, SERVER_WS_EVENT, TYPE_TRAIT};
 use crate::typescript::FileTypes;
 
 /// Cheap pre-filter before invoking the parser: a file can only contribute a
-/// generated type if its text mentions `Type` or `Props` (the attribute macros,
-/// or their legacy derive form). `Props` implies `Type`, so both must be checked
-/// — a file using only `#[Props]` contains no `Type` substring.
+/// generated type if its text mentions one of the type-generating attribute
+/// markers (`Type`/`Props`, or the directional WebSocket event macros). `Props`
+/// implies `Type`, so both must be checked — a file using only `#[Props]`
+/// contains no `Type` substring.
 fn mentions_a_type_marker(file_str: &str) -> bool {
-    file_str.contains(*TYPE_TRAIT) || file_str.contains(*PROPS_TRAIT)
+    file_str.contains(*TYPE_TRAIT)
+        || file_str.contains(*PROPS_TRAIT)
+        || file_str.contains(*SERVER_WS_EVENT)
+        || file_str.contains(*CLIENT_WS_EVENT)
 }
 
 #[derive(Debug, Clone, Default)]

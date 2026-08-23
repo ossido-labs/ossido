@@ -66,6 +66,7 @@ mod ssr;
 mod static_paths;
 mod vite_reverse_proxy;
 mod vite_websocket_proxy;
+mod ws_impl;
 
 // Re-exports
 pub use action::{ActionError, ActionInputError, Files, PrevState, UploadedFile};
@@ -81,7 +82,10 @@ pub use logger::Logger;
 pub use mode::Mode;
 // `Props` is re-exported both as the struct (from `response`) and as the
 // attribute macro — the same name in two namespaces, like `serde::Serialize`.
-pub use ossido_macros::{Environment, Props, Type, action, api, handler, middleware, static_paths};
+pub use ossido_macros::{
+    Environment, Props, Type, action, api, client_ws_event, handler, middleware, server_ws_event,
+    static_paths, ws,
+};
 pub use ossido_ssr::Ssr;
 pub use payload::Payload;
 pub use request::{BodyParseError, Request};
@@ -104,3 +108,16 @@ pub use tokio;
 // Ossido — a `#[middleware]` returns a `tower::Layer`. `tower_http` is left out
 // on purpose: it's an opt-in dependency users add themselves when needed.
 pub use tower;
+
+/// WebSocket support: the axum WS types plus Ossido's typed-event protocol and
+/// keyed connection store. Used by the `#[ossido::ws]` handler and the
+/// `#[ossido::server_ws_event]` / `#[ossido::client_ws_event]` event macros.
+pub mod ws {
+    pub use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgrade};
+
+    pub use crate::ws_impl::{
+        ClientWsEvent, ConnId, Connection, Incoming, Key, ServerWsEvent, SocketGroup, SocketHandle,
+        SocketManager, TypedSink, TypedSocket, TypedStream, WsError, WsEvent, decode, encode,
+        sockets,
+    };
+}

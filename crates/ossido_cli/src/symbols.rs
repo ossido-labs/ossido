@@ -15,6 +15,12 @@ pub const PROPS_TRAIT: Symbol = Symbol("Props");
 // TypeScript types and the SSR-injected env global.
 pub const ENVIRONMENT_TRAIT: Symbol = Symbol("Environment");
 
+// The directional WebSocket event attribute macros. Each does everything
+// `#[Type]` does (so their structs generate TypeScript) plus a direction marker
+// trait, so they are recognised for TypeScript generation too.
+pub const SERVER_WS_EVENT: Symbol = Symbol("server_ws_event");
+pub const CLIENT_WS_EVENT: Symbol = Symbol("client_ws_event");
+
 impl PartialEq<Symbol> for Ident {
     fn eq(&self, word: &Symbol) -> bool {
         self == word.0

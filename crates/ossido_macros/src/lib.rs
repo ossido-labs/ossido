@@ -14,6 +14,8 @@ mod middleware;
 mod props;
 mod static_paths;
 mod utils;
+mod ws;
+mod ws_event;
 
 #[proc_macro_attribute]
 pub fn handler(args: TokenStream, item: TokenStream) -> TokenStream {
@@ -33,6 +35,31 @@ pub fn Props(args: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn api(args: TokenStream, item: TokenStream) -> TokenStream {
     api::api_core(args.into(), item.into()).into()
+}
+
+/// `#[ossido::ws]` — the project's single WebSocket handler. Must live in
+/// `src/ws.rs`; the build fails if it appears under `src/routes/**`. Generates
+/// the axum upgrade handler that hands the raw socket + `SocketManager` to the
+/// annotated function. See [`ossido::ws`](../ossido/ws/index.html).
+#[proc_macro_attribute]
+pub fn ws(args: TokenStream, item: TokenStream) -> TokenStream {
+    ws::ws_core(args.into(), item.into()).into()
+}
+
+/// `#[ossido::server_ws_event("name")]` — a JSON event the **server sends** to
+/// the client. Applies `#[ossido::Type]` (serde + TypeScript) and marks the
+/// struct as a `ServerWsEvent`.
+#[proc_macro_attribute]
+pub fn server_ws_event(args: TokenStream, item: TokenStream) -> TokenStream {
+    ws_event::ws_event_core(ws_event::Direction::Server, args.into(), item.into()).into()
+}
+
+/// `#[ossido::client_ws_event("name")]` — a JSON event the **client sends** to
+/// the server. Applies `#[ossido::Type]` (serde + TypeScript) and marks the
+/// struct as a `ClientWsEvent`.
+#[proc_macro_attribute]
+pub fn client_ws_event(args: TokenStream, item: TokenStream) -> TokenStream {
+    ws_event::ws_event_core(ws_event::Direction::Client, args.into(), item.into()).into()
 }
 
 /// `#[ossido::action]` — a Next.js-style server action. Marks a function whose
