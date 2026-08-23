@@ -50,6 +50,12 @@ export type RouteComponent = ComponentType<any> & {
    * accept handler. Absent in prod and on eagerly-imported components.
    */
   update?: (next: RouteComponent) => void;
+  /**
+   * Dev-only. Replace the wrapper's import fn with the newest one from a
+   * re-generated route tree, keeping the (identity-cached) wrapper's `preload`
+   * live across route-tree hot swaps. Absent in prod.
+   */
+  __setFactory?: (next: () => Promise<{ default: RouteComponent }>) => void;
 };
 
 /**

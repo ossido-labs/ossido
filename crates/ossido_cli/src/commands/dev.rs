@@ -250,16 +250,30 @@ pub async fn watch(source_builder: SourceBuilder) -> Result<()> {
                                 removed_files_from_types.insert(path.to_path_buf());
                                 should_refresh_axum_source = true;
                             }
-                        }),
-                        FileEventKind::Modify(_) => event.paths().for_each(|(path, _)| {
-                            if path.extension().is_some_and(|ext| ext == "rs") {
-                                should_reload_rust_server = true;
-                                paths_to_refresh_types.insert(path.to_path_buf());
-                            }
+                            // A deleted route/component file must also rebuild
+                            // the SSR bundle — otherwise it keeps serving the
+                            // removed route on a hard navigation.
                             if ssr_reload_needed(path) {
                                 should_reload_ssr_bundle = true;
                             }
                         }),
+                        // A created file needs the same handling as a modified
+                        // one: a new `.rs` route/handler must rebuild + restart
+                        // the Rust server, and a new route/component file must
+                        // rebuild the SSR bundle (otherwise SSR serves not-found
+                        // for a route the client tree already has). Some editors
+                        // emit only Create when a file is first saved.
+                        FileEventKind::Create(_) | FileEventKind::Modify(_) => {
+                            event.paths().for_each(|(path, _)| {
+                                if path.extension().is_some_and(|ext| ext == "rs") {
+                                    should_reload_rust_server = true;
+                                    paths_to_refresh_types.insert(path.to_path_buf());
+                                }
+                                if ssr_reload_needed(path) {
+                                    should_reload_ssr_bundle = true;
+                                }
+                            })
+                        }
                         _ => {}
                     }
                 }
