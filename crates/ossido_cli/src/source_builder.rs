@@ -314,10 +314,10 @@ impl SourceBuilder {
             ..
         }) = collect_environment(&self.base_path)
         else {
-            // No struct: still load `.env`, but nothing to register.
+            // No struct: still load `.env`, but nothing to register or reload.
             return (
                 String::new(),
-                "ossido::bootstrap(MODE, None);\n".to_string(),
+                "ossido::bootstrap(MODE, None, None);\n".to_string(),
             );
         };
 
@@ -334,18 +334,48 @@ impl SourceBuilder {
             r#"#[path = "../{relative}"]
 mod __ossido_environment_mod;
 
-/// The parsed environment singleton — the target of `ossido::get_env!`.
-fn __ossido_environment() -> &'static __ossido_environment_mod::{struct_name} {{
-    static __OSSIDO_ENV: ::std::sync::OnceLock<__ossido_environment_mod::{struct_name}> =
-        ::std::sync::OnceLock::new();
-    __OSSIDO_ENV.get_or_init(__ossido_environment_mod::{struct_name}::from_env)
+/// The swappable parsed-environment cell. `RwLock<Arc<..>>` so the dev-mode
+/// `.env` watcher can hot-swap it while `get_env!` reads a cheap `Arc` snapshot.
+fn __ossido_env_cell()
+-> &'static ::std::sync::RwLock<::std::sync::Arc<__ossido_environment_mod::{struct_name}>> {{
+    static __OSSIDO_ENV: ::std::sync::OnceLock<
+        ::std::sync::RwLock<::std::sync::Arc<__ossido_environment_mod::{struct_name}>>,
+    > = ::std::sync::OnceLock::new();
+    __OSSIDO_ENV.get_or_init(|| {{
+        ::std::sync::RwLock::new(::std::sync::Arc::new(
+            __ossido_environment_mod::{struct_name}::from_env(),
+        ))
+    }})
+}}
+
+/// The parsed environment snapshot — the target of `ossido::get_env!`.
+fn __ossido_environment() -> ::std::sync::Arc<__ossido_environment_mod::{struct_name}> {{
+    __ossido_env_cell()
+        .read()
+        .expect("environment lock poisoned")
+        .clone()
+}}
+
+/// Rebuild the environment from a reloaded `.env` variable map (dev hot reload)
+/// and return its new public-env JSON. Handed to `ossido::bootstrap` so the
+/// framework's watcher can swap the singleton in place.
+fn __ossido_environment_reload(
+    __ossido_map: &::std::collections::HashMap<::std::string::String, ::std::string::String>,
+) -> ::std::string::String {{
+    let __ossido_env = __ossido_environment_mod::{struct_name}::__ossido_from_lookup(
+        |__ossido_key| __ossido_map.get(__ossido_key).cloned(),
+    );
+    let __ossido_json = __ossido_env.__ossido_public_env_json();
+    *__ossido_env_cell()
+        .write()
+        .expect("environment lock poisoned") = ::std::sync::Arc::new(__ossido_env);
+    __ossido_json
 }}
 "#
         );
 
-        let bootstrap_call =
-            "ossido::bootstrap(MODE, Some(|| __ossido_environment().__ossido_public_env_json()));\n"
-                .to_string();
+        let bootstrap_call = "ossido::bootstrap(MODE, Some(|| __ossido_environment().__ossido_public_env_json()), Some(__ossido_environment_reload));\n"
+            .to_string();
 
         (top_level, bootstrap_call)
     }
