@@ -189,8 +189,7 @@ impl From<&PathBuf> for TypesJar {
                         match FileTypes::try_from((file_path.clone(), file_str)) {
                             Ok(ttype) => jar.types.push(ttype),
                             // Pre-filter false positive (see `refresh_file`).
-                            Err(err)
-                                if err.to_string() == crate::typescript::NO_TYPES_FOUND => {}
+                            Err(err) if err.to_string() == crate::typescript::NO_TYPES_FOUND => {}
                             Err(_) => {
                                 error!("Failed to parse file: {:?}", file_path);
                             }
