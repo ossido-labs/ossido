@@ -38,6 +38,27 @@
         "typescript": "^7.0.2",
       },
     },
+    "examples/kitchen-sink": {
+      "name": "kitchen-sink",
+      "version": "0.0.1",
+      "dependencies": {
+        "@ossido-labs/ossido": "workspace:*",
+        "@tailwindcss/vite": "^4.3.3",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "tailwindcss": "^4.3.3",
+      },
+      "devDependencies": {
+        "@ossido-labs/ossido-cli": "workspace:*",
+        "@ossido-labs/ossido-eslint-plugin": "workspace:*",
+        "@oxlint/plugins": "1.76.0",
+        "@types/react": "^19.0.2",
+        "@types/react-dom": "^19.0.2",
+        "oxlint": "1.76.0",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.0",
+      },
+    },
     "examples/ossido-app": {
       "name": "ossido-app",
       "version": "0.0.1",
@@ -96,6 +117,44 @@
         "vite": "^8.2.0",
       },
     },
+    "examples/with-opentelemetry": {
+      "name": "with-opentelemetry",
+      "version": "0.0.1",
+      "dependencies": {
+        "@ossido-labs/ossido": "workspace:*",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+      },
+      "devDependencies": {
+        "@ossido-labs/ossido-cli": "workspace:*",
+        "@ossido-labs/ossido-eslint-plugin": "workspace:*",
+        "@oxlint/plugins": "1.76.0",
+        "@types/react": "^19.0.2",
+        "@types/react-dom": "^19.0.2",
+        "oxlint": "1.76.0",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.0",
+      },
+    },
+    "examples/with-sqlx": {
+      "name": "with-sqlx",
+      "version": "0.0.1",
+      "dependencies": {
+        "@ossido-labs/ossido": "workspace:*",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+      },
+      "devDependencies": {
+        "@ossido-labs/ossido-cli": "workspace:*",
+        "@ossido-labs/ossido-eslint-plugin": "workspace:*",
+        "@oxlint/plugins": "1.76.0",
+        "@types/react": "^19.0.2",
+        "@types/react-dom": "^19.0.2",
+        "oxlint": "1.76.0",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.0",
+      },
+    },
     "examples/with-tailwind": {
       "name": "with-tailwind",
       "version": "0.0.1",
@@ -105,6 +164,25 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "tailwindcss": "^4.3.3",
+      },
+      "devDependencies": {
+        "@ossido-labs/ossido-cli": "workspace:*",
+        "@ossido-labs/ossido-eslint-plugin": "workspace:*",
+        "@oxlint/plugins": "1.76.0",
+        "@types/react": "^19.0.2",
+        "@types/react-dom": "^19.0.2",
+        "oxlint": "1.76.0",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.0",
+      },
+    },
+    "examples/with-websockets": {
+      "name": "with-websockets",
+      "version": "0.0.1",
+      "dependencies": {
+        "@ossido-labs/ossido": "workspace:*",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
       },
       "devDependencies": {
         "@ossido-labs/ossido-cli": "workspace:*",
@@ -1239,6 +1317,8 @@
 
     "keyv": ["keyv@4.5.4", "", { "dependencies": { "json-buffer": "3.0.1" } }, "sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw=="],
 
+    "kitchen-sink": ["kitchen-sink@workspace:examples/kitchen-sink"],
+
     "levn": ["levn@0.4.1", "", { "dependencies": { "prelude-ls": "^1.2.1", "type-check": "~0.4.0" } }, "sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ=="],
 
     "lightningcss": ["lightningcss@1.33.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.33.0", "lightningcss-darwin-arm64": "1.33.0", "lightningcss-darwin-x64": "1.33.0", "lightningcss-freebsd-x64": "1.33.0", "lightningcss-linux-arm-gnueabihf": "1.33.0", "lightningcss-linux-arm64-gnu": "1.33.0", "lightningcss-linux-arm64-musl": "1.33.0", "lightningcss-linux-x64-gnu": "1.33.0", "lightningcss-linux-x64-musl": "1.33.0", "lightningcss-win32-arm64-msvc": "1.33.0", "lightningcss-win32-x64-msvc": "1.33.0" } }, "sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA=="],
@@ -1623,7 +1703,13 @@
 
     "with-mdx": ["with-mdx@workspace:examples/with-mdx"],
 
+    "with-opentelemetry": ["with-opentelemetry@workspace:examples/with-opentelemetry"],
+
+    "with-sqlx": ["with-sqlx@workspace:examples/with-sqlx"],
+
     "with-tailwind": ["with-tailwind@workspace:examples/with-tailwind"],
+
+    "with-websockets": ["with-websockets@workspace:examples/with-websockets"],
 
     "word-wrap": ["word-wrap@1.2.5", "", {}, "sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA=="],
 
@@ -1689,6 +1775,10 @@
 
     "fixture-base/@types/react-dom": ["@types/react-dom@19.2.4", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw=="],
 
+    "kitchen-sink/@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
+
+    "kitchen-sink/@types/react-dom": ["@types/react-dom@19.2.4", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw=="],
+
     "ossido-app/@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
 
     "ossido-app/@types/react-dom": ["@types/react-dom@19.2.4", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw=="],
@@ -1717,9 +1807,21 @@
 
     "with-mdx/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "with-opentelemetry/@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
+
+    "with-opentelemetry/@types/react-dom": ["@types/react-dom@19.2.4", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw=="],
+
+    "with-sqlx/@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
+
+    "with-sqlx/@types/react-dom": ["@types/react-dom@19.2.4", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw=="],
+
     "with-tailwind/@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
 
     "with-tailwind/@types/react-dom": ["@types/react-dom@19.2.4", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw=="],
+
+    "with-websockets/@types/react": ["@types/react@19.2.18", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w=="],
+
+    "with-websockets/@types/react-dom": ["@types/react-dom@19.2.4", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-Bsc+QHgp+P/F02XDzNCY9jnZNCUuLki36KT7VKrTXXLdHf+vHMNZnW1rVu5DNW/rCK+fya3DATySbLM4yhtKUw=="],
 
     "@oxc-resolver/binding-wasm32-wasi/@emnapi/core/@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA=="],
 

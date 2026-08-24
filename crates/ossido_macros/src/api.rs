@@ -5,8 +5,8 @@ use syn::token::Comma;
 use syn::{FnArg, Ident, ItemFn, Pat};
 
 use crate::utils::{
-    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
-    is_logger_pat, params_argument, request_argument,
+    crate_application_state_extractor, create_struct_fn_arg, is_logger_pat, params_argument,
+    request_argument,
 };
 
 pub fn api_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -59,7 +59,6 @@ pub fn api_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
     axum_arguments.push(request_argument());
 
     let application_state_extractor = crate_application_state_extractor(state_field_names.clone());
-    let application_state_import = import_main_application_state(state_field_names.clone());
 
     // Binds each declared `logger` parameter to a request-scoped logger (emitted
     // after `#modified_request` builds `req`).
@@ -90,7 +89,6 @@ pub fn api_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #application_state_import
 
         #item
 
@@ -163,7 +161,8 @@ mod tests {
             quote! { async fn list(req: Request, db: Db) -> Response { todo!() } },
         );
         assert!(out.contains("ossido::axum::extract::State(state)"));
-        assert!(out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(out.contains("State<crate::ossido_main_state::ApplicationState>"));
+        assert!(out.contains("letcrate::ossido_main_state::ApplicationState{db,..}=state;"));
         assert!(out.contains("list(req.clone(),db)"));
     }
 

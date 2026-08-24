@@ -5,8 +5,8 @@ use syn::token::Comma;
 use syn::{FnArg, ItemFn, Pat};
 
 use crate::utils::{
-    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
-    is_logger_pat, params_argument, request_argument,
+    crate_application_state_extractor, create_struct_fn_arg, is_logger_pat, params_argument,
+    request_argument,
 };
 
 pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
@@ -52,7 +52,6 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
     axum_arguments.push(request_argument());
 
     let application_state_extractor = crate_application_state_extractor(state_field_names.clone());
-    let application_state_import = import_main_application_state(state_field_names.clone());
 
     // Binds each declared `logger` parameter to a request-scoped framework
     // logger. Must be emitted where `req` is in scope.
@@ -73,7 +72,6 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #application_state_import
 
         #item
 
@@ -202,7 +200,7 @@ mod tests {
         // No `State(state)` extractor and no `ApplicationState` destructuring when
         // the handler declares no state fields.
         assert!(!out.contains("State(state)"));
-        assert!(!out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(!out.contains("letcrate::ossido_main_state::ApplicationState"));
         assert!(!out.contains("Logger::new"));
     }
 
@@ -213,7 +211,7 @@ mod tests {
         });
         // The axum `State` extractor and the state import both appear…
         assert!(out.contains("ossido::axum::extract::State(state)"));
-        assert!(out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(out.contains("State<crate::ossido_main_state::ApplicationState>"));
         // …and every declared field is destructured and forwarded to the handler.
         assert!(out.contains("ApplicationState{db,user,..}"));
         assert!(out.contains("dashboard(req.clone(),db,user)"));
@@ -227,7 +225,7 @@ mod tests {
         // The logger is provided by the framework, so it neither adds a `State`
         // extractor nor an `ApplicationState` import…
         assert!(!out.contains("State(state)"));
-        assert!(!out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(!out.contains("letcrate::ossido_main_state::ApplicationState"));
         // …it is bound to a request-scoped logger and forwarded to the handler.
         assert!(out.contains("letlogger=ossido::Logger::new(&req)"));
         assert!(out.contains("home(req.clone(),logger)"));

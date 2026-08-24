@@ -49,19 +49,28 @@ impl TypesJar {
     pub fn refresh_file(&mut self, path: PathBuf) {
         if let Ok(file_str) = read_to_string(&path) {
             if mentions_a_type_marker(&file_str) {
-                if let Ok(ttype) = FileTypes::try_from((path.clone(), file_str)) {
-                    if Some(&ttype) == self.types.iter().find(|t| t.file_path == path) {
-                        // The new file exactly matches the old one
-                        trace!("File already exists in jar: {:?}", path);
-                        return;
-                    }
-                    trace!("Refreshing: {:?} type", ttype.types);
+                match FileTypes::try_from((path.clone(), file_str)) {
+                    Ok(ttype) => {
+                        if Some(&ttype) == self.types.iter().find(|t| t.file_path == path) {
+                            // The new file exactly matches the old one
+                            trace!("File already exists in jar: {:?}", path);
+                            return;
+                        }
+                        trace!("Refreshing: {:?} type", ttype.types);
 
-                    self.should_generate_typescript_file = true;
-                    self.remove_file(path);
-                    self.types.push(ttype);
-                } else {
-                    error!("Failed to parse file: {:?}", path);
+                        self.should_generate_typescript_file = true;
+                        self.remove_file(path);
+                        self.types.push(ttype);
+                    }
+                    // The text pre-filter matched an incidental substring (e.g.
+                    // `PgTypeInfo`) but the file declares no `#[Type]` items —
+                    // not a failure. Drop any stale entry it may have had.
+                    Err(err) if err.to_string() == crate::typescript::NO_TYPES_FOUND => {
+                        self.remove_file(path);
+                    }
+                    Err(_) => {
+                        error!("Failed to parse file: {:?}", path);
+                    }
                 }
             } else {
                 // No `Type`/`Props` marker: if this file was previously in the jar
@@ -177,10 +186,13 @@ impl From<&PathBuf> for TypesJar {
                         if !mentions_a_type_marker(&file_str) {
                             return;
                         }
-                        if let Ok(ttype) = FileTypes::try_from((file_path.clone(), file_str)) {
-                            jar.types.push(ttype);
-                        } else {
-                            error!("Failed to parse file: {:?}", file_path);
+                        match FileTypes::try_from((file_path.clone(), file_str)) {
+                            Ok(ttype) => jar.types.push(ttype),
+                            // Pre-filter false positive (see `refresh_file`).
+                            Err(err) if err.to_string() == crate::typescript::NO_TYPES_FOUND => {}
+                            Err(_) => {
+                                error!("Failed to parse file: {:?}", file_path);
+                            }
                         }
                     } else {
                         error!("Failed to read file: {:?}", file_path);

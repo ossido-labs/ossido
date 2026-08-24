@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ossido
+      POSTGRES_PASSWORD: ossido
+      POSTGRES_DB: kitchen_sink
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ossido -d kitchen_sink']
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  # Local trace/log viewer: web UI on http://localhost:8000, OTLP intake on
+  # 4318 (http/protobuf — the transport ossido exports). Start the app with
+  # `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` to see traces.
+  otel-desktop-viewer:
+    image: ghcr.io/ctrlspice/otel-desktop-viewer:latest
+    # Bind on all interfaces so the published ports work from the host.
+    command: ['--host', '0.0.0.0']
+    ports:
+      - '8000:8000' # web UI
+      - '4318:4318' # OTLP http/protobuf
+
+volumes:
+  postgres-data:

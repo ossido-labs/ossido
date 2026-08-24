@@ -4,10 +4,7 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{FnArg, ItemFn, Pat, Type};
 
-use crate::utils::{
-    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
-    is_logger_pat,
-};
+use crate::utils::{crate_application_state_extractor, create_struct_fn_arg, is_logger_pat};
 
 /// The last path segment of a type, e.g. `ossido::ws::WebSocket` → `"WebSocket"`.
 fn type_last_ident(ty: &Type) -> Option<String> {
@@ -75,14 +72,12 @@ pub fn ws_core(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     axum_arguments.push(syn::parse_quote!(headers: ossido::axum::http::HeaderMap));
 
     let application_state_extractor = crate_application_state_extractor(state_field_names.clone());
-    let application_state_import = import_main_application_state(state_field_names);
 
     let logger_bindings = quote! {
         #( let #logger_pats = ossido::Logger::new(&req); )*
     };
 
     quote! {
-        #application_state_import
 
         #item
 
@@ -129,8 +124,8 @@ mod tests {
             async fn socket(req: Request, socket: WebSocket, sockets: SocketManager, db: Db, logger: Logger) {}
         });
         assert!(out.contains("State(state)"));
-        assert!(out.contains("usecrate::ossido_main_state::ApplicationState"));
-        assert!(out.contains("letApplicationState{db,..}=state;"));
+        assert!(out.contains("State<crate::ossido_main_state::ApplicationState>"));
+        assert!(out.contains("letcrate::ossido_main_state::ApplicationState{db,..}=state;"));
         assert!(out.contains("letlogger=ossido::Logger::new(&req)"));
         // Declared order is preserved in the call.
         assert!(out.contains("socket(req,__ossido_ws_raw,ossido::ws::sockets(),db,logger)"));
