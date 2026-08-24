@@ -54,24 +54,48 @@ fn record(label: &str, elapsed: Duration) {
     });
 }
 
-/// Time a synchronous task and record it in the current request trace.
+/// The OTel span for a timed phase, or a disabled span when it shouldn't be
+/// traced. Phases only become spans *inside* an active span (the request span
+/// on tokio tasks, the render-job span on pool threads) — this keeps warm-up
+/// renders and other out-of-request work from exporting orphan root spans.
+/// Console waterfall labels stay as-is; the exported span names are the
+/// semconv-flavoured equivalents.
+fn phase_span(label: &str) -> tracing::Span {
+    if tracing::Span::current().is_none() {
+        return tracing::Span::none();
+    }
+    let name = match label {
+        "bundle read" => "ssr.bundle_read",
+        "v8 compile" => "ssr.v8_compile",
+        "ssr render" => "ssr.render",
+        other => other,
+    };
+    tracing::info_span!("phase", { "otel.name" } = name)
+}
+
+/// Time a synchronous task, recording it in the current request trace
+/// (`DEBUG=1`) and as an OTel span (telemetry on).
 pub fn time<T>(label: &str, task: impl FnOnce() -> T) -> T {
-    if !log::debug_enabled() {
+    if !log::debug_enabled() && !crate::otel::enabled() {
         return task();
     }
+    let span = phase_span(label);
+    let _guard = span.enter();
     let start = Instant::now();
     let out = task();
     record(label, start.elapsed());
     out
 }
 
-/// Time an async task and record it in the current request trace.
+/// Time an async task, recording it in the current request trace (`DEBUG=1`)
+/// and as an OTel span (telemetry on).
 pub async fn time_async<F: Future>(label: &str, task: F) -> F::Output {
-    if !log::debug_enabled() {
+    if !log::debug_enabled() && !crate::otel::enabled() {
         return task.await;
     }
+    use tracing::instrument::Instrument;
     let start = Instant::now();
-    let out = task.await;
+    let out = task.instrument(phase_span(label)).await;
     record(label, start.elapsed());
     out
 }

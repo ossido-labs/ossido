@@ -152,10 +152,16 @@ pub fn action_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // wrapped in `Ok(..)`.
     let returns_result = matches!(&item.sig.output, ReturnType::Type(_, ty) if is_result(ty));
 
+    // `instrument_handler` wraps the user function in its per-handler OTel
+    // span (a no-op unless telemetry is active).
     let call_body = if returns_result {
-        quote! { #fn_name(#(#call_args),*) }
+        quote! { ossido::__otel::instrument_handler(stringify!(#fn_name), #fn_name(#(#call_args),*)) }
     } else {
-        quote! { async move { Ok::<_, ossido::ActionError>(#fn_name(#(#call_args),*).await) } }
+        quote! { async move {
+            Ok::<_, ossido::ActionError>(
+                ossido::__otel::instrument_handler(stringify!(#fn_name), #fn_name(#(#call_args),*)).await
+            )
+        } }
     };
 
     let dispatch = match &input_ty {
@@ -288,7 +294,7 @@ mod tests {
         assert!(out.contains("__ossido_form.input::<CreateUser>()"));
         // Forwards input + state to the user function.
         assert!(out.contains(
-            "run_action(&req,__ossido_decoded,move|__ossido_input|create_user(__ossido_input,db)"
+            "run_action(&req,__ossido_decoded,move|__ossido_input|ossido::__otel::instrument_handler(stringify!(create_user),create_user(__ossido_input,db))"
         ));
         // Extracts application state.
         assert!(out.contains("letApplicationState{db,..}=state;"));
@@ -299,7 +305,9 @@ mod tests {
         let out = expand(quote! {
             async fn subscribe(form: Subscribe) -> FormState { todo!() }
         });
-        assert!(out.contains("Ok::<_,ossido::ActionError>(subscribe(__ossido_input).await)"));
+        assert!(out.contains(
+            "Ok::<_,ossido::ActionError>(ossido::__otel::instrument_handler(stringify!(subscribe),subscribe(__ossido_input)).await)"
+        ));
     }
 
     #[test]

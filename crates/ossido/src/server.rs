@@ -83,6 +83,11 @@ impl Server {
             Ok("1") | Ok("true")
         ));
 
+        // Opt-in OpenTelemetry (traces + logs), driven purely by the standard
+        // `OTEL_*` env vars. After the log format is set (its init messages
+        // should honour it) and before anything request-related starts.
+        crate::otel::init();
+
         let _ = GLOBAL_MODE.set(mode);
         let _ = GLOBAL_CONFIG.set(config.clone());
 
@@ -150,9 +155,7 @@ impl Server {
                         .fallback(get(catch_all).layer(LoggerLayer::new())),
                 );
 
-            axum::serve(self.listener, router)
-                .await
-                .expect("Failed to serve development server");
+            serve_until_shutdown(self.listener, router, "development").await;
         } else {
             let router = self
                 .router
@@ -168,9 +171,59 @@ impl Server {
                 // `Content-Encoding: br` bytes — are passed through untouched.
                 .layer(CompressionLayer::new());
 
-            axum::serve(self.listener, router)
-                .await
-                .expect("Failed to serve production server");
+            serve_until_shutdown(self.listener, router, "production").await;
         }
+
+        // Drain the OpenTelemetry batch queues before the process exits so the
+        // final spans/logs are not lost. No-op when telemetry is off.
+        crate::otel::shutdown();
+    }
+}
+
+/// Serve until the process receives SIGINT (Ctrl-C) or, on unix, SIGTERM.
+///
+/// The signal *interrupts* serving rather than starting an axum graceful
+/// drain: draining would wait on long-lived connections (the HMR/vite
+/// websockets, open SSE streams), turning Ctrl-C into a hang. Shutdown stays
+/// as abrupt for in-flight requests as it always was — catching the signal
+/// here exists so `start` regains control to flush telemetry.
+async fn serve_until_shutdown(
+    listener: tokio::net::TcpListener,
+    router: Router,
+    mode_label: &'static str,
+) {
+    let serve = axum::serve(listener, router);
+    tokio::select! {
+        result = serve => {
+            result.unwrap_or_else(|_| panic!("Failed to serve {mode_label} server"));
+        }
+        _ = shutdown_signal() => {}
+    }
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        // If the signal handler cannot be installed, never resolve — the
+        // process then behaves as before (killed by the default handler).
+        if tokio::signal::ctrl_c().await.is_err() {
+            std::future::pending::<()>().await;
+        }
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(_) => std::future::pending::<()>().await,
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
     }
 }
