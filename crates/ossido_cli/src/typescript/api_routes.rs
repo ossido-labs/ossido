@@ -3,6 +3,8 @@ use std::path::Path;
 use glob::glob;
 use syn::{GenericArgument, Item, ItemFn, PathArguments, ReturnType, Type};
 
+use crate::typescript::parser::utils::rust_to_typescript_type_with;
+
 /// One `#[api(METHOD)]` handler: its HTTP method (uppercase) and the concrete
 /// JSON response type, if any.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,43 +144,9 @@ fn json_inner_type_name(ty: &Type) -> Option<String> {
 /// structurally, and any other named type becomes an
 /// `import("@ossido-labs/ossido/types").Name` reference.
 fn ts_type_expr(ty: &Type) -> String {
-    let Type::Path(type_path) = ty else {
-        return "unknown".to_string();
-    };
-    let Some(segment) = type_path.path.segments.last() else {
-        return "unknown".to_string();
-    };
-    let name = segment.ident.to_string();
-
-    if let PathArguments::AngleBracketed(args) = &segment.arguments {
-        let inner: Vec<String> = args
-            .args
-            .iter()
-            .filter_map(|arg| match arg {
-                GenericArgument::Type(inner) => Some(ts_type_expr(inner)),
-                _ => None,
-            })
-            .collect();
-        let first = || inner.first().map(String::as_str).unwrap_or("unknown");
-        return match name.as_str() {
-            "Vec" => format!("Array<{}>", first()),
-            "Option" => format!("{} | null", first()),
-            "HashMap" | "BTreeMap" => format!(
-                "Record<{}, {}>",
-                first(),
-                inner.get(1).map(String::as_str).unwrap_or("unknown")
-            ),
-            _ => "unknown".to_string(),
-        };
-    }
-
-    match name.as_str() {
-        "str" | "String" | "char" => "string".to_string(),
-        "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64"
-        | "isize" | "usize" => "number".to_string(),
-        "bool" => "boolean".to_string(),
-        other => format!("import(\"@ossido-labs/ossido/types\").{other}"),
-    }
+    rust_to_typescript_type_with(ty, &|name| {
+        format!("import(\"@ossido-labs/ossido/types\").{name}")
+    })
 }
 
 /// Render the `apiClient` route map as a merge into the global `OssidoApiRoutes`
@@ -268,6 +236,17 @@ mod tests {
         assert_eq!(
             json_inner_type_name(&ty),
             Some("Array<import(\"@ossido-labs/ossido/types\").Todo>".to_string())
+        );
+
+        // Tuples map structurally too (shared with the schema generator's
+        // mapping, so the same Rust type reads identically in both outputs).
+        let pairs: ReturnType = syn::parse_str("-> Json<Vec<(String, Todo)>>").unwrap();
+        let ReturnType::Type(_, ty) = pairs else {
+            panic!()
+        };
+        assert_eq!(
+            json_inner_type_name(&ty),
+            Some("Array<[string, import(\"@ossido-labs/ossido/types\").Todo]>".to_string())
         );
 
         // Opaque returns type as `unknown` (None).

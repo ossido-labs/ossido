@@ -227,8 +227,8 @@ pub(crate) fn request_span<B>(req: &http::Request<B>) -> tracing::Span {
     // Internal noise, mirroring the LoggerLayer's log-skip rules: the
     // browser-log intake is never traced; the data endpoint (client-side
     // navigation) only under DEBUG.
-    if path.starts_with("/__ossido/logs")
-        || (path.starts_with("/__ossido/data") && !log::debug_enabled())
+    if path.starts_with(crate::server::BROWSER_LOGS_PATH)
+        || (path.starts_with(crate::server::DATA_PATH_PREFIX) && !log::debug_enabled())
     {
         return tracing::Span::none();
     }
@@ -240,8 +240,8 @@ pub(crate) fn request_span<B>(req: &http::Request<B>) -> tracing::Span {
     let route = req
         .extensions()
         .get::<axum::extract::MatchedPath>()
-        .map(|matched| matched.as_str().to_owned());
-    let name = match &route {
+        .map(|matched| matched.as_str());
+    let name = match route {
         Some(route) => format!("{method} {route}"),
         None => method.to_owned(),
     };
@@ -250,10 +250,11 @@ pub(crate) fn request_span<B>(req: &http::Request<B>) -> tracing::Span {
         .get(http::header::HOST)
         .and_then(|value| value.to_str().ok());
     let (server_address, server_port) = match host {
-        Some(host) => match host.rsplit_once(':') {
-            Some((address, port)) if port.parse::<u16>().is_ok() => {
-                (Some(address), port.parse::<u16>().ok())
-            }
+        Some(host) => match host
+            .rsplit_once(':')
+            .map(|(address, port)| (address, port.parse::<u16>()))
+        {
+            Some((address, Ok(port))) => (Some(address), Some(port)),
             _ => (Some(host), None),
         },
         None => (None, None),
@@ -268,7 +269,7 @@ pub(crate) fn request_span<B>(req: &http::Request<B>) -> tracing::Span {
         { "otel.name" } = %name,
         { "otel.kind" } = "server",
         { "http.request.method" } = method,
-        { "http.route" } = route.as_deref(),
+        { "http.route" } = route,
         { "url.path" } = path,
         { "url.query" } = req.uri().query(),
         { "server.address" } = server_address,

@@ -18,6 +18,13 @@ use crate::vite_websocket_proxy::vite_websocket_proxy;
 const DEV_PUBLIC_DIR: &str = "public";
 const PROD_PUBLIC_DIR: &str = "out/client";
 
+/// Internal endpoint paths, shared with the log/telemetry skip rules
+/// (`services/logger.rs`, `otel/mod.rs`) so the filters can't drift from the
+/// routes. The `/__ossido/data{…}` routes themselves are registered by
+/// CLI-generated code, which spells the prefix out.
+pub(crate) const BROWSER_LOGS_PATH: &str = "/__ossido/logs";
+pub(crate) const DATA_PATH_PREFIX: &str = "/__ossido/data";
+
 pub fn ossido_internal_init_v8_platform() {
     // `--no-lazy-feedback-allocation`: allocate type-feedback vectors on first
     // call instead of after V8's lazy heuristic, so the tiering compilers
@@ -147,7 +154,7 @@ impl Server {
                 .router
                 .to_owned()
                 .layer(LoggerLayer::new())
-                .route("/__ossido/logs", post(browser_logs))
+                .route(BROWSER_LOGS_PATH, post(browser_logs))
                 .route("/vite-server/", get(vite_websocket_proxy))
                 .route("/vite-server/{*path}", get(vite_reverse_proxy))
                 .fallback_service(

@@ -5,13 +5,13 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{GenericArgument, GenericParam, PathArguments};
 
-fn type_to_typescript(type_name: &str) -> &str {
+fn builtin_to_typescript(type_name: &str) -> Option<&'static str> {
     match type_name {
         "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64"
-        | "isize" | "usize" => "number",
-        "str" | "String" | "char" => "string",
-        "bool" => "boolean",
-        _ => type_name,
+        | "isize" | "usize" => Some("number"),
+        "str" | "String" | "char" => Some("string"),
+        "bool" => Some("boolean"),
+        _ => None,
     }
 }
 
@@ -98,10 +98,21 @@ pub fn should_skip_element(attrs: &[syn::Attribute]) -> bool {
 }
 
 pub fn rust_to_typescript_type(ty: &syn::Type) -> String {
+    rust_to_typescript_type_with(ty, &|name| name.to_string())
+}
+
+/// Like [`rust_to_typescript_type`], but with a caller-chosen rendering for
+/// named (non-builtin) leaf types: the schema generator emits bare names (the
+/// types are declared in the same generated module), while the API-route
+/// generator emits `import(…)`-qualified references.
+pub fn rust_to_typescript_type_with(ty: &syn::Type, named: &dyn Fn(&str) -> String) -> String {
     match ty {
         syn::Type::Tuple(tuple) => {
-            let inner_types: Vec<String> =
-                tuple.elems.iter().map(rust_to_typescript_type).collect();
+            let inner_types: Vec<String> = tuple
+                .elems
+                .iter()
+                .map(|elem| rust_to_typescript_type_with(elem, named))
+                .collect();
             format!("[{}]", inner_types.join(", "))
         }
         syn::Type::Path(type_path) => {
@@ -115,19 +126,20 @@ pub fn rust_to_typescript_type(ty: &syn::Type) -> String {
                         .iter()
                         .filter_map(|arg| {
                             if let GenericArgument::Type(inner_type) = arg {
-                                Some(rust_to_typescript_type(inner_type))
+                                Some(rust_to_typescript_type_with(inner_type, named))
                             } else {
                                 None
                             }
                         })
                         .collect();
+                    let first = || inner_types.first().map(String::as_str).unwrap_or("unknown");
 
                     match outer_type.as_str() {
                         "Option" => {
-                            format!("{} | null", inner_types[0])
+                            format!("{} | null", first())
                         }
                         "Vec" => {
-                            let inner = &inner_types[0];
+                            let inner = first();
                             // `T[]` binds tighter than unions — a compound inner
                             // type needs the `Array<…>` form.
                             if inner.chars().all(|c| c.is_alphanumeric() || c == '_') {
@@ -137,12 +149,18 @@ pub fn rust_to_typescript_type(ty: &syn::Type) -> String {
                             }
                         }
                         "HashMap" | "BTreeMap" => {
-                            format!("Record<{}, {}>", inner_types[0], inner_types[1])
+                            format!(
+                                "Record<{}, {}>",
+                                first(),
+                                inner_types.get(1).map(String::as_str).unwrap_or("unknown")
+                            )
                         }
                         _ => "unknown".to_string(),
                     }
                 } else {
-                    type_to_typescript(&outer_type).to_string()
+                    builtin_to_typescript(&outer_type)
+                        .map(str::to_string)
+                        .unwrap_or_else(|| named(&outer_type))
                 }
             } else {
                 "unknown".to_string()
@@ -150,15 +168,7 @@ pub fn rust_to_typescript_type(ty: &syn::Type) -> String {
         }
         syn::Type::Reference(reference) => {
             // Ignore lifetimes and treat references as their base type
-            if let syn::Type::Path(type_path) = &*reference.elem {
-                if let Some(base_type) = type_path.path.segments.last() {
-                    type_to_typescript(&base_type.ident.to_string()).to_string()
-                } else {
-                    "unknown".to_string()
-                }
-            } else {
-                "unknown".to_string()
-            }
+            rust_to_typescript_type_with(&reference.elem, named)
         }
         _ => "unknown".to_string(),
     }
