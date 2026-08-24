@@ -61,6 +61,31 @@ describe('generator works', async () => {
     expect(content).toContain('PageRoute.options.loadingComponent =');
     expect(content).toContain('AboutPageRoute.options.loadingComponent =');
   });
+
+  it('emits a structural self-accept that swaps the new tree into the router', async () => {
+    const testDirPath = `${process.cwd()}/tests/generator/single-level`;
+    await routeGenerator({
+      folderName: `${testDirPath}/routes`,
+      generatedRouteTree: `${testDirPath}/routeTree.gen.ts`,
+    });
+    const content = await fs.readFile(
+      `${testDirPath}/routeTree.gen.ts`,
+      'utf-8',
+    );
+
+    // Self-accept (structural changes rewrite this module): the new tree is
+    // applied in place; a failed re-evaluation escalates via invalidate().
+    expect(content).toContain('import.meta.hot.accept((newModule) =>');
+    expect(content).toContain(
+      '__ossido__internal__applyRouteTree(newModule.routeTree)',
+    );
+    expect(content).toContain('import.meta.hot?.invalidate()');
+
+    // Lazy wrappers carry their specifier so identity is cached across swaps.
+    expect(content).toContain(
+      "() => import('./routes/page'),\n  './routes/page',",
+    );
+  });
 });
 
 describe('route collection issues', () => {

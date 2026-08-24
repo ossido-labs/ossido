@@ -59,6 +59,13 @@ export class Router {
   };
 
   #buildRouteTree = (): void => {
+    // Start from FRESH map objects (never merge into the old ones): a
+    // dev-mode route-tree hot swap must drop routes that no longer exist, and
+    // the new `routesById` identity also invalidates `matchRoute`'s
+    // WeakMap-cached dynamic-route index.
+    this.routesById = {};
+    this.routesByPath = {};
+
     const recurseRoutes = (childRoutes: Array<Route>): void => {
       childRoutes.forEach((route: Route, i: number) => {
         route.init(i);

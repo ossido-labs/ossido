@@ -4,15 +4,18 @@ import {
   createRoute,
   __ossido__internal__lazyLoadRoute,
   __ossido__internal__applyRouteHot,
+  __ossido__internal__applyRouteTree,
 } from '@ossido-labs/ossido'
 
 import RootLayoutImport from './routes/layout'
 
 const PageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/page'),
+  './routes/page',
 )
 const AboutPageImport = __ossido__internal__lazyLoadRoute(
   () => import('./routes/about/page'),
+  './routes/about/page',
 )
 
 const rootRoute = createRoute({
@@ -61,4 +64,11 @@ if (import.meta.hot) {
       })
     },
   )
+  import.meta.hot.accept((newModule) => {
+    if (newModule?.routeTree) {
+      __ossido__internal__applyRouteTree(newModule.routeTree)
+    } else {
+      import.meta.hot?.invalidate()
+    }
+  })
 }
