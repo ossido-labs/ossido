@@ -21,9 +21,7 @@ export default function TodoDetailPage({
         <h1 className="text-2xl font-bold">{title}</h1>
         <p
           className={`mt-3 inline-block rounded-full px-3 py-1 text-sm ${
-            done
-              ? 'bg-green-100 text-green-800'
-              : 'bg-amber-100 text-amber-800'
+            done ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
           }`}
         >
           {done ? 'Done' : 'Still to do'}

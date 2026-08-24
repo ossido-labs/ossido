@@ -7,18 +7,18 @@ server-side surface in one place.
 ossido new my-app --template kitchen-sink
 ```
 
-| Feature | Where |
-| --- | --- |
-| Postgres via [sqlx](https://github.com/launchbadge/sqlx) (pool in app state, embedded migrations) | `src/app.rs`, `migrations/`, `docker-compose.yml` |
-| Server-side props from the database | `src/routes/page.rs` |
-| Server actions — `useActionState` form + imperative calls | `src/routes/actions.rs`, `src/components/TodoApp.tsx` |
-| Dynamic route with a typed param | `src/routes/todos/[id]/page.rs` |
-| JSON API route | `src/routes/api/todos.rs` |
-| Typed environment (`#[ossido::Environment]`, public + server-only) | `src/env.rs`, `.env` |
-| Site-wide and API-scoped middleware | `src/routes/middleware.rs`, `src/routes/api/middleware.rs` |
-| Tailwind CSS v4 (vite plugin + theme tokens) | `ossido.config.ts`, `src/styles/global.css` |
-| OpenTelemetry traces + logs (opt-in) | `src/routes/todos/[id]/page.rs`, below |
-| Database spans (OTel semconv, per query) | `src/db.rs`, below |
+| Feature                                                                                           | Where                                                      |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Postgres via [sqlx](https://github.com/launchbadge/sqlx) (pool in app state, embedded migrations) | `src/app.rs`, `migrations/`, `docker-compose.yml`          |
+| Server-side props from the database                                                               | `src/routes/page.rs`                                       |
+| Server actions — `useActionState` form + imperative calls                                         | `src/routes/actions.rs`, `src/components/TodoApp.tsx`      |
+| Dynamic route with a typed param                                                                  | `src/routes/todos/[id]/page.rs`                            |
+| JSON API route                                                                                    | `src/routes/api/todos.rs`                                  |
+| Typed environment (`#[ossido::Environment]`, public + server-only)                                | `src/env.rs`, `.env`                                       |
+| Site-wide and API-scoped middleware                                                               | `src/routes/middleware.rs`, `src/routes/api/middleware.rs` |
+| Tailwind CSS v4 (vite plugin + theme tokens)                                                      | `ossido.config.ts`, `src/styles/global.css`                |
+| OpenTelemetry traces + logs (opt-in)                                                              | `src/routes/todos/[id]/page.rs`, below                     |
+| Database spans (OTel semconv, per query)                                                          | `src/db.rs`, below                                         |
 
 ## Running
 
@@ -79,7 +79,7 @@ GET /                       (server span)
 Each `SELECT todos` / `INSERT todos` / `UPDATE todos` / `DELETE todos` span
 carries `db.system.name`, `db.operation.name`, `db.collection.name`,
 `db.query.text`, and `db.response.returned_rows` (recorded as an `i64` — a
-smaller integer type would export as a *string* attribute). A failed query
+smaller integer type would export as a _string_ attribute). A failed query
 marks the span `ERROR` and emits a trace-correlated error log. The span name
 and attributes are derived from the SQL itself, so new queries need no extra
 code.
