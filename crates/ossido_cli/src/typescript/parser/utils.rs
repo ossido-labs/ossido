@@ -97,6 +97,13 @@ pub fn should_skip_element(attrs: &[syn::Attribute]) -> bool {
     false
 }
 
+/// The `import(…)`-qualified reference to a named type declared in the
+/// generated types module — the form for generated TypeScript that lives
+/// outside that module (API route maps, WS event interfaces).
+pub fn types_import(name: &str) -> String {
+    format!("import(\"@ossido-labs/ossido/types\").{name}")
+}
+
 pub fn rust_to_typescript_type(ty: &syn::Type) -> String {
     rust_to_typescript_type_with(ty, &|name| name.to_string())
 }

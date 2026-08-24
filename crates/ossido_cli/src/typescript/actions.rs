@@ -79,7 +79,10 @@ pub fn collect_actions(base_path: &Path) -> Vec<ActionDef> {
             let fn_name = func.sig.ident.to_string();
             actions.push(ActionDef {
                 ts_name: action_custom_name(func).unwrap_or_else(|| to_camel_case(&fn_name)),
-                url: format!("/__ossido/action/{module_key}/{fn_name}"),
+                url: format!(
+                    "{action}/{module_key}/{fn_name}",
+                    action = ossido_internal::endpoints::ACTION_PREFIX
+                ),
                 input: action_input_type(func),
                 output: action_output_type(func),
                 prev_state: action_prev_state_type(func),

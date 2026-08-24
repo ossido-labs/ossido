@@ -227,8 +227,8 @@ pub(crate) fn request_span<B>(req: &http::Request<B>) -> tracing::Span {
     // Internal noise, mirroring the LoggerLayer's log-skip rules: the
     // browser-log intake is never traced; the data endpoint (client-side
     // navigation) only under DEBUG.
-    if path.starts_with(crate::server::BROWSER_LOGS_PATH)
-        || (path.starts_with(crate::server::DATA_PATH_PREFIX) && !log::debug_enabled())
+    if path.starts_with(ossido_internal::endpoints::BROWSER_LOGS)
+        || (path.starts_with(ossido_internal::endpoints::DATA_PREFIX) && !log::debug_enabled())
     {
         return tracing::Span::none();
     }

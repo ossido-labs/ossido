@@ -3,7 +3,7 @@ use std::path::Path;
 use glob::glob;
 use syn::{GenericArgument, Item, ItemFn, PathArguments, ReturnType, Type};
 
-use crate::typescript::parser::utils::rust_to_typescript_type_with;
+use crate::typescript::parser::utils::{rust_to_typescript_type_with, types_import};
 
 /// One `#[api(METHOD)]` handler: its HTTP method (uppercase) and the concrete
 /// JSON response type, if any.
@@ -144,9 +144,7 @@ fn json_inner_type_name(ty: &Type) -> Option<String> {
 /// structurally, and any other named type becomes an
 /// `import("@ossido-labs/ossido/types").Name` reference.
 fn ts_type_expr(ty: &Type) -> String {
-    rust_to_typescript_type_with(ty, &|name| {
-        format!("import(\"@ossido-labs/ossido/types\").{name}")
-    })
+    rust_to_typescript_type_with(ty, &types_import)
 }
 
 /// Render the `apiClient` route map as a merge into the global `OssidoApiRoutes`

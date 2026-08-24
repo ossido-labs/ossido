@@ -4,6 +4,7 @@ use glob::glob;
 use syn::{Item, ItemStruct};
 
 use crate::macro_attr::is_ossido_attr;
+use crate::typescript::parser::utils::types_import;
 
 /// One directional WebSocket event: its wire name and the Rust/TS type name.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,8 +114,9 @@ fn render_interface(name: &str, defs: &[WsEventDef]) -> String {
     let mut ts = format!("interface {name} {{\n");
     for def in defs {
         ts.push_str(&format!(
-            "  \"{}\": import(\"@ossido-labs/ossido/types\").{}\n",
-            def.event, def.type_name
+            "  \"{}\": {}\n",
+            def.event,
+            types_import(&def.type_name)
         ));
     }
     ts.push_str("}\n");

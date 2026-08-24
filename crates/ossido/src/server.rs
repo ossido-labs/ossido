@@ -1,5 +1,6 @@
 use axum::routing::{Router, get, post};
 use ossido_internal::config::Config;
+use ossido_internal::endpoints;
 use ossido_internal::log::{self, Level};
 use ossido_ssr::Ssr;
 use tower_http::compression::CompressionLayer;
@@ -17,13 +18,6 @@ use crate::vite_websocket_proxy::vite_websocket_proxy;
 
 const DEV_PUBLIC_DIR: &str = "public";
 const PROD_PUBLIC_DIR: &str = "out/client";
-
-/// Internal endpoint paths, shared with the log/telemetry skip rules
-/// (`services/logger.rs`, `otel/mod.rs`) so the filters can't drift from the
-/// routes. The `/__ossido/data{…}` routes themselves are registered by
-/// CLI-generated code, which spells the prefix out.
-pub(crate) const BROWSER_LOGS_PATH: &str = "/__ossido/logs";
-pub(crate) const DATA_PATH_PREFIX: &str = "/__ossido/data";
 
 pub fn ossido_internal_init_v8_platform() {
     // `--no-lazy-feedback-allocation`: allocate type-feedback vectors on first
@@ -154,7 +148,7 @@ impl Server {
                 .router
                 .to_owned()
                 .layer(LoggerLayer::new())
-                .route(BROWSER_LOGS_PATH, post(browser_logs))
+                .route(endpoints::BROWSER_LOGS, post(browser_logs))
                 .route("/vite-server/", get(vite_websocket_proxy))
                 .route("/vite-server/{*path}", get(vite_reverse_proxy))
                 .fallback_service(

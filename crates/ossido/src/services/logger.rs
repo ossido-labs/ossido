@@ -93,8 +93,9 @@ where
             // The browser-log intake is always internal noise. The data endpoint
             // (hit by client-side navigation) is normally skipped too, but under
             // `DEBUG=1` it is traced so a navigation's backend cost is visible.
-            let is_data = path.starts_with(crate::server::DATA_PATH_PREFIX);
-            if path.starts_with(crate::server::BROWSER_LOGS_PATH) || (is_data && timeline.is_none())
+            let is_data = path.starts_with(ossido_internal::endpoints::DATA_PREFIX);
+            if path.starts_with(ossido_internal::endpoints::BROWSER_LOGS)
+                || (is_data && timeline.is_none())
             {
                 return res;
             }
