@@ -6,13 +6,12 @@ use std::str::FromStr;
 
 use fs_extra::dir::create_all;
 use http::Method;
+use ossido_internal::endpoints;
 use regex::Regex;
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use syn::{Attribute, Ident, Item, Meta};
 use tracing::trace;
-
-use ossido_internal::endpoints;
 
 use crate::macro_attr::is_ossido_attr;
 
