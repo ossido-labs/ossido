@@ -42,6 +42,12 @@ Rollup
 Tailwind
 Hunspell
 React
+Grafana
+Postgres
+
+# --- Libraries ---
+sqlx
+otel
 
 # --- Languages / formats ---
 TypeScript
@@ -61,6 +67,7 @@ NPM
 FFI
 E2E
 UI
+PG
 
 # --- Platform / build targets ---
 arm64
@@ -108,3 +115,5 @@ prebaking
 timerless
 async
 polyfills
+env
+todo
