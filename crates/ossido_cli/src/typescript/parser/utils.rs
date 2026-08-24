@@ -108,24 +108,14 @@ pub fn rust_to_typescript_type(ty: &syn::Type) -> String {
             if let Some(last_segment) = type_path.path.segments.last() {
                 let outer_type = last_segment.ident.to_string();
                 if let PathArguments::AngleBracketed(args) = &last_segment.arguments {
+                    // Recurse so nested containers map structurally
+                    // (`Option<Vec<Todo>>` → `Todo[] | null`, not `Vec | null`).
                     let inner_types: Vec<String> = args
                         .args
                         .iter()
                         .filter_map(|arg| {
                             if let GenericArgument::Type(inner_type) = arg {
-                                match inner_type {
-                                    syn::Type::Path(inner_type_path) => {
-                                        Some(inner_type_path.path.segments[0].ident.to_string())
-                                    }
-                                    syn::Type::Reference(reference) => {
-                                        if let syn::Type::Path(inner_type_path) = &*reference.elem {
-                                            Some(inner_type_path.path.segments[0].ident.to_string())
-                                        } else {
-                                            Some("unknown".to_string())
-                                        }
-                                    }
-                                    _ => Some("unknown".to_string()),
-                                }
+                                Some(rust_to_typescript_type(inner_type))
                             } else {
                                 None
                             }
@@ -134,17 +124,20 @@ pub fn rust_to_typescript_type(ty: &syn::Type) -> String {
 
                     match outer_type.as_str() {
                         "Option" => {
-                            format!("{} | null", type_to_typescript(&inner_types[0]))
+                            format!("{} | null", inner_types[0])
                         }
                         "Vec" => {
-                            format!("{}[]", type_to_typescript(&inner_types[0]))
+                            let inner = &inner_types[0];
+                            // `T[]` binds tighter than unions — a compound inner
+                            // type needs the `Array<…>` form.
+                            if inner.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                                format!("{inner}[]")
+                            } else {
+                                format!("Array<{inner}>")
+                            }
                         }
                         "HashMap" | "BTreeMap" => {
-                            format!(
-                                "Record<{}, {}>",
-                                type_to_typescript(&inner_types[0]),
-                                type_to_typescript(&inner_types[1])
-                            )
+                            format!("Record<{}, {}>", inner_types[0], inner_types[1])
                         }
                         _ => "unknown".to_string(),
                     }

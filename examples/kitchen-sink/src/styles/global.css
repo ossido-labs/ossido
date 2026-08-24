@@ -1,0 +1,7 @@
+@import 'tailwindcss' source('../..');
+
+/* Design tokens exposed as Tailwind theme values (e.g. `bg-ossido-red`). */
+@theme {
+  --color-ossido-red: #e43717;
+  --color-ossido-red-dark: #c02508;
+}

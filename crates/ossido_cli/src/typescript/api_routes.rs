@@ -8,9 +8,10 @@ use syn::{GenericArgument, Item, ItemFn, PathArguments, ReturnType, Type};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApiMethod {
     pub method: String,
-    /// The inner type of an `axum::Json<T>` return (`T`), referenced later as
-    /// `import("@ossido-labs/ossido/types").T`. `None` for opaque returns (`StatusCode`,
-    /// `Response`, `impl IntoResponse`, …), which type as `unknown`.
+    /// The inner type of an `axum::Json<T>` return (`T`) as a ready TypeScript
+    /// type expression (named types already `import(…)`-qualified). `None` for
+    /// opaque returns (`StatusCode`, `Response`, `impl IntoResponse`, …), which
+    /// type as `unknown`.
     pub response: Option<String>,
 }
 
@@ -115,8 +116,10 @@ fn api_method_from_attr(attr: &syn::Attribute) -> Option<String> {
     Some(method.to_string().to_uppercase())
 }
 
-/// The inner type name of an `axum::Json<T>` return type (`T`), or `None` for
-/// anything else.
+/// The inner type of an `axum::Json<T>` return type (`T`) rendered as a
+/// TypeScript type expression, or `None` for anything else. Containers map
+/// structurally (`Json<Vec<Todo>>` → `Array<import(…).Todo>`); named types are
+/// qualified against the generated types module.
 fn json_inner_type_name(ty: &Type) -> Option<String> {
     let Type::Path(type_path) = ty else {
         return None;
@@ -128,10 +131,54 @@ fn json_inner_type_name(ty: &Type) -> Option<String> {
     let PathArguments::AngleBracketed(args) = &segment.arguments else {
         return None;
     };
-    let GenericArgument::Type(Type::Path(inner)) = args.args.first()? else {
+    let GenericArgument::Type(inner) = args.args.first()? else {
         return None;
     };
-    Some(inner.path.segments.last()?.ident.to_string())
+    Some(ts_type_expr(inner))
+}
+
+/// A Rust type as a TypeScript type expression usable inside `.ossido/types.ts`
+/// interfaces: builtins map to their TS primitives, known containers map
+/// structurally, and any other named type becomes an
+/// `import("@ossido-labs/ossido/types").Name` reference.
+fn ts_type_expr(ty: &Type) -> String {
+    let Type::Path(type_path) = ty else {
+        return "unknown".to_string();
+    };
+    let Some(segment) = type_path.path.segments.last() else {
+        return "unknown".to_string();
+    };
+    let name = segment.ident.to_string();
+
+    if let PathArguments::AngleBracketed(args) = &segment.arguments {
+        let inner: Vec<String> = args
+            .args
+            .iter()
+            .filter_map(|arg| match arg {
+                GenericArgument::Type(inner) => Some(ts_type_expr(inner)),
+                _ => None,
+            })
+            .collect();
+        let first = || inner.first().map(String::as_str).unwrap_or("unknown");
+        return match name.as_str() {
+            "Vec" => format!("Array<{}>", first()),
+            "Option" => format!("{} | null", first()),
+            "HashMap" | "BTreeMap" => format!(
+                "Record<{}, {}>",
+                first(),
+                inner.get(1).map(String::as_str).unwrap_or("unknown")
+            ),
+            _ => "unknown".to_string(),
+        };
+    }
+
+    match name.as_str() {
+        "str" | "String" | "char" => "string".to_string(),
+        "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64"
+        | "isize" | "usize" => "number".to_string(),
+        "bool" => "boolean".to_string(),
+        other => format!("import(\"@ossido-labs/ossido/types\").{other}"),
+    }
 }
 
 /// Render the `apiClient` route map as a merge into the global `OssidoApiRoutes`
@@ -165,10 +212,7 @@ pub fn render_api_routes(routes: &[ApiRoute]) -> String {
 
         ts.push_str(&format!("  \"{}\": {{\n", route.path));
         for ApiMethod { method, response } in &route.methods {
-            let response_ts = match response {
-                Some(name) => format!("import(\"@ossido-labs/ossido/types\").{name}"),
-                None => "unknown".to_string(),
-            };
+            let response_ts = response.as_deref().unwrap_or("unknown");
             ts.push_str(&format!(
                 "    {method}: {{ params: {params_ts}; response: {response_ts} }}\n"
             ));
@@ -201,14 +245,30 @@ mod tests {
         let ReturnType::Type(_, ty) = json else {
             panic!()
         };
-        assert_eq!(json_inner_type_name(&ty), Some("Pokemon".to_string()));
+        assert_eq!(
+            json_inner_type_name(&ty),
+            Some("import(\"@ossido-labs/ossido/types\").Pokemon".to_string())
+        );
 
         // Fully-qualified path.
         let qualified: ReturnType = syn::parse_str("-> ossido::axum::Json<User>").unwrap();
         let ReturnType::Type(_, ty) = qualified else {
             panic!()
         };
-        assert_eq!(json_inner_type_name(&ty), Some("User".to_string()));
+        assert_eq!(
+            json_inner_type_name(&ty),
+            Some("import(\"@ossido-labs/ossido/types\").User".to_string())
+        );
+
+        // Containers map structurally instead of collapsing to their name.
+        let list: ReturnType = syn::parse_str("-> Json<Vec<Todo>>").unwrap();
+        let ReturnType::Type(_, ty) = list else {
+            panic!()
+        };
+        assert_eq!(
+            json_inner_type_name(&ty),
+            Some("Array<import(\"@ossido-labs/ossido/types\").Todo>".to_string())
+        );
 
         // Opaque returns type as `unknown` (None).
         let status: ReturnType = syn::parse_str("-> StatusCode").unwrap();
@@ -225,7 +285,10 @@ mod tests {
                 .unwrap();
         let method = api_method(&func).unwrap();
         assert_eq!(method.method, "POST");
-        assert_eq!(method.response, Some("User".to_string()));
+        assert_eq!(
+            method.response,
+            Some("import(\"@ossido-labs/ossido/types\").User".to_string())
+        );
 
         // A non-api function is ignored.
         let plain: ItemFn = syn::parse_str("async fn helper() {}").unwrap();
@@ -246,7 +309,7 @@ mod tests {
                 path: "/api/users/[id]".to_string(),
                 methods: vec![ApiMethod {
                     method: "GET".to_string(),
-                    response: Some("User".to_string()),
+                    response: Some("import(\"@ossido-labs/ossido/types\").User".to_string()),
                 }],
             },
         ];

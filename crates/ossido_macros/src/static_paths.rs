@@ -5,8 +5,7 @@ use syn::token::Comma;
 use syn::{FnArg, ItemFn, Pat};
 
 use crate::utils::{
-    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
-    is_logger_pat, request_argument,
+    crate_application_state_extractor, create_struct_fn_arg, is_logger_pat, request_argument,
 };
 
 /// `#[ossido::static_paths]` — mark the function in a dynamic route's
@@ -64,7 +63,6 @@ pub fn static_paths_core(_args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let application_state_extractor = crate_application_state_extractor(state_field_names.clone());
-    let application_state_import = import_main_application_state(state_field_names.clone());
 
     // Static-path enumeration has no incoming user request, so a declared
     // `logger` is bound against a `Request` synthesised from the internal
@@ -84,7 +82,6 @@ pub fn static_paths_core(_args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #application_state_import
 
         #item
 
@@ -133,7 +130,7 @@ mod tests {
             async fn static_paths(paths: &mut StaticPaths) {}
         });
         assert!(!out.contains("State(state)"));
-        assert!(!out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(!out.contains("letcrate::ossido_main_state::ApplicationState"));
         assert!(!out.contains("Logger::new"));
         assert!(!out.contains("request:ossido::axum::extract::Request"));
     }
@@ -144,7 +141,7 @@ mod tests {
             async fn static_paths(paths: &mut StaticPaths, db: Db, users: Users) {}
         });
         assert!(out.contains("ossido::axum::extract::State(state)"));
-        assert!(out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(out.contains("State<crate::ossido_main_state::ApplicationState>"));
         assert!(out.contains("ApplicationState{db,users,..}"));
         assert!(out.contains("static_paths(&mutpaths,db,users)"));
         // No request extractor when no logger is used.

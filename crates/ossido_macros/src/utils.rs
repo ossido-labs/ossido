@@ -9,27 +9,22 @@ pub fn is_logger_pat(pat: &Pat) -> bool {
     matches!(pat, Pat::Ident(pat_ident) if pat_ident.ident == "logger")
 }
 
+// `ApplicationState` is referenced by full path (never via a generated `use`):
+// a file with several state-using handlers/actions would otherwise emit the
+// same import more than once (E0252).
 pub fn create_struct_fn_arg() -> FnArg {
     parse2(quote! {
-        ossido::axum::extract::State(state): ossido::axum::extract::State<ApplicationState>
+        ossido::axum::extract::State(state):
+            ossido::axum::extract::State<crate::ossido_main_state::ApplicationState>
     })
     .unwrap()
 }
 
-pub fn import_main_application_state(argument_names: Punctuated<Pat, Comma>) -> Option<Stmt> {
-    if !argument_names.is_empty() {
-        let local: Stmt = parse_quote!(
-            use crate::ossido_main_state::ApplicationState;
-        );
-        return Some(local);
-    }
-
-    None
-}
-
 pub fn crate_application_state_extractor(argument_names: Punctuated<Pat, Comma>) -> Option<Stmt> {
     if !argument_names.is_empty() {
-        let use_item: Stmt = parse_quote!(let ApplicationState { #argument_names, .. } = state;);
+        let use_item: Stmt = parse_quote!(
+            let crate::ossido_main_state::ApplicationState { #argument_names, .. } = state;
+        );
         return Some(use_item);
     }
 
@@ -83,29 +78,25 @@ mod tests {
 
     #[test]
     fn state_helpers_are_none_without_state_fields() {
-        assert!(import_main_application_state(args(&[])).is_none());
         assert!(crate_application_state_extractor(args(&[])).is_none());
-    }
-
-    #[test]
-    fn import_main_application_state_emits_the_use_when_state_is_used() {
-        let stmt = import_main_application_state(args(&["db"])).expect("a use statement");
-        assert_eq!(
-            norm(&stmt),
-            "usecrate::ossido_main_state::ApplicationState;"
-        );
     }
 
     #[test]
     fn state_extractor_destructures_the_declared_fields() {
         let stmt = crate_application_state_extractor(args(&["db", "user"])).expect("a statement");
-        assert_eq!(norm(&stmt), "letApplicationState{db,user,..}=state;");
+        assert_eq!(
+            norm(&stmt),
+            "letcrate::ossido_main_state::ApplicationState{db,user,..}=state;"
+        );
     }
 
     #[test]
     fn axum_argument_helpers_produce_the_expected_extractors() {
         assert!(norm(create_struct_fn_arg()).contains("State(state)"));
-        assert!(norm(create_struct_fn_arg()).contains("State<ApplicationState>"));
+        assert!(
+            norm(create_struct_fn_arg())
+                .contains("State<crate::ossido_main_state::ApplicationState>")
+        );
 
         let params = norm(params_argument());
         assert!(params.contains("Path(params)"));

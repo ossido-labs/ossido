@@ -6,6 +6,12 @@ use tracing::trace;
 use super::utils::has_derive_type;
 use crate::typescript::parser::{parse_enum, parse_struct};
 
+/// `TryFrom` error for a file that parsed fine but declares no `#[Type]` /
+/// `#[Props]` items. Benign: the cheap text pre-filter (`mentions_a_type_marker`)
+/// can match incidental substrings (e.g. `PgTypeInfo`), so callers must not log
+/// this case as a failure.
+pub const NO_TYPES_FOUND: &str = "No types found in the file";
+
 /// Represents all the valid typescript types found in a file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileTypes {
@@ -55,7 +61,7 @@ impl TryFrom<(PathBuf, String)> for FileTypes {
         }
 
         if types_as_string.is_empty() {
-            return Err("No types found in the file".into());
+            return Err(NO_TYPES_FOUND.into());
         }
 
         Ok(Self {

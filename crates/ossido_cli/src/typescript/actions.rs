@@ -285,9 +285,18 @@ pub fn render_actions_client(actions: &[ActionDef]) -> String {
     }
     type_names.sort();
 
-    ts.push_str(
-        "import { createAction, createStatefulAction } from \"@ossido-labs/ossido/actions\"\n",
-    );
+    // Import only the helpers actually used — an unused import fails a
+    // project's `noUnusedLocals` typecheck.
+    let has_stateless = actions.iter().any(|action| action.prev_state.is_none());
+    let has_stateful = actions.iter().any(|action| action.prev_state.is_some());
+    let helpers = match (has_stateless, has_stateful) {
+        (true, true) => "createAction, createStatefulAction",
+        (false, true) => "createStatefulAction",
+        _ => "createAction",
+    };
+    ts.push_str(&format!(
+        "import {{ {helpers} }} from \"@ossido-labs/ossido/actions\"\n"
+    ));
     if !type_names.is_empty() {
         ts.push_str(&format!(
             "import type {{ {} }} from \"@ossido-labs/ossido/types\"\n",
