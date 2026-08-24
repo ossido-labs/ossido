@@ -5,8 +5,8 @@ use syn::token::Comma;
 use syn::{FnArg, ItemFn, Pat};
 
 use crate::utils::{
-    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
-    is_logger_pat, params_argument, request_argument,
+    crate_application_state_extractor, create_struct_fn_arg, is_logger_pat, params_argument,
+    request_argument,
 };
 
 pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
@@ -52,7 +52,6 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
     axum_arguments.push(request_argument());
 
     let application_state_extractor = crate_application_state_extractor(state_field_names.clone());
-    let application_state_import = import_main_application_state(state_field_names.clone());
 
     // Binds each declared `logger` parameter to a request-scoped framework
     // logger. Must be emitted where `req` is in scope.
@@ -73,7 +72,6 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #application_state_import
 
         #item
 
@@ -90,7 +88,12 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
         ) -> ossido::HandlerData {
             #props_state_binding
             #logger_bindings
-            let result = ossido::catch_handler(#fn_name(req, #argument_names))
+            // `instrument_handler` wraps the user function in its per-handler
+            // OTel span (a no-op unless telemetry is active).
+            let result = ossido::catch_handler(ossido::__otel::instrument_handler(
+                    stringify!(#fn_name),
+                    #fn_name(req, #argument_names),
+                ))
                 .await
                 .map(ossido::Response::from);
             ossido::resolve_handler(result)
@@ -118,7 +121,10 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
            // into a `Send` outcome *synchronously* here — nothing non-`Send` may
            // live across the awaits below. `req` is carried in the error variant so
            // the async error path can use it without cloning it on the hot path.
-           let outcome = match ossido::catch_handler(#fn_name(req.clone(), #argument_names)).await {
+           let outcome = match ossido::catch_handler(ossido::__otel::instrument_handler(
+               stringify!(#fn_name),
+               #fn_name(req.clone(), #argument_names),
+           )).await {
                Ok(response) => Ok(ossido::Response::from(response).into_render_job(req)),
                Err(server_error) => Err((req, server_error)),
            };
@@ -145,7 +151,10 @@ pub fn handler_core(_args: TokenStream, item: TokenStream) -> TokenStream {
 
            // Serialize the (non-`Send`) response synchronously; carry the error
            // for the async path so nothing non-`Send` lives across the await.
-           let outcome = match ossido::catch_handler(#fn_name(req.clone(), #argument_names)).await {
+           let outcome = match ossido::catch_handler(ossido::__otel::instrument_handler(
+               stringify!(#fn_name),
+               #fn_name(req.clone(), #argument_names),
+           )).await {
                Ok(response) => Ok(ossido::Response::from(response).json().into_response()),
                Err(server_error) => Err((req, server_error)),
            };
@@ -191,7 +200,7 @@ mod tests {
         // No `State(state)` extractor and no `ApplicationState` destructuring when
         // the handler declares no state fields.
         assert!(!out.contains("State(state)"));
-        assert!(!out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(!out.contains("letcrate::ossido_main_state::ApplicationState"));
         assert!(!out.contains("Logger::new"));
     }
 
@@ -202,7 +211,7 @@ mod tests {
         });
         // The axum `State` extractor and the state import both appear…
         assert!(out.contains("ossido::axum::extract::State(state)"));
-        assert!(out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(out.contains("State<crate::ossido_main_state::ApplicationState>"));
         // …and every declared field is destructured and forwarded to the handler.
         assert!(out.contains("ApplicationState{db,user,..}"));
         assert!(out.contains("dashboard(req.clone(),db,user)"));
@@ -216,7 +225,7 @@ mod tests {
         // The logger is provided by the framework, so it neither adds a `State`
         // extractor nor an `ApplicationState` import…
         assert!(!out.contains("State(state)"));
-        assert!(!out.contains("usecrate::ossido_main_state::ApplicationState"));
+        assert!(!out.contains("letcrate::ossido_main_state::ApplicationState"));
         // …it is bound to a request-scoped logger and forwarded to the handler.
         assert!(out.contains("letlogger=ossido::Logger::new(&req)"));
         assert!(out.contains("home(req.clone(),logger)"));
@@ -233,6 +242,20 @@ mod tests {
         assert!(out.contains("letlogger=ossido::Logger::new(&req)"));
         // Both are passed to the handler in declared order.
         assert!(out.contains("page(req.clone(),db,logger)"));
+    }
+
+    #[test]
+    fn every_entry_point_wraps_the_handler_in_its_otel_span() {
+        let out = expand(quote! {
+            async fn home(req: Request) -> Response { todo!() }
+        });
+        // All three entry points route the user function through
+        // `instrument_handler`, so each invocation carries the handler span.
+        assert_eq!(
+            out.matches("ossido::__otel::instrument_handler(stringify!(home),home(")
+                .count(),
+            3,
+        );
     }
 
     #[test]

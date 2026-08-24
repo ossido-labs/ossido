@@ -12,6 +12,10 @@ exclude = [
   "examples/ossido-app",
   "examples/ossido-tutorial",
   "examples/with-tailwind",
+  "examples/kitchen-sink",
+  "examples/with-sqlx",
+  "examples/with-websockets",
+  "examples/with-opentelemetry",
   "e2e/fixtures/base",
 ]
 

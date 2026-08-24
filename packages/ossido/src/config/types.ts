@@ -190,4 +190,16 @@ export interface OssidoConfigDev {
    * unstyled flash on first visit to a route.
    */
   criticalCss?: boolean;
+  /**
+   * Route the browser's HMR websocket through the Rust dev server's
+   * `/vite-server/` proxy instead of connecting directly to the Vite dev server
+   * (`port + 1`). Default `false` (direct).
+   *
+   * Direct connection keeps hot reloading alive across Rust server rebuilds —
+   * the proxy dies with every `.rs` edit, and Vite's client reacts to the
+   * dropped socket with a full page reload. Only enable this in environments
+   * where the browser cannot reach `port + 1` (e.g. a container exposing a
+   * single port), accepting the reload-on-rebuild behaviour.
+   */
+  hmrThroughProxy?: boolean;
 }

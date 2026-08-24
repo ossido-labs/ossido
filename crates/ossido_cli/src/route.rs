@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 use fs_extra::dir::create_all;
 use http::Method;
+use ossido_internal::endpoints;
 use regex::Regex;
 use reqwest::blocking::Client;
 use serde::Deserialize;
@@ -317,7 +318,10 @@ impl Route {
             .ok_or_else(|| format!("Route {} is missing module info", self.path))?
             .module_import;
 
-        let url = format!("{base_url}/__ossido/static_paths/{module}");
+        let url = format!(
+            "{base_url}{static_paths}/{module}",
+            static_paths = endpoints::STATIC_PATHS_PREFIX
+        );
         trace!("Requesting static paths: {url}");
 
         let response = reqwest
@@ -363,7 +367,7 @@ impl Route {
             // Request from the live server using the raw path so it matches the
             // codegen'd `/__ossido/data{axum_route}` route — including the root's
             // trailing slash (`/__ossido/data/`).
-            let data_url = format!("{base_url}/__ossido/data{path}");
+            let data_url = format!("{base_url}{data}{path}", data = endpoints::DATA_PREFIX);
             trace!("Requesting the JSON file: {data_url}");
             let mut response = reqwest
                 .get(&data_url)
@@ -465,10 +469,11 @@ fn concrete_path(pattern: &str, params: &ParamSet) -> Result<String, String> {
 /// with the root written as `data.json` (not `data/.json`) to avoid a dotfile /
 /// dir-vs-file clash.
 fn static_data_file_path(path: &str) -> PathBuf {
+    let data = endpoints::DATA_PREFIX;
     if path == "/" {
-        PathBuf::from("out/static/__ossido/data.json")
+        PathBuf::from(format!("out/static{data}.json"))
     } else {
-        PathBuf::from(format!("out/static/__ossido/data{path}.json"))
+        PathBuf::from(format!("out/static{data}{path}.json"))
     }
 }
 

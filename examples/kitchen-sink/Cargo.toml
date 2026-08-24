@@ -1,0 +1,29 @@
+[package]
+name = "kitchen-sink"
+version = "0.0.1"
+edition = "2024"
+
+[[bin]]
+name = "ossido"
+path = ".ossido/main.rs"
+
+[dependencies]
+ossido = { path = "../../crates/ossido" }
+serde = { version = "1.0.202", features = ["derive"] }
+# `runtime-tokio` + `postgres` — no TLS feature needed for the local
+# docker-compose database.
+# For the `sqlx::Executor` impl on the traced `Db` handle (`src/db.rs`).
+futures-core = "0.3"
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"] }
+# Only needed for the `#[tracing::instrument]` attribute macro (it expands to
+# `::tracing` paths). The `ossido::tracing` re-export covers everything else
+# (`info_span!`, `info!`, …) without a direct dependency.
+tracing = "0.1"
+tower-http = { version = "0.6.8", features = ["cors", "set-header"] }
+
+# Trade compile time for run-time performance in production builds. No
+# `panic = "abort"` — ossido's SSR render pool relies on unwinding to recover
+# from a failed render.
+[profile.release]
+lto = "fat"
+codegen-units = 1

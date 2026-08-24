@@ -31,7 +31,7 @@ describe('normalizeConfig', () => {
         routeTree: false,
         browser: { enabled: true, level: 'info' },
       },
-      dev: { criticalCss: true },
+      dev: { criticalCss: true, hmrThroughProxy: false },
       ssr: { renderThreads: null, warmupRenders: null },
       output: 'server',
       viewTransitions: false,
@@ -57,7 +57,7 @@ describe('normalizeConfig', () => {
         routeTree: false,
         browser: { enabled: true, level: 'info' },
       },
-      dev: { criticalCss: true },
+      dev: { criticalCss: true, hmrThroughProxy: false },
       ssr: { renderThreads: null, warmupRenders: null },
       output: 'server',
       viewTransitions: false,
@@ -186,7 +186,7 @@ describe('normalizeConfig', () => {
     it('should default criticalCss to true', () => {
       expect(normalizeConfig({})).toStrictEqual(
         expect.objectContaining({
-          dev: { criticalCss: true },
+          dev: { criticalCss: true, hmrThroughProxy: false },
         }),
       );
     });
@@ -196,7 +196,7 @@ describe('normalizeConfig', () => {
 
       expect(normalizeConfig(config)).toStrictEqual(
         expect.objectContaining({
-          dev: { criticalCss: false },
+          dev: { criticalCss: false, hmrThroughProxy: false },
         }),
       );
     });

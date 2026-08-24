@@ -200,6 +200,14 @@ const developmentSSRBundle = (): void => {
           // which triggers a spurious full-page reload (and data refetch) right
           // after the in-place Fast Refresh has already applied.
           cacheDir: 'cache-ssr',
+          // Don't copy `public/` into `.ossido/server` on every rebuild: the
+          // runtime reads only `dev-server.js`, and the Rust server serves
+          // `public/` itself. The copy also churned ~every public asset on
+          // every `.tsx` edit, which content-scanning plugins in the client
+          // dev server (e.g. `@tailwindcss/vite`, whose scan is rooted at the
+          // vite root `.ossido`) reacted to with a full page reload — right
+          // after Fast Refresh had already applied the edit in place.
+          publicDir: false,
           plugins: VITE_SSR_PLUGINS,
           build: {
             ssr: true,
@@ -244,6 +252,26 @@ const developmentCSRWatch = (): void => {
             host: config.server.host,
             port: config.server.port + 1,
             strictPort: true,
+            watch: {
+              // The SSR bundle build writes into `.ossido/server` (and its own
+              // `cache-ssr`) on every `.tsx`/`.mdx`/CSS-module edit. That churn
+              // is build OUTPUT — never part of this dev server's module graph
+              // — but content-scanning plugins (e.g. `@tailwindcss/vite`) react
+              // to it with a full page reload, undoing the in-place Fast
+              // Refresh that just applied. Don't watch it at all.
+              ignored: ['**/.ossido/server/**', '**/.ossido/cache-ssr/**'],
+            },
+            // The browser's HMR websocket connects straight to this Vite dev
+            // server instead of through the Rust server's `/vite-server/`
+            // proxy. The proxy dies with every Rust rebuild (any `.rs` edit),
+            // and Vite's client reacts to the dropped socket by polling
+            // `__vite_ping` and hard-reloading the page. A direct connection
+            // keeps HMR alive across Rust restarts, letting `.rs` edits refresh
+            // route props in place. `dev.hmrThroughProxy` opts back into the
+            // proxied (reload-on-rebuild) behaviour for single-port setups.
+            ...(config.dev?.hmrThroughProxy
+              ? {}
+              : { hmr: { clientPort: config.server.port + 1 } }),
           },
           build: {
             manifest: true,

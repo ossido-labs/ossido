@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 use clap::crate_version;
+use ossido_internal::endpoints;
 use tracing::error;
 
 use crate::app::{App, MIDDLEWARE_FILENAME, ROUTES_FOLDER_PATH};
@@ -201,7 +202,10 @@ impl SourceBuilder {
     /// upgrade handler is a GET; `get` is fully-qualified so it needs no import.
     fn create_ws_route(&self) -> String {
         if self.has_ws_handler() {
-            ".merge(Router::new().route(\"/__ossido/ws\", ossido::axum::routing::get(ossido_ws::ossido_internal_ws)))\n".to_string()
+            format!(
+                ".merge(Router::new().route(\"{ws}\", ossido::axum::routing::get(ossido_ws::ossido_internal_ws)))\n",
+                ws = endpoints::WS,
+            )
         } else {
             String::new()
         }
@@ -505,7 +509,8 @@ fn __ossido_environment_reload(
                     r#".route("{axum_route}", get({module_import}::ossido_internal_route))"#
                 ));
                 route_declarations.push_str(&format!(
-                    r#".route("/__ossido/data{axum_route}", get({module_import}::ossido_internal_api))"#
+                    r#".route("{data}{axum_route}", get({module_import}::ossido_internal_api))"#,
+                    data = endpoints::DATA_PREFIX,
                 ));
             } else {
                 // Wrapped by ≥1 `layout.rs`: use the generated composites.
@@ -513,7 +518,8 @@ fn __ossido_environment_reload(
                     r#".route("{axum_route}", get(__ossido_ssr_{module_import}))"#
                 ));
                 route_declarations.push_str(&format!(
-                    r#".route("/__ossido/data{axum_route}", get(__ossido_data_{module_import}))"#
+                    r#".route("{data}{axum_route}", get(__ossido_data_{module_import}))"#,
+                    data = endpoints::DATA_PREFIX,
                 ));
             }
 
@@ -524,7 +530,8 @@ fn __ossido_environment_reload(
             // placeholders, which an enumeration endpoint must not.
             if route.has_static_paths {
                 route_declarations.push_str(&format!(
-                    r#".route("/__ossido/static_paths/{module_import}", get({module_import}::ossido_internal_static_paths))"#
+                    r#".route("{static_paths}/{module_import}", get({module_import}::ossido_internal_static_paths))"#,
+                    static_paths = endpoints::STATIC_PATHS_PREFIX,
                 ));
             }
         }

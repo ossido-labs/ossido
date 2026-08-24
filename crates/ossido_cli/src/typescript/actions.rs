@@ -79,7 +79,10 @@ pub fn collect_actions(base_path: &Path) -> Vec<ActionDef> {
             let fn_name = func.sig.ident.to_string();
             actions.push(ActionDef {
                 ts_name: action_custom_name(func).unwrap_or_else(|| to_camel_case(&fn_name)),
-                url: format!("/__ossido/action/{module_key}/{fn_name}"),
+                url: format!(
+                    "{action}/{module_key}/{fn_name}",
+                    action = ossido_internal::endpoints::ACTION_PREFIX
+                ),
                 input: action_input_type(func),
                 output: action_output_type(func),
                 prev_state: action_prev_state_type(func),
@@ -285,9 +288,18 @@ pub fn render_actions_client(actions: &[ActionDef]) -> String {
     }
     type_names.sort();
 
-    ts.push_str(
-        "import { createAction, createStatefulAction } from \"@ossido-labs/ossido/actions\"\n",
-    );
+    // Import only the helpers actually used — an unused import fails a
+    // project's `noUnusedLocals` typecheck.
+    let has_stateless = actions.iter().any(|action| action.prev_state.is_none());
+    let has_stateful = actions.iter().any(|action| action.prev_state.is_some());
+    let helpers = match (has_stateless, has_stateful) {
+        (true, true) => "createAction, createStatefulAction",
+        (false, true) => "createStatefulAction",
+        _ => "createAction",
+    };
+    ts.push_str(&format!(
+        "import {{ {helpers} }} from \"@ossido-labs/ossido/actions\"\n"
+    ));
     if !type_names.is_empty() {
         ts.push_str(&format!(
             "import type {{ {} }} from \"@ossido-labs/ossido/types\"\n",

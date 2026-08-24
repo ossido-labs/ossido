@@ -55,11 +55,53 @@ tungstenite = "0.29.0"
 http = "1.5.0"
 pin-project = "1.1.13"
 tower = "0.5.3"
+# Instrumentation API. Unconditional (it is already in the dependency graph and
+# compiles to a no-op atomic check when no subscriber is installed); the OTel
+# SDK/exporter stack below is what the `telemetry` feature actually gates.
+tracing = "0.1"
+
+# OpenTelemetry (traces + logs over OTLP http/protobuf). All `opentelemetry*`
+# crates plus `tracing-opentelemetry` must be bumped in lockstep (0.32 pairs
+# with tracing-opentelemetry 0.33) — a mismatch produces two copies of
+# `opentelemetry` and baffling trait errors.
+#
+# `reqwest-blocking-client` + the SDK's thread-based batch processors keep the
+# export path off the tokio runtime. It does not enable reqwest's rustls
+# features, so feature unification with the `reqwest` dependency above keeps
+# the native-tls-only build footprint.
+opentelemetry = { version = "0.32", optional = true }
+opentelemetry_sdk = { version = "0.32", default-features = false, features = ["trace", "logs", "internal-logs"], optional = true }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = ["http-proto", "trace", "logs", "reqwest-blocking-client", "internal-logs"], optional = true }
+opentelemetry-http = { version = "0.32", optional = true }
+opentelemetry-semantic-conventions = { version = "0.32", optional = true }
+# Its default `metrics` feature would drag `opentelemetry/metrics` in.
+tracing-opentelemetry = { version = "0.33", default-features = false, features = ["tracing-log"], optional = true }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std", "env-filter"], optional = true }
+
+[features]
+default = ["telemetry"]
+# Opt-in OpenTelemetry traces + logs (enabled at runtime via `OTEL_*` env
+# vars). Compile with `default-features = false` to drop the SDK/exporter
+# dependency weight entirely.
+telemetry = [
+    "dep:opentelemetry",
+    "dep:opentelemetry_sdk",
+    "dep:opentelemetry-otlp",
+    "dep:opentelemetry-http",
+    "dep:opentelemetry-semantic-conventions",
+    "dep:tracing-opentelemetry",
+    "dep:tracing-subscriber",
+    "reqwest/blocking",
+]
 
 [dev-dependencies]
 fs_extra = "1.3.0"
 tempfile = "3.27.0"
 serial_test = "4.0.1"
+# In-test OTLP receiver: decodes the http/protobuf export bodies. The
+# `gen-tonic-messages` feature generates plain prost messages — no tonic.
+opentelemetry-proto = { version = "0.32", default-features = false, features = ["gen-tonic-messages", "trace", "logs"] }
+prost = "0.14"
 
 [[bench]]
 name = "streaming_vs_buffered"

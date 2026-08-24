@@ -76,6 +76,14 @@ jobs:
 
       - name: Setup rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          # Cache the example's own target dir too: each example is a standalone
+          # cargo project that compiles the full `ossido` dependency tree (incl.
+          # the v8 static lib, whose release-asset download is the flakiest step
+          # on hosted runners) a second time next to the workspace build.
+          cache-workspaces: |
+            .
+            examples/${{ matrix.example_name }}
 
       - name: Build Rust
         run: cargo build

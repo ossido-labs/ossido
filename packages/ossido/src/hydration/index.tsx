@@ -7,6 +7,15 @@ import { OssidoEntryPoint } from '../shared/OssidoEntryPoint';
 import { SERVER_PAYLOAD_VARIABLE_NAME } from '../constants';
 
 import { installBrowserLogForwarding } from './browserLogForwarding';
+import { reportPendingFullReload } from './devHmr';
+
+// Dev HMR hooks, re-exported for the generated client entry (the only module
+// with an `import.meta.hot` context) to forward events into.
+export {
+  __ossido__internal__devServerRestarting,
+  __ossido__internal__devServerReady,
+  __ossido__internal__recordFullReload,
+} from './devHmr';
 
 type RouteTree = ReturnType<typeof createRoute>;
 
@@ -17,6 +26,8 @@ export function hydrate(routeTree: RouteTree): void {
   if (window[SERVER_PAYLOAD_VARIABLE_NAME]?.mode === 'Dev') {
     installBrowserLogForwarding();
     warmDevErrorSource();
+    // If this load was itself a dev full reload, say what caused it.
+    reportPendingFullReload();
   }
 
   // Create a new router instance

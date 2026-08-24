@@ -30,8 +30,12 @@ interface RouteMatchProps {
 export const RouteMatch = ({ route, mode }: RouteMatchProps): JSX.Element => {
   const { location, navigationId, retry } = useRouterContext();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const routes = useMemo(() => loadParentComponents(route), [route.id]);
+  // Keyed by the route OBJECT (not `route.id`): within one tree the matched
+  // route object is stable per id, so this recomputes exactly as before — but
+  // a dev route-tree hot swap produces a new object for the same id, and the
+  // layout chain must be re-derived from the new tree rather than served
+  // stale from the old one.
+  const routes = useMemo(() => loadParentComponents(route), [route]);
 
   const resourceKey = buildResourceKey(navigationId, location);
 

@@ -7,6 +7,11 @@ export { DevErrorOverlayHost } from './components/DevErrorOverlayHost';
 export { DevErrorReporter } from './components/DevErrorReporter';
 export { devErrorStore } from './components/devErrorStore';
 export type { DevErrorKind, DevBuildError } from './components/devErrorStore';
+export { devServerStatus } from './components/devServerStatus';
+export type {
+  DevServerPhase,
+  DevServerStatusState,
+} from './components/devServerStatus';
 export { warmDevErrorSource } from './components/devErrorSource';
 
 export type {

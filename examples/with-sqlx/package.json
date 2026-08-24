@@ -1,0 +1,26 @@
+{
+  "name": "with-sqlx",
+  "description": "Minimal sqlx + SQLite example: a pool in app state, one page, one action",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "ossido dev",
+    "build": "ossido build",
+    "lint": "oxlint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@ossido-labs/ossido": "workspace:*"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.76.0",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@ossido-labs/ossido-cli": "workspace:*",
+    "@ossido-labs/ossido-eslint-plugin": "workspace:*",
+    "oxlint": "1.76.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0"
+  }
+}

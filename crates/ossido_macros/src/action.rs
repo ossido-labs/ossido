@@ -5,8 +5,8 @@ use syn::token::Comma;
 use syn::{FnArg, GenericArgument, Ident, ItemFn, Pat, PathArguments, ReturnType, Type};
 
 use crate::utils::{
-    crate_application_state_extractor, create_struct_fn_arg, import_main_application_state,
-    is_logger_pat, params_argument, request_argument,
+    crate_application_state_extractor, create_struct_fn_arg, is_logger_pat, params_argument,
+    request_argument,
 };
 
 /// The role each argument of an `#[action]` function plays, in declared order.
@@ -117,7 +117,6 @@ pub fn action_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
     }
     axum_arguments.push(request_argument());
 
-    let application_state_import = import_main_application_state(state_field_names.clone());
     let application_state_extractor = crate_application_state_extractor(state_field_names.clone());
 
     let logger_binding = if has_logger {
@@ -152,10 +151,16 @@ pub fn action_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // wrapped in `Ok(..)`.
     let returns_result = matches!(&item.sig.output, ReturnType::Type(_, ty) if is_result(ty));
 
+    // `instrument_handler` wraps the user function in its per-handler OTel
+    // span (a no-op unless telemetry is active).
     let call_body = if returns_result {
-        quote! { #fn_name(#(#call_args),*) }
+        quote! { ossido::__otel::instrument_handler(stringify!(#fn_name), #fn_name(#(#call_args),*)) }
     } else {
-        quote! { async move { Ok::<_, ossido::ActionError>(#fn_name(#(#call_args),*).await) } }
+        quote! { async move {
+            Ok::<_, ossido::ActionError>(
+                ossido::__otel::instrument_handler(stringify!(#fn_name), #fn_name(#(#call_args),*)).await
+            )
+        } }
     };
 
     let dispatch = match &input_ty {
@@ -169,7 +174,6 @@ pub fn action_core(attrs: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     quote! {
-        #application_state_import
 
         #item
 
@@ -288,10 +292,10 @@ mod tests {
         assert!(out.contains("__ossido_form.input::<CreateUser>()"));
         // Forwards input + state to the user function.
         assert!(out.contains(
-            "run_action(&req,__ossido_decoded,move|__ossido_input|create_user(__ossido_input,db)"
+            "run_action(&req,__ossido_decoded,move|__ossido_input|ossido::__otel::instrument_handler(stringify!(create_user),create_user(__ossido_input,db))"
         ));
         // Extracts application state.
-        assert!(out.contains("letApplicationState{db,..}=state;"));
+        assert!(out.contains("letcrate::ossido_main_state::ApplicationState{db,..}=state;"));
     }
 
     #[test]
@@ -299,7 +303,9 @@ mod tests {
         let out = expand(quote! {
             async fn subscribe(form: Subscribe) -> FormState { todo!() }
         });
-        assert!(out.contains("Ok::<_,ossido::ActionError>(subscribe(__ossido_input).await)"));
+        assert!(out.contains(
+            "Ok::<_,ossido::ActionError>(ossido::__otel::instrument_handler(stringify!(subscribe),subscribe(__ossido_input)).await)"
+        ));
     }
 
     #[test]

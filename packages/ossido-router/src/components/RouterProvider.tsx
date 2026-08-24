@@ -15,6 +15,7 @@ import {
 import { getInitialLocation } from './RouterContext';
 import { RouterContextProvider } from './RouterContextProvider';
 import { Matches } from './Matches';
+import { requestPropsRefetch } from '../data/propsRefetch';
 
 interface RouterProviderProps {
   router: Router;
@@ -74,7 +75,9 @@ export function RouterProvider({
           code-splits it into chunks that a real prod visitor never fetches (the
           runtime `mode` check gates them). The `mode` check is also what keeps
           the overlay working in the dev bundle. */}
-      {import.meta.env.DEV && mode === 'Dev' && <DevErrorOverlayHost />}
+      {import.meta.env.DEV && mode === 'Dev' && (
+        <DevErrorOverlayHost onRefreshProps={requestPropsRefetch} />
+      )}
     </RouterContextProvider>
   );
 }
