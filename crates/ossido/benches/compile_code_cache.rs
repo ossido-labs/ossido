@@ -153,6 +153,45 @@ fn main() {
     println!("cached compile median: {}\n", fmt_ms(median(&mut cached)));
 
     // ------------------------------------------------------------------
+    // 1c. Startup snapshot: evaluate + serialize the finished heap once,
+    //     then deserialize per fresh isolate (prod's fast path — skips
+    //     parse, compile AND top-level evaluation).
+    // ------------------------------------------------------------------
+    let start = Instant::now();
+    let blob = Ssr::snapshot_module(source.clone())
+        .expect("bench bundle failed to snapshot")
+        .expect("bench bundle must be snapshottable");
+    let snap_produce_ns = start.elapsed().as_nanos() as f64;
+    println!(
+        "snapshot produce: {} (blob: {:.2} MiB)",
+        fmt_ms(snap_produce_ns),
+        blob.len() as f64 / (1024.0 * 1024.0)
+    );
+
+    let mut restored = Vec::with_capacity(COMPILE_REPS);
+    for rep in 0..COMPILE_REPS {
+        let start = Instant::now();
+        let restored_ssr =
+            Ssr::from_snapshot(blob.clone()).expect("bench snapshot failed to restore");
+        let ns = start.elapsed().as_nanos() as f64;
+        restored.push(ns);
+        println!("snapshot restore #{}: {}", rep + 1, fmt_ms(ns));
+        drop(restored_ssr);
+    }
+    println!("snapshot restore median: {}", fmt_ms(median(&mut restored)));
+
+    // Sanity: a restored isolate renders the same document as a compiled one.
+    {
+        let mut compiled = Ssr::from_module(source.clone()).unwrap();
+        let expected = compiled.render("renderFn", Some(payload)).unwrap();
+        drop(compiled);
+        let mut restored_ssr = Ssr::from_snapshot(blob.clone()).unwrap();
+        let html = restored_ssr.render("renderFn", Some(payload)).unwrap();
+        assert_eq!(html, expected, "restored isolate must render identically");
+        println!("restored-isolate render matches compiled-isolate render\n");
+    }
+
+    // ------------------------------------------------------------------
     // 2. Render tier-up curve + steady state on one reused isolate.
     // ------------------------------------------------------------------
     let mut ssr = Ssr::from_module(source.clone()).expect("bench bundle failed to compile");

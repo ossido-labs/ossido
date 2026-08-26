@@ -53,12 +53,28 @@ pub(crate) struct DecoderRegistry {
     next_id: u32,
 }
 
+impl DecoderRegistry {
+    /// Live streaming decoders. Used as a snapshottability gate: a mid-stream
+    /// `TextDecoder`'s carry state lives in this Rust registry, which a heap
+    /// snapshot cannot capture — the restored JS object would hold a dangling
+    /// stream id — so a non-empty registry refuses the snapshot.
+    pub(crate) fn active(&self) -> usize {
+        self.decoders.len()
+    }
+}
+
 /// Install the registry on the isolate; the returned pointer is owned by the
 /// [`crate::Ssr`] and must be freed (via `Box::from_raw`) before the isolate.
-pub(crate) fn install_decoder_registry(isolate: *mut v8::OwnedIsolate) -> *mut DecoderRegistry {
+pub(crate) fn install_decoder_registry(isolate: &mut v8::Isolate) -> *mut DecoderRegistry {
     let registry = Box::into_raw(Box::new(DecoderRegistry::default()));
-    unsafe { (*isolate).set_data(DECODER_SLOT, registry as *mut c_void) };
+    isolate.set_data(DECODER_SLOT, registry as *mut c_void);
     registry
+}
+
+/// Streaming decoders still open on this isolate (0 when no registry is
+/// installed). See [`DecoderRegistry::active`].
+pub(crate) fn active_decoders(scope: &mut v8::HandleScope) -> usize {
+    decoder_registry(scope).map_or(0, |registry| registry.active())
 }
 
 /// Borrow the isolate's [`DecoderRegistry`] via [`DECODER_SLOT`], if installed.
@@ -222,6 +238,108 @@ pub(crate) fn encode_into_callback(
         }
     }
 }
+
+// --- encodeInto fast path -------------------------------------------------
+
+/// Marshal a one-byte (latin1) V8 string into an owned Rust `String`. Shared
+/// by the fast-call paths, which receive raw latin1 bytes rather than a
+/// scoped `v8::String`.
+pub(crate) fn latin1_to_string(bytes: &[u8]) -> String {
+    if bytes.is_ascii() {
+        // Safety: ASCII is valid UTF-8 byte-for-byte.
+        unsafe { std::str::from_utf8_unchecked(bytes) }.to_string()
+    } else {
+        // Latin1 code points 0x80..=0xFF map 1:1 to Unicode scalars; `char`
+        // conversion re-encodes them as two-byte UTF-8.
+        bytes.iter().map(|&b| b as char).collect()
+    }
+}
+
+/// The fast-call overload for `__ossido_encode_into`, invoked directly from
+/// TurboFan-optimised code with no `FunctionCallbackInfo` trampoline and no
+/// handle scopes. V8 dispatches here only when `source` is a sequential
+/// one-byte (latin1) string — anything else (two-byte strings, cons strings,
+/// unoptimised frames) takes [`encode_into_callback`] instead, so the two
+/// must agree: latin1→UTF-8 with `read` counted in UTF-16 units (1 per latin1
+/// char) and code points never split at the destination boundary.
+///
+/// Fast calls may not allocate on the V8 heap, re-enter JS, or throw; the
+/// type mismatches the slow path reports as `TypeError`s are handled here by
+/// writing nothing (the bootstrap always passes correct types).
+pub(crate) extern "C" fn encode_into_fast(
+    _receiver: v8::Local<v8::Value>,
+    source: *const v8::fast_api::FastApiOneByteString,
+    dest: v8::Local<v8::Value>,
+    scratch: v8::Local<v8::Value>,
+) {
+    // Safety: V8 passes a valid string reference for the duration of the call.
+    let bytes = unsafe { &*source }.as_bytes();
+    let Ok(dest) = v8::Local::<v8::ArrayBufferView>::try_from(dest) else {
+        return;
+    };
+    let Ok(scratch) = v8::Local::<v8::ArrayBufferView>::try_from(scratch) else {
+        return;
+    };
+
+    let mut read = 0usize;
+    let mut written = 0usize;
+    let capacity = dest.byte_length();
+    let out = dest.data() as *mut u8;
+    if !out.is_null() {
+        for &b in bytes {
+            let need = if b < 0x80 { 1 } else { 2 };
+            if written + need > capacity {
+                break;
+            }
+            // Safety: `written + need <= capacity`, and a live attached view's
+            // window is valid writable memory for the duration of this call.
+            unsafe {
+                if b < 0x80 {
+                    *out.add(written) = b;
+                } else {
+                    *out.add(written) = 0xC0 | (b >> 6);
+                    *out.add(written + 1) = 0x80 | (b & 0x3F);
+                }
+            }
+            written += need;
+            read += 1;
+        }
+    }
+
+    if scratch.byte_length() >= 8 {
+        let report = scratch.data() as *mut u32;
+        if !report.is_null() {
+            // Safety: the bootstrap owns this 2-element Uint32Array.
+            unsafe {
+                *report = read as u32;
+                *report.add(1) = written as u32;
+            }
+        }
+    }
+}
+
+/// `encode_into_fast`'s C signature: (receiver, seq-one-byte string, dest
+/// view, scratch view) → void. `'static` so the type-info pointer baked into
+/// function templates (and the external-references table) stays valid.
+static ENCODE_INTO_FAST_ARGS: [v8::fast_api::CTypeInfo; 4] = [
+    v8::fast_api::Type::V8Value.as_info(), // receiver
+    v8::fast_api::Type::SeqOneByteString.as_info(),
+    v8::fast_api::Type::V8Value.as_info(), // dest Uint8Array
+    v8::fast_api::Type::V8Value.as_info(), // scratch Uint32Array
+];
+static ENCODE_INTO_FAST_INFO: super::FastCallDescriptor<v8::fast_api::CFunctionInfo> =
+    super::FastCallDescriptor(v8::fast_api::CFunctionInfo::new(
+        v8::fast_api::Type::Void.as_info(),
+        &ENCODE_INTO_FAST_ARGS,
+        v8::fast_api::Int64Representation::Number,
+    ));
+/// The fast overload registered alongside [`encode_into_callback`] in the
+/// globals registry.
+pub(crate) static ENCODE_INTO_CFN: super::FastCallDescriptor<v8::fast_api::CFunction> =
+    super::FastCallDescriptor(v8::fast_api::CFunction::new(
+        encode_into_fast as *const c_void,
+        &ENCODE_INTO_FAST_INFO.0,
+    ));
 
 // --- TextDecoder ---------------------------------------------------------
 

@@ -6,7 +6,9 @@ use rustc_hash::FxHashMap;
 
 use crate::globals::install_runtime_globals;
 use crate::globals::text_codecs::{install_decoder_registry, DecoderRegistry};
-use crate::globals::timers::{install_timers, reset_macrotasks, run_macrotasks, TimerQueue};
+use crate::globals::timers::{
+    install_timer_queue, install_timers, reset_macrotasks, run_macrotasks, TimerQueue,
+};
 
 /// This enum holds all the possible Ssr error states.
 #[derive(Debug, PartialEq, Eq)]
@@ -186,6 +188,72 @@ fn stream_write_callback(
     sink.write_chunk_owned(chunk);
 }
 
+/// The fast-call overload for the writer global: from TurboFan-optimised code
+/// V8 calls this directly with the chunk's raw latin1 bytes — no
+/// `FunctionCallbackInfo` trampoline, no handle scope. Dispatched only for
+/// sequential one-byte strings; two-byte and cons-string chunks (and
+/// unoptimised frames) fall back to [`stream_write_callback`]. The sink is
+/// pure Rust (string marshal + channel/buffer write), which is exactly what
+/// fast calls permit: no V8 heap allocation, no JS re-entry.
+extern "C" fn stream_write_fast(
+    _receiver: v8::Local<v8::Value>,
+    chunk: *const v8::fast_api::FastApiOneByteString,
+    options: *mut v8::fast_api::FastApiCallbackOptions,
+) {
+    // Safety: V8 passes valid references for the duration of the call.
+    let bytes = unsafe { &*chunk }.as_bytes();
+    let isolate = unsafe { &*options }.isolate;
+
+    // Same slot protocol as the slow path; see `stream_write_callback`.
+    let ptr = unsafe { (*isolate).get_data(SINK_SLOT) } as *mut &mut dyn StreamSink;
+    if ptr.is_null() {
+        return;
+    }
+    // Safety: see `stream_write_callback` — the slot holds a live, unaliased
+    // `&mut dyn StreamSink` for the whole streaming render.
+    let sink = unsafe { &mut *ptr };
+    sink.write_chunk_owned(crate::globals::text_codecs::latin1_to_string(bytes));
+}
+
+/// `stream_write_fast`'s C signature: (receiver, seq-one-byte string, callback
+/// options) → void. `'static` so the type-info pointer baked into the writer's
+/// function template (and the external-references table) stays valid.
+static STREAM_WRITE_FAST_ARGS: [v8::fast_api::CTypeInfo; 3] = [
+    v8::fast_api::Type::V8Value.as_info(), // receiver
+    v8::fast_api::Type::SeqOneByteString.as_info(),
+    v8::fast_api::Type::CallbackOptions.as_info(),
+];
+static STREAM_WRITE_FAST_INFO: crate::globals::FastCallDescriptor<v8::fast_api::CFunctionInfo> =
+    crate::globals::FastCallDescriptor(v8::fast_api::CFunctionInfo::new(
+        v8::fast_api::Type::Void.as_info(),
+        &STREAM_WRITE_FAST_ARGS,
+        v8::fast_api::Int64Representation::Number,
+    ));
+static STREAM_WRITE_CFN: crate::globals::FastCallDescriptor<v8::fast_api::CFunction> =
+    crate::globals::FastCallDescriptor(v8::fast_api::CFunction::new(
+        stream_write_fast as *const c_void,
+        &STREAM_WRITE_FAST_INFO.0,
+    ));
+
+/// The streaming writer's contribution to the external-references table. The
+/// writer is installed lazily (post-restore) so a snapshot never actually
+/// contains it today, but registering it is harmless and keeps the table
+/// complete should an isolate that has streamed ever be snapshotted.
+pub(crate) fn stream_external_references() -> Vec<v8::ExternalReference<'static>> {
+    use v8::MapFnTo;
+    vec![
+        v8::ExternalReference {
+            function: stream_write_callback.map_fn_to(),
+        },
+        v8::ExternalReference {
+            pointer: STREAM_WRITE_CFN.0.address() as *mut c_void,
+        },
+        v8::ExternalReference {
+            type_info: STREAM_WRITE_CFN.0.type_info(),
+        },
+    ]
+}
+
 /// A streaming render session over an [`Ssr`] isolate, created by
 /// [`Ssr::streaming`]. Where [`Ssr::render`] buffers the whole result into one
 /// string, a streaming render invokes a caller sink for each chunk the bundle
@@ -271,6 +339,46 @@ enum CacheMode<'a> {
     Produce,
     /// Compile consuming a previously produced code cache.
     Consume(&'a [u8]),
+}
+
+/// Walk `object`'s own properties, collecting every function-valued property
+/// as a callable entry point. Shared by the classic-script build (the entry
+/// object), the module build (the module namespace), and snapshot restore
+/// (the namespace stashed in the blob).
+fn collect_exports<'s>(
+    scope: &mut v8::HandleScope<'s>,
+    object: v8::Local<v8::Object>,
+) -> Result<FxHashMap<String, v8::Local<'s, v8::Function>>, SsrError> {
+    let mut fn_map: FxHashMap<String, v8::Local<'s, v8::Function>> = FxHashMap::default();
+
+    if let Some(props) = object.get_own_property_names(scope, Default::default()) {
+        for i in 0..props.length() {
+            let name = match props.get_index(scope, i) {
+                Some(val) => val,
+                None => return Err(SsrError::FailedToParseJs("Failed to get property name")),
+            };
+
+            let mut scope = v8::EscapableHandleScope::new(scope);
+
+            let value = match object.get(&mut scope, name) {
+                Some(val) => val,
+                None => return Err(SsrError::FailedToParseJs("Failed to get property from obj")),
+            };
+
+            if !value.is_function() {
+                continue;
+            }
+
+            let fn_name = match name.to_string(&mut scope) {
+                Some(val) => val.to_rust_string_lossy(&mut scope),
+                None => return Err(SsrError::FailedToParseJs("Failed to find function name")),
+            };
+
+            fn_map.insert(fn_name, scope.escape(value.cast()));
+        }
+    }
+
+    Ok(fn_map)
 }
 
 /// This struct holds all the necessary v8 utilities to
@@ -372,7 +480,7 @@ where
         // The registered native globals (text codecs, …) before the bundle
         // runs, so its conditional polyfills keep them.
         install_runtime_globals(scope);
-        let decoder_registry = install_decoder_registry(isolate);
+        let decoder_registry = install_decoder_registry(unsafe { &mut *isolate });
 
         let code = match v8::String::new(scope, &format!("{source};{entry_point}")) {
             Some(val) => val,
@@ -398,40 +506,7 @@ where
             }
         };
 
-        let mut fn_map: FxHashMap<String, v8::Local<v8::Function>> = FxHashMap::default();
-
-        if let Some(props) = object.get_own_property_names(scope, Default::default()) {
-            // Replaces a `Some(props).iter()...collect()` that iterated the
-            // `Option`, not the array, so it only ever registered the first
-            // property - fine when there's one export, wrong once `render` looks
-            // up entry points by name.
-            for i in 0..props.length() {
-                let name = match props.get_index(scope, i) {
-                    Some(val) => val,
-                    None => return Err(SsrError::FailedToParseJs("Failed to get property name")),
-                };
-
-                let mut scope = v8::EscapableHandleScope::new(scope);
-
-                let value = match object.get(&mut scope, name) {
-                    Some(val) => val,
-                    None => {
-                        return Err(SsrError::FailedToParseJs("Failed to get property from obj"))
-                    }
-                };
-
-                if !value.is_function() {
-                    continue;
-                }
-
-                let fn_name = match name.to_string(&mut scope) {
-                    Some(val) => val.to_rust_string_lossy(&mut scope),
-                    None => return Err(SsrError::FailedToParseJs("Failed to find function name")),
-                };
-
-                fn_map.insert(fn_name, scope.escape(value.cast()));
-            }
-        }
+        let fn_map = collect_exports(scope, object)?;
 
         Ok(Ssr {
             isolate,
@@ -491,6 +566,238 @@ where
             Some(bytes) => Self::build_module(source, CacheMode::Consume(bytes)),
             None => Self::build_module(source, CacheMode::Produce),
         }
+    }
+
+    /// Evaluate `source` in a snapshot-creator isolate and serialize the
+    /// resulting heap as a V8 **startup snapshot**: the compiled bundle, the
+    /// runtime globals, and — crucially — the result of running all of the
+    /// module's top-level code. [`Ssr::from_snapshot`] then builds isolates
+    /// that deserialize that finished heap instead of re-parsing, re-compiling
+    /// and re-evaluating the bundle.
+    ///
+    /// Returns `Ok(None)` when the evaluated heap is **not snapshottable**:
+    /// state is pending against the embedder — a live timer whose deadline and
+    /// callback sit in the Rust timer queue, or a mid-stream `TextDecoder`
+    /// whose carry state sits in the Rust decoder registry — which a heap blob
+    /// cannot capture. Restoring such a blob would silently drop that state,
+    /// so the caller should fall back to the compile path instead. (`None` is
+    /// also returned in the unlikely case V8 declines to serialize the heap.)
+    ///
+    /// Values the bundle computed during evaluation (a top-level `Date.now()`,
+    /// a random seed) are baked into the blob and shared by every restored
+    /// isolate; that is undetectable here and simply a property of
+    /// snapshotting.
+    pub fn snapshot_module(source: String) -> Result<Option<Vec<u8>>, SsrError> {
+        let refs = crate::globals::external_references();
+        let mut isolate = v8::Isolate::snapshot_creator(Some(refs), None);
+
+        let timer_queue;
+        let decoder_registry;
+        let outcome;
+        {
+            let handle_scope = &mut v8::HandleScope::new(&mut isolate);
+            let context = v8::Context::new(handle_scope, Default::default());
+            let scope = &mut v8::ContextScope::new(handle_scope, context);
+
+            timer_queue = install_timer_queue(scope);
+            crate::globals::timers::install_timer_globals(scope);
+            decoder_registry = install_decoder_registry(scope);
+            install_runtime_globals(scope);
+
+            outcome = Self::snapshot_body(scope, context, &source);
+
+            // Unconditional: a snapshot-creator isolate refuses to be dropped
+            // without producing a blob (rusty_v8 asserts), so even the refusal
+            // and error paths below must feed it a context and serialize a
+            // throwaway blob.
+            scope.set_default_context(context);
+        }
+
+        // Free the slot-owned Rust state on every path (the gate guarantees
+        // it holds no pending work when a blob is produced). The timer queue
+        // holds `v8::Global`s, which must drop while the isolate is alive —
+        // and `create_blob` below consumes it.
+        unsafe {
+            let _ = Box::from_raw(timer_queue);
+            let _ = Box::from_raw(decoder_registry);
+        }
+
+        // `create_blob` must run outside any handle scope (hence the block
+        // above) and must run on every path — the discarded blobs exist only
+        // to satisfy the creator-isolate teardown contract.
+        match outcome {
+            Err(error) => {
+                let _ = isolate.create_blob(v8::FunctionCodeHandling::Clear);
+                Err(error)
+            }
+            Ok(false) => {
+                let _ = isolate.create_blob(v8::FunctionCodeHandling::Clear);
+                Ok(None)
+            }
+            // `Keep` serializes the eagerly-compiled code too, so restored
+            // isolates start with compiled bytecode, not just source.
+            Ok(true) => Ok(isolate
+                .create_blob(v8::FunctionCodeHandling::Keep)
+                .map(|blob| blob.to_vec())),
+        }
+    }
+
+    /// The scope-bound phase of [`Ssr::snapshot_module`]: compile + evaluate
+    /// the module, settle its top-level await, run the snapshottability gate,
+    /// and stage the context (plus the exports as context datum 0) for
+    /// serialization. Returns whether the heap is snapshottable. Split out so
+    /// the caller can free the slot-owned Rust state on early error returns.
+    fn snapshot_body(
+        scope: &mut v8::HandleScope,
+        context: v8::Local<v8::Context>,
+        source: &str,
+    ) -> Result<bool, SsrError> {
+        let code = match v8::String::new(scope, source) {
+            Some(val) => val,
+            None => return Err(SsrError::InvalidJs("Strings are needed")),
+        };
+        let resource_name = match v8::String::new(scope, "server-main") {
+            Some(val) => val,
+            None => return Err(SsrError::InvalidJs("Strings are needed")),
+        };
+        let origin = v8::ScriptOrigin::new(
+            scope,
+            resource_name.into(),
+            0,     // resource_line_offset
+            0,     // resource_column_offset
+            false, // resource_is_shared_cross_origin
+            0,     // script_id
+            None,  // source_map_url
+            false, // resource_is_opaque
+            false, // is_wasm
+            true,  // is_module
+            None,  // host_defined_options
+        );
+
+        // Eager compile, mirroring the cache-produce path: with
+        // `FunctionCodeHandling::Keep` the blob then carries compiled code for
+        // every function, not just the ones evaluation happened to touch.
+        let mut module_source = v8::script_compiler::Source::new(code, Some(&origin));
+        let module = match v8::script_compiler::compile_module2(
+            scope,
+            &mut module_source,
+            v8::script_compiler::CompileOptions::EagerCompile,
+            v8::script_compiler::NoCacheReason::NoReason,
+        ) {
+            Some(val) => val,
+            None => return Err(SsrError::InvalidJs("Failed to compile the module")),
+        };
+
+        if module
+            .instantiate_module(scope, no_import_resolve_callback)
+            .is_none()
+        {
+            return Err(SsrError::InvalidJs("Failed to instantiate the module"));
+        }
+
+        let eval_result = module.evaluate(scope);
+        if let Some(promise) =
+            eval_result.and_then(|value| v8::Local::<v8::Promise>::try_from(value).ok())
+        {
+            pump_until(
+                scope,
+                || promise.state() == v8::PromiseState::Pending,
+                "Module top-level await did not settle: unresolvable async during evaluation",
+            )?;
+        }
+
+        match module.get_status() {
+            v8::ModuleStatus::Evaluated => {}
+            v8::ModuleStatus::Errored => {
+                let exception = module.get_exception();
+                let reason = exception
+                    .to_string(scope)
+                    .map(|s| s.to_rust_string_lossy(scope))
+                    .unwrap_or_else(|| "<module evaluation failed>".to_string());
+                return Err(SsrError::JsException(reason));
+            }
+            _ => return Err(SsrError::InvalidJs("Module did not finish evaluating")),
+        }
+
+        // Leave no microtask behind: V8 serializes the heap, not the
+        // microtask queue, so anything still queued here would vanish.
+        scope.perform_microtask_checkpoint();
+
+        // The snapshottability gate. Both counters are embedder-owned Rust
+        // state a heap blob cannot capture: V8 can serialize the *waiters*
+        // (pending promises, suspended frames) but not these *wakers*.
+        if crate::globals::timers::pending_timers(scope) != 0
+            || crate::globals::text_codecs::active_decoders(scope) != 0
+        {
+            return Ok(false);
+        }
+
+        let namespace = module.get_module_namespace();
+        let object = match namespace.to_object(scope) {
+            Some(val) => val,
+            None => return Err(SsrError::InvalidJs("The module namespace is not an object")),
+        };
+
+        // Stash the exports as context datum 0 so restore can rebuild the
+        // entry-point map without re-evaluating anything. (The caller sets the
+        // default context — it must do so on refusal/error paths too.)
+        let index = scope.add_context_data(context, object);
+        debug_assert_eq!(index, 0, "module exports must be context datum 0");
+
+        Ok(true)
+    }
+
+    /// Build an [`Ssr`] by **deserializing** a startup snapshot produced by
+    /// [`Ssr::snapshot_module`]: no parse, no compile, no evaluation — the
+    /// isolate wakes up with the bundle's post-evaluation heap and the entry
+    /// points ready to call. This replaces the whole compile-and-evaluate path
+    /// with a single blob read.
+    ///
+    /// The blob must have been produced in-process, or gated by the caller as
+    /// belonging to the same V8 version/flags and bundle source: V8 verifies
+    /// blob integrity with a `CHECK` that **aborts the process** on a
+    /// mismatch, it does not reject gracefully.
+    pub fn from_snapshot(blob: Vec<u8>) -> Result<Self, SsrError> {
+        let refs = crate::globals::external_references();
+        let params = v8::CreateParams::default()
+            .snapshot_blob(blob)
+            .external_references(&**refs);
+
+        let isolate = Box::into_raw(Box::new(v8::Isolate::new(params)));
+
+        let handle_scope = unsafe { Box::into_raw(Box::new(v8::HandleScope::new(&mut *isolate))) };
+
+        // On a snapshotted isolate this deserializes the blob's default
+        // context — evaluated bundle, globals and all — instead of creating
+        // an empty one.
+        let context = unsafe { v8::Context::new(&mut *handle_scope, Default::default()) };
+
+        let scope_ptr =
+            unsafe { Box::into_raw(Box::new(v8::ContextScope::new(&mut *handle_scope, context))) };
+
+        let scope = unsafe { &mut *scope_ptr };
+
+        let object = scope
+            .get_context_data_from_snapshot_once::<v8::Object>(0)
+            .map_err(|_| SsrError::InvalidJs("Snapshot blob has no module exports datum"))?;
+        let fn_map = collect_exports(scope, object)?;
+
+        // Fresh slot state: the snapshot carries the JS half of the timers
+        // and codecs (the globals, the classes), but the Rust queue/registry
+        // behind the isolate slots must be recreated per isolate. The
+        // snapshottability gate guarantees neither had pending state to lose.
+        let timer_queue = install_timer_queue(unsafe { &mut *isolate });
+        let decoder_registry = install_decoder_registry(unsafe { &mut *isolate });
+
+        Ok(Ssr {
+            isolate,
+            handle_scope,
+            fn_map,
+            scope: scope_ptr,
+            stream_writer: None,
+            timer_queue,
+            decoder_registry,
+        })
     }
 
     /// Shared ES-module build behind [`Ssr::from_module`] /
@@ -606,7 +913,7 @@ where
         // runs, so its conditional polyfills keep them (pure-JS codecs are the
         // dominant per-render cost on large documents).
         install_runtime_globals(scope);
-        let decoder_registry = install_decoder_registry(isolate);
+        let decoder_registry = install_decoder_registry(unsafe { &mut *isolate });
 
         // For a module with top-level await, `evaluate` returns a promise that
         // settles when the whole module (including its awaits) is done. Drive
@@ -645,36 +952,7 @@ where
             None => return Err(SsrError::InvalidJs("The module namespace is not an object")),
         };
 
-        let mut fn_map: FxHashMap<String, v8::Local<v8::Function>> = FxHashMap::default();
-
-        if let Some(props) = object.get_own_property_names(scope, Default::default()) {
-            for i in 0..props.length() {
-                let name = match props.get_index(scope, i) {
-                    Some(val) => val,
-                    None => return Err(SsrError::FailedToParseJs("Failed to get property name")),
-                };
-
-                let mut scope = v8::EscapableHandleScope::new(scope);
-
-                let value = match object.get(&mut scope, name) {
-                    Some(val) => val,
-                    None => {
-                        return Err(SsrError::FailedToParseJs("Failed to get property from obj"))
-                    }
-                };
-
-                if !value.is_function() {
-                    continue;
-                }
-
-                let fn_name = match name.to_string(&mut scope) {
-                    Some(val) => val.to_rust_string_lossy(&mut scope),
-                    None => return Err(SsrError::FailedToParseJs("Failed to find function name")),
-                };
-
-                fn_map.insert(fn_name, scope.escape(value.cast()));
-            }
-        }
+        let fn_map = collect_exports(scope, object)?;
 
         Ok(ModuleBuild {
             ssr: Ssr {
@@ -841,9 +1119,20 @@ where
     /// ```
     pub fn streaming(&mut self, write_fn: &'static str) -> Result<Streaming<'_, 's, 'i>, SsrError> {
         // Install the writer global once per isolate — the global persists across
-        // renders, so repeated `streaming` calls need not re-allocate it.
+        // renders, so repeated `streaming` calls need not re-allocate it. Built
+        // from a template carrying the fast-call overload, so once the render
+        // path tiers up, per-chunk writes skip the callback trampoline.
         if self.stream_writer != Some(write_fn) {
-            self.add_global_fn(write_fn, stream_write_callback)?;
+            let scope = unsafe { &mut *self.scope };
+            let context = scope.get_current_context();
+            let global = context.global(scope);
+            let name = v8::String::new(scope, write_fn).ok_or(SsrError::InvalidFunctionName)?;
+            let template = v8::FunctionTemplate::builder(stream_write_callback)
+                .build_fast(scope, &[STREAM_WRITE_CFN.0]);
+            let function = template
+                .get_function(scope)
+                .ok_or(SsrError::InvalidFunction)?;
+            global.set(scope, name.into(), function.into());
             self.stream_writer = Some(write_fn);
         }
         Ok(Streaming { ssr: self })
@@ -1909,5 +2198,193 @@ mod tests {
         // "A2" arriving after the inner "B1"/"B2" proves the outer slot survived
         // the nested render intact.
         assert_eq!(collected, vec!["A1", "B1", "B2", "A2"]);
+    }
+
+    // --- Startup snapshots ------------------------------------------------
+
+    /// The core promise of the snapshot: top-level evaluation (including a
+    /// settled top-level await over a native timer) runs once at produce time,
+    /// and a restored isolate renders without re-evaluating it.
+    #[test]
+    fn snapshot_round_trip_renders_without_reevaluating() {
+        init_test();
+        let source = r##"
+            globalThis.__evals = (globalThis.__evals || 0) + 1;
+            const greeting = await new Promise((r) => setTimeout(() => r("hi"), 10));
+            export function renderFn() {
+                return "<html>" + greeting + ":" + globalThis.__evals + "</html>";
+            }
+        "##
+        .to_string();
+
+        let blob = Ssr::snapshot_module(source)
+            .unwrap()
+            .expect("a settled module must be snapshottable");
+
+        // Two isolates from one blob (the render-pool pattern): each sees the
+        // single produce-time evaluation (`__evals == 1`), proving restore
+        // deserializes the evaluated heap rather than running the module again.
+        for _ in 0..2 {
+            let mut ssr = Ssr::from_snapshot(blob.clone()).unwrap();
+            assert_eq!(ssr.render("renderFn", None).unwrap(), "<html>hi:1</html>");
+        }
+    }
+
+    /// Restored isolates must have working runtime globals: the JS half
+    /// (classes, timer functions) comes from the blob via external references;
+    /// the Rust half (timer queue, decoder registry) is recreated fresh.
+    #[test]
+    fn snapshot_restore_supports_timers_and_codecs() {
+        init_test();
+        let source = r##"
+            export function renderFn() {
+                return new Promise((resolve) => setTimeout(() => {
+                    const bytes = new TextEncoder().encode("snap-é");
+                    resolve("<html>" + new TextDecoder().decode(bytes) + "</html>");
+                }, 5));
+            }
+        "##
+        .to_string();
+
+        let blob = Ssr::snapshot_module(source).unwrap().unwrap();
+        let mut ssr = Ssr::from_snapshot(blob).unwrap();
+        assert_eq!(
+            ssr.render("renderFn", None).unwrap(),
+            "<html>snap-\u{e9}</html>"
+        );
+    }
+
+    /// Streaming still works from a restored isolate — the writer global is
+    /// installed lazily post-restore, so it is not part of the blob.
+    #[test]
+    fn snapshot_restore_supports_streaming() {
+        init_test();
+        let source = r##"
+            export async function renderStream() {
+                __ssr_write("<part1>");
+                await new Promise((r) => setTimeout(r, 1));
+                __ssr_write("<part2>");
+            }
+        "##
+        .to_string();
+
+        let blob = Ssr::snapshot_module(source).unwrap().unwrap();
+        let mut ssr = Ssr::from_snapshot(blob).unwrap();
+        let mut sink = Collector::default();
+        ssr.streaming("__ssr_write")
+            .unwrap()
+            .render("renderStream", None, &mut sink)
+            .unwrap();
+        assert_eq!(sink.chunks, vec!["<part1>", "<part2>"]);
+    }
+
+    /// A timer still pending after evaluation settles lives in the Rust queue,
+    /// which the blob cannot capture — the gate must refuse rather than let
+    /// the timer silently vanish on restore.
+    #[test]
+    fn snapshot_refuses_pending_timer() {
+        init_test();
+        let source = r##"
+            setTimeout(() => { globalThis.__later = true; }, 1000);
+            export function renderFn() { return "x"; }
+        "##
+        .to_string();
+
+        assert_eq!(Ssr::snapshot_module(source).unwrap(), None);
+    }
+
+    /// A `TextDecoder` abandoned mid-stream holds carry state in the Rust
+    /// decoder registry; restoring would leave the JS object pointing at a
+    /// stream id that no longer exists, so the gate must refuse.
+    #[test]
+    fn snapshot_refuses_open_streaming_decoder() {
+        init_test();
+        let source = r##"
+            globalThis.__decoder = new TextDecoder();
+            globalThis.__decoder.decode(new Uint8Array([0xE2]), { stream: true });
+            export function renderFn() { return "x"; }
+        "##
+        .to_string();
+
+        assert_eq!(Ssr::snapshot_module(source).unwrap(), None);
+    }
+
+    /// A module whose evaluation throws must surface the JS error, not a blob.
+    #[test]
+    fn snapshot_surfaces_evaluation_errors() {
+        init_test();
+        let source = r##"
+            throw new Error("boom at top level");
+            export function renderFn() { return "x"; }
+        "##
+        .to_string();
+
+        match Ssr::snapshot_module(source) {
+            Err(SsrError::JsException(reason)) => assert!(reason.contains("boom at top level")),
+            other => panic!("expected JsException, got {other:?}"),
+        }
+    }
+
+    // --- Fast API -----------------------------------------------------------
+
+    /// V8 only dispatches to the fast `encodeInto` overload from optimised
+    /// code, so nothing exercises its Rust body deterministically in-engine —
+    /// call it directly and check it agrees with the slow path's semantics:
+    /// latin1→UTF-8, `read` in UTF-16 units, code points never split at the
+    /// destination boundary, `[read, written]` reported via the scratch array.
+    #[test]
+    fn encode_into_fast_agrees_with_slow_path_semantics() {
+        init_test();
+        let source = r##"export function renderFn() { return "x"; }"##.to_string();
+        let ssr = Ssr::from_module(source).unwrap();
+        // Tests live in `ssr.rs`'s module, so the private scope pointer is
+        // reachable — the fast callback needs real `Local`s to cast.
+        let scope = unsafe { &mut *ssr.scope };
+
+        let call =
+            |scope: &mut v8::HandleScope, input: &[u8], dest_len: usize| -> (Vec<u8>, u32, u32) {
+                let dest_buffer = v8::ArrayBuffer::new(scope, dest_len);
+                let dest = v8::Uint8Array::new(scope, dest_buffer, 0, dest_len).unwrap();
+                let scratch_buffer = v8::ArrayBuffer::new(scope, 8);
+                let scratch = v8::Uint32Array::new(scope, scratch_buffer, 0, 2).unwrap();
+
+                let string = v8::fast_api::FastApiOneByteString {
+                    data: input.as_ptr() as *const std::os::raw::c_char,
+                    length: input.len() as u32,
+                };
+                let receiver: v8::Local<v8::Value> = v8::undefined(scope).into();
+                crate::globals::text_codecs::encode_into_fast(
+                    receiver,
+                    &string,
+                    dest.into(),
+                    scratch.into(),
+                );
+
+                let mut written_bytes = vec![0u8; dest_len];
+                dest.copy_contents(&mut written_bytes);
+                let mut report = [0u8; 8];
+                scratch.copy_contents(&mut report);
+                let read = u32::from_ne_bytes(report[0..4].try_into().unwrap());
+                let written = u32::from_ne_bytes(report[4..8].try_into().unwrap());
+                (written_bytes, read, written)
+            };
+
+        // ASCII passes through byte-for-byte.
+        let (bytes, read, written) = call(scope, b"abcd", 8);
+        assert_eq!((&bytes[..4], read, written), (&b"abcd"[..], 4, 4));
+
+        // Latin1 0x80..=0xFF expands to two UTF-8 bytes; `read` counts UTF-16
+        // units (1 per latin1 char). 0xE9 = é → 0xC3 0xA9.
+        let (bytes, read, written) = call(scope, b"ab\xE9cd", 8);
+        assert_eq!(&bytes[..6], &[0x61, 0x62, 0xC3, 0xA9, 0x63, 0x64]);
+        assert_eq!((read, written), (5, 6));
+
+        // Truncation never splits a code point: with 3 dest bytes, "ab" fits
+        // but é needs 2 and only 1 remains — stop at read=2, written=2.
+        let (bytes, read, written) = call(scope, b"ab\xE9cd", 3);
+        assert_eq!(&bytes[..2], b"ab");
+        assert_eq!((read, written), (2, 2));
+
+        drop(ssr);
     }
 }

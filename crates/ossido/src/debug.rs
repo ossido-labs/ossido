@@ -67,6 +67,8 @@ fn phase_span(label: &str) -> tracing::Span {
     let name = match label {
         "bundle read" => "ssr.bundle_read",
         "v8 compile" => "ssr.v8_compile",
+        "v8 snapshot produce" => "ssr.v8_snapshot_produce",
+        "v8 snapshot restore" => "ssr.v8_snapshot_restore",
         "ssr render" => "ssr.render",
         other => other,
     };

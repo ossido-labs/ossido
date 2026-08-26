@@ -27,9 +27,12 @@ use crate::mode::{GLOBAL_MODE, Mode};
 /// `&mut dyn StreamSink` for the duration of the call rather than taking
 /// ownership, so the sink can hold borrowed local state and need not be `'static`.
 ///
-/// Each phase (`bundle read` / `v8 compile` / `ssr render`) is timed into the
-/// request trace under `DEBUG=1`, so a warm request shows only `ssr render`
-/// while the first request (or the one after a rebuild) also shows the compile.
+/// Each phase (`bundle read` / `v8 snapshot produce` / `v8 snapshot restore` /
+/// `v8 compile` / `ssr render`) is timed into the request trace under
+/// `DEBUG=1`, so a warm request shows only `ssr render` while the first
+/// request (or the one after a rebuild) also shows the isolate build —
+/// normally a snapshot restore in prod, a compile in dev or when the bundle
+/// isn't snapshottable.
 pub struct Js;
 
 /// Buffered-render export: resolves the whole page to a single string.
@@ -128,6 +131,15 @@ const DISK_CACHE_MAGIC: &[u8; 8] = b"OSSIDOV8";
 /// magic + version tag (u32) + source len (u64) + source hash (u64).
 const DISK_CACHE_HEADER_LEN: usize = 8 + 4 + 8 + 8;
 
+/// Prod's persisted startup snapshot: the bundle's fully *evaluated* heap, so
+/// a restart with an unchanged bundle skips parse, compile and top-level
+/// evaluation entirely. Same header scheme as the code cache — and here the
+/// gate is not just an optimisation: V8 *aborts the process* on a
+/// mismatched snapshot blob rather than rejecting it, so a blob is only ever
+/// fed back for the exact V8 version/flags and bundle source that produced it.
+const DISK_SNAPSHOT_PATH: &str = "./.ossido/cache/prod-server.v8snap";
+const DISK_SNAPSHOT_MAGIC: &[u8; 8] = b"OSSIDOSP";
+
 /// The V8 cached-data version tag (V8 version + flags), latched on first use
 /// so the whole process sees one consistent value — flags never change after
 /// platform init, and latching also avoids a repeated FFI call per header
@@ -157,16 +169,20 @@ fn source_fingerprint(source: &str) -> u64 {
     hasher.finish()
 }
 
-/// Read the persisted cache, returning its payload only if the header matches
-/// this V8 version/flags and this exact bundle source. Any mismatch or IO
-/// error is a miss, never an error.
+/// Read a persisted blob (code cache or snapshot), returning its payload only
+/// if the header matches `magic`, this V8 version/flags, and this exact
+/// bundle source. Any mismatch or IO error is a miss, never an error.
 fn read_disk_cache(source: &str) -> Option<Vec<u8>> {
-    read_disk_cache_at(Path::new(DISK_CACHE_PATH), source)
+    read_disk_blob_at(Path::new(DISK_CACHE_PATH), DISK_CACHE_MAGIC, source)
 }
 
-fn read_disk_cache_at(path: &Path, source: &str) -> Option<Vec<u8>> {
+fn read_disk_snapshot(source: &str) -> Option<Vec<u8>> {
+    read_disk_blob_at(Path::new(DISK_SNAPSHOT_PATH), DISK_SNAPSHOT_MAGIC, source)
+}
+
+fn read_disk_blob_at(path: &Path, magic: &[u8; 8], source: &str) -> Option<Vec<u8>> {
     let data = fs::read(path).ok()?;
-    if data.len() < DISK_CACHE_HEADER_LEN || &data[0..8] != DISK_CACHE_MAGIC {
+    if data.len() < DISK_CACHE_HEADER_LEN || &data[0..8] != magic {
         return None;
     }
     let tag = u32::from_le_bytes(data[8..12].try_into().ok()?);
@@ -189,21 +205,46 @@ fn read_disk_cache_at(path: &Path, source: &str) -> Option<Vec<u8>> {
 /// Takes the source length/fingerprint rather than the source itself because
 /// the compile consumes the source string before the cache exists.
 fn write_disk_cache(source_len: u64, fingerprint: u64, cache: &[u8]) {
-    write_disk_cache_at(Path::new(DISK_CACHE_PATH), source_len, fingerprint, cache);
+    write_disk_blob_at(
+        Path::new(DISK_CACHE_PATH),
+        DISK_CACHE_MAGIC,
+        source_len,
+        fingerprint,
+        cache,
+    );
 }
 
-fn write_disk_cache_at(path: &Path, source_len: u64, fingerprint: u64, cache: &[u8]) {
+fn write_disk_snapshot(source_len: u64, fingerprint: u64, blob: &[u8]) {
+    write_disk_blob_at(
+        Path::new(DISK_SNAPSHOT_PATH),
+        DISK_SNAPSHOT_MAGIC,
+        source_len,
+        fingerprint,
+        blob,
+    );
+}
+
+fn write_disk_blob_at(
+    path: &Path,
+    magic: &[u8; 8],
+    source_len: u64,
+    fingerprint: u64,
+    blob: &[u8],
+) {
     let Some(dir) = path.parent() else { return };
     if fs::create_dir_all(dir).is_err() {
         return;
     }
-    let mut data = Vec::with_capacity(DISK_CACHE_HEADER_LEN + cache.len());
-    data.extend_from_slice(DISK_CACHE_MAGIC);
+    let mut data = Vec::with_capacity(DISK_CACHE_HEADER_LEN + blob.len());
+    data.extend_from_slice(magic);
     data.extend_from_slice(&cached_data_version_tag().to_le_bytes());
     data.extend_from_slice(&source_len.to_le_bytes());
     data.extend_from_slice(&fingerprint.to_le_bytes());
-    data.extend_from_slice(cache);
-    let tmp = path.with_extension("v8cache.tmp");
+    data.extend_from_slice(blob);
+    // Keep the real extension in the temp name (`.v8cache.tmp` / `.v8snap.tmp`)
+    // so concurrent cache and snapshot writes can't collide on one temp file.
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("blob");
+    let tmp = path.with_extension(format!("{ext}.tmp"));
     if fs::write(&tmp, &data).is_ok() && fs::rename(&tmp, path).is_err() {
         let _ = fs::remove_file(&tmp);
     }
@@ -290,6 +331,144 @@ fn compile_with_shared_cache(
     Ok(build.ssr)
 }
 
+// --- Startup snapshot (prod) ------------------------------------------------
+//
+// Where the code cache skips the *parse+compile* of the bundle, the startup
+// snapshot skips the whole build: parse, compile AND top-level evaluation
+// (React's init, every module initializer). The first thread evaluates the
+// bundle once inside a snapshot-creator isolate and serializes the finished
+// heap; every other isolate — pool threads, post-panic recompiles, restarts
+// with an unchanged bundle (via the disk copy) — deserializes it directly.
+
+/// The in-process snapshot blob for the current bundle, keyed by mtime like
+/// [`CODE_CACHE`].
+static SNAPSHOT_CACHE: Mutex<Option<CodeCacheEntry>> = Mutex::new(None);
+
+/// The bundle mtime whose snapshot production was refused (pending
+/// embedder state, produce failure), so later threads skip straight to the
+/// code-cache path instead of re-attempting an expensive produce per thread.
+/// Keyed by mtime so a redeployed bundle gets a fresh attempt.
+static SNAPSHOT_REFUSED: Mutex<Option<Option<SystemTime>>> = Mutex::new(None);
+
+/// Escape hatch: `OSSIDO_SSR_SNAPSHOT=0` disables the snapshot path (the
+/// code-cache compile path still works).
+fn snapshot_enabled() -> bool {
+    std::env::var("OSSIDO_SSR_SNAPSHOT")
+        .map(|v| v != "0")
+        .unwrap_or(true)
+}
+
+/// The in-process snapshot blob, if it belongs to the bundle stamped `modified`.
+fn shared_snapshot_for(modified: Option<SystemTime>) -> Option<Arc<Vec<u8>>> {
+    let cache = SNAPSHOT_CACHE.lock().expect("SSR snapshot lock poisoned");
+    cache
+        .as_ref()
+        .filter(|(key, _)| *key == modified)
+        .map(|(_, bytes)| Arc::clone(bytes))
+}
+
+fn snapshot_refused_for(modified: Option<SystemTime>) -> bool {
+    *SNAPSHOT_REFUSED
+        .lock()
+        .expect("SSR snapshot-refused lock poisoned")
+        == Some(modified)
+}
+
+fn mark_snapshot_refused(modified: Option<SystemTime>) {
+    *SNAPSHOT_REFUSED
+        .lock()
+        .expect("SSR snapshot-refused lock poisoned") = Some(modified);
+}
+
+/// Deserialize an isolate from `blob`; on failure forget the blob (memory and
+/// disk) so the compile fallback takes over and a later cold produce
+/// regenerates it.
+fn restore_snapshot(blob: &Arc<Vec<u8>>) -> Option<Ssr<'static, 'static>> {
+    match crate::debug::time("v8 snapshot restore", || {
+        Ssr::from_snapshot((**blob).clone())
+    }) {
+        Ok(ssr) => Some(ssr),
+        Err(error) => {
+            ossido_internal::log::backend(
+                ossido_internal::log::Level::Warn,
+                format!("SSR snapshot restore failed ({error}); recompiling from source"),
+            );
+            *SNAPSHOT_CACHE.lock().expect("SSR snapshot lock poisoned") = None;
+            let _ = fs::remove_file(DISK_SNAPSHOT_PATH);
+            None
+        }
+    }
+}
+
+/// The snapshot fast path for a prod isolate: consume the in-process blob,
+/// then prod's disk copy, then eagerly produce under [`PRODUCE_LOCK`] so
+/// exactly one thread pays the evaluate+serialize. `None` means "use the
+/// compile path" — either the bundle isn't snapshottable (pending embedder
+/// state at the end of evaluation) or a restore failed.
+fn snapshot_ssr(source: &str, modified: Option<SystemTime>) -> Option<Ssr<'static, 'static>> {
+    // 1. In-process blob from another pool thread (or an earlier produce).
+    if let Some(blob) = shared_snapshot_for(modified) {
+        return restore_snapshot(&blob);
+    }
+
+    // 2. A blob persisted by a previous run of this exact bundle. The header
+    //    check (version tag + source hash) is what makes feeding it to V8
+    //    safe — a mismatched blob aborts the process rather than rejecting.
+    if disk_cache_enabled()
+        && let Some(bytes) = read_disk_snapshot(source)
+    {
+        let blob = Arc::new(bytes);
+        let ssr = restore_snapshot(&blob);
+        if ssr.is_some() {
+            *SNAPSHOT_CACHE.lock().expect("SSR snapshot lock poisoned") = Some((modified, blob));
+        }
+        return ssr;
+    }
+
+    // 3. Cold: one thread evaluates the bundle and serializes the heap while
+    //    the others block on the lock, then consume via the double-check.
+    let _guard = PRODUCE_LOCK.lock().expect("SSR produce lock poisoned");
+    if let Some(blob) = shared_snapshot_for(modified) {
+        return restore_snapshot(&blob);
+    }
+    if snapshot_refused_for(modified) {
+        return None;
+    }
+
+    let header = disk_cache_enabled().then(|| (source.len() as u64, source_fingerprint(source)));
+    match crate::debug::time("v8 snapshot produce", || {
+        Ssr::snapshot_module(source.to_string())
+    }) {
+        Ok(Some(blob)) => {
+            if let Some((source_len, fingerprint)) = header {
+                write_disk_snapshot(source_len, fingerprint, &blob);
+            }
+            let blob = Arc::new(blob);
+            *SNAPSHOT_CACHE.lock().expect("SSR snapshot lock poisoned") =
+                Some((modified, Arc::clone(&blob)));
+            restore_snapshot(&blob)
+        }
+        Ok(None) => {
+            ossido_internal::log::backend(
+                ossido_internal::log::Level::Warn,
+                "SSR bundle is not snapshottable (pending timers or open streaming decoders \
+                 after evaluation); using the compile path"
+                    .to_string(),
+            );
+            mark_snapshot_refused(modified);
+            None
+        }
+        Err(error) => {
+            ossido_internal::log::backend(
+                ossido_internal::log::Level::Warn,
+                format!("SSR snapshot production failed ({error}); using the compile path"),
+            );
+            mark_snapshot_refused(modified);
+            None
+        }
+    }
+}
+
 struct ProdJs;
 
 impl ProdJs {
@@ -304,10 +483,12 @@ impl ProdJs {
         Self::SSR.with(|cell| {
             let mut cache = cell.borrow_mut();
 
-            // Compiled once per worker thread, then reused for every request.
-            // The first thread eagerly compiles and shares the V8 code cache;
-            // the others (and post-panic recompiles) consume it. A cache
-            // persisted by a previous run of this bundle skips even that.
+            // Built once per worker thread, then reused for every request.
+            // Preferred path: deserialize the shared startup snapshot (the
+            // bundle's already-evaluated heap — no parse, compile or
+            // evaluation). Fallback: the code-cache compile path, where the
+            // first thread eagerly compiles and shares the V8 code cache and
+            // the others (and post-panic recompiles) consume it.
             if cache.is_none() {
                 let source = crate::debug::time("bundle read", || {
                     fs::read_to_string(PROD_BUNDLE_PATH).expect("Server bundle not found")
@@ -315,10 +496,15 @@ impl ProdJs {
                 let modified = fs::metadata(PROD_BUNDLE_PATH)
                     .and_then(|meta| meta.modified())
                     .ok();
-                let ssr = crate::debug::time("v8 compile", || {
-                    compile_with_shared_cache(source, modified, true)
-                        .expect("Failed to initialise the SSR bundle")
-                });
+                let ssr = snapshot_enabled()
+                    .then(|| snapshot_ssr(&source, modified))
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        crate::debug::time("v8 compile", || {
+                            compile_with_shared_cache(source, modified, true)
+                                .expect("Failed to initialise the SSR bundle")
+                        })
+                    });
                 *cache = Some(ssr);
             }
 
@@ -507,14 +693,42 @@ mod tests {
         let source = "export function renderFn() { return 'x'; }";
         let payload = vec![7u8; 64];
 
-        write_disk_cache_at(
+        write_disk_blob_at(
             &path,
+            DISK_CACHE_MAGIC,
             source.len() as u64,
             source_fingerprint(source),
             &payload,
         );
 
-        assert_eq!(read_disk_cache_at(&path, source), Some(payload));
+        assert_eq!(
+            read_disk_blob_at(&path, DISK_CACHE_MAGIC, source),
+            Some(payload)
+        );
+    }
+
+    /// The cache and snapshot files share the header scheme but must never be
+    /// readable as each other: a code cache fed to `snapshot_blob` would abort
+    /// the process, so the magic check is load-bearing.
+    #[test]
+    fn disk_blob_magic_distinguishes_cache_from_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bundle.v8snap");
+        let source = "export function renderFn() { return 'x'; }";
+
+        write_disk_blob_at(
+            &path,
+            DISK_SNAPSHOT_MAGIC,
+            source.len() as u64,
+            source_fingerprint(source),
+            &[9, 9, 9],
+        );
+
+        assert_eq!(read_disk_blob_at(&path, DISK_CACHE_MAGIC, source), None);
+        assert_eq!(
+            read_disk_blob_at(&path, DISK_SNAPSHOT_MAGIC, source),
+            Some(vec![9, 9, 9])
+        );
     }
 
     /// Same length, different contents: the fingerprint must miss. (V8's own
@@ -528,16 +742,20 @@ mod tests {
         let source_b = "export function renderFn() { return 'b'; }";
         assert_eq!(source_a.len(), source_b.len());
 
-        write_disk_cache_at(
+        write_disk_blob_at(
             &path,
+            DISK_CACHE_MAGIC,
             source_a.len() as u64,
             source_fingerprint(source_a),
             &[1, 2, 3],
         );
 
-        assert_eq!(read_disk_cache_at(&path, source_b), None);
+        assert_eq!(read_disk_blob_at(&path, DISK_CACHE_MAGIC, source_b), None);
         // The original source still hits.
-        assert_eq!(read_disk_cache_at(&path, source_a), Some(vec![1, 2, 3]));
+        assert_eq!(
+            read_disk_blob_at(&path, DISK_CACHE_MAGIC, source_a),
+            Some(vec![1, 2, 3])
+        );
     }
 
     /// Garbage or truncated files are a miss, never an error.
@@ -547,10 +765,10 @@ mod tests {
         let path = dir.path().join("bundle.v8cache");
 
         fs::write(&path, b"not a cache").unwrap();
-        assert_eq!(read_disk_cache_at(&path, "whatever"), None);
+        assert_eq!(read_disk_blob_at(&path, DISK_CACHE_MAGIC, "whatever"), None);
 
         fs::write(&path, b"OSSIDOV8").unwrap(); // magic only, truncated header
-        assert_eq!(read_disk_cache_at(&path, "whatever"), None);
+        assert_eq!(read_disk_blob_at(&path, DISK_CACHE_MAGIC, "whatever"), None);
     }
 
     /// A missing file is a plain miss.
@@ -558,7 +776,7 @@ mod tests {
     fn disk_cache_misses_when_absent() {
         let dir = tempfile::tempdir().unwrap();
         assert_eq!(
-            read_disk_cache_at(&dir.path().join("nope.v8cache"), "src"),
+            read_disk_blob_at(&dir.path().join("nope.v8cache"), DISK_CACHE_MAGIC, "src"),
             None
         );
     }
