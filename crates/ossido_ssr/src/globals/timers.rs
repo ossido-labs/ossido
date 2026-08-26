@@ -68,6 +68,19 @@ pub(crate) struct TimerQueue {
     seq: u64,
 }
 
+impl TimerQueue {
+    /// Timers that would still fire (queued and not cancelled). Used as the
+    /// snapshottability gate: a pending timer's callback + deadline live in
+    /// this Rust queue, which a heap snapshot cannot capture — snapshotting
+    /// would silently drop it, so a non-empty queue refuses the snapshot.
+    pub(crate) fn live_timers(&self) -> usize {
+        self.tasks
+            .iter()
+            .filter(|Reverse(timer)| !self.cleared.contains(&timer.id))
+            .count()
+    }
+}
+
 /// Borrow the isolate's [`TimerQueue`] via [`TIMER_SLOT`], if installed.
 fn timer_queue<'a>(scope: &mut v8::HandleScope) -> Option<&'a mut TimerQueue> {
     let ptr = scope.get_data(TIMER_SLOT) as *mut TimerQueue;
@@ -132,6 +145,34 @@ fn clear_timeout_callback(
     }
 }
 
+/// Install just the isolate's [`TimerQueue`] (no globals): the slot-only half
+/// of [`install_timers`], used on snapshot restore where the timer *functions*
+/// already exist in the deserialized heap but the Rust queue behind them must
+/// be recreated fresh.
+pub(crate) fn install_timer_queue(isolate: &mut v8::Isolate) -> *mut TimerQueue {
+    let queue = Box::into_raw(Box::new(TimerQueue::default()));
+    isolate.set_data(TIMER_SLOT, queue as *mut c_void);
+    queue
+}
+
+/// Timers still pending on this isolate's queue (0 when no queue is
+/// installed). See [`TimerQueue::live_timers`].
+pub(crate) fn pending_timers(scope: &mut v8::HandleScope) -> usize {
+    timer_queue(scope).map_or(0, |queue| queue.live_timers())
+}
+
+/// Install just the timer *globals* (no queue): the context-scoped half of
+/// [`install_timers`], used by snapshot production, where the queue is
+/// installed separately against the creator isolate.
+pub(crate) fn install_timer_globals(scope: &mut v8::HandleScope) {
+    // `setImmediate(cb)` is `setTimeout(cb)` with no delay (→ 0); the same
+    // callback handles both. Likewise `clearImmediate` == `clearTimeout`.
+    super::set_global_fn(scope, "setTimeout", set_timeout_callback);
+    super::set_global_fn(scope, "setImmediate", set_timeout_callback);
+    super::set_global_fn(scope, "clearTimeout", clear_timeout_callback);
+    super::set_global_fn(scope, "clearImmediate", clear_timeout_callback);
+}
+
 /// Install the native timer globals and the isolate's [`TimerQueue`]. Must run
 /// before the bundle executes so `setTimeout` exists when it does. Returns the
 /// queue pointer for the [`Ssr`] to own and free.
@@ -139,17 +180,24 @@ pub(crate) fn install_timers(
     scope: &mut v8::HandleScope,
     isolate: *mut v8::OwnedIsolate,
 ) -> *mut TimerQueue {
-    let queue = Box::into_raw(Box::new(TimerQueue::default()));
-    unsafe { (*isolate).set_data(TIMER_SLOT, queue as *mut c_void) };
-
-    // `setImmediate(cb)` is `setTimeout(cb)` with no delay (→ 0); the same
-    // callback handles both. Likewise `clearImmediate` == `clearTimeout`.
-    super::set_global_fn(scope, "setTimeout", set_timeout_callback);
-    super::set_global_fn(scope, "setImmediate", set_timeout_callback);
-    super::set_global_fn(scope, "clearTimeout", clear_timeout_callback);
-    super::set_global_fn(scope, "clearImmediate", clear_timeout_callback);
-
+    let queue = install_timer_queue(unsafe { &mut *isolate });
+    install_timer_globals(scope);
     queue
+}
+
+/// The timer callbacks' addresses for the external-references table — the
+/// timer globals are installed outside the registry macro (they have an
+/// owned-slot lifecycle), so they contribute their snapshot addresses here.
+pub(crate) fn external_references() -> Vec<v8::ExternalReference<'static>> {
+    use v8::MapFnTo;
+    vec![
+        v8::ExternalReference {
+            function: set_timeout_callback.map_fn_to(),
+        },
+        v8::ExternalReference {
+            function: clear_timeout_callback.map_fn_to(),
+        },
+    ]
 }
 
 /// Run one generation of due timers (the macrotask drain): fire every timer due
