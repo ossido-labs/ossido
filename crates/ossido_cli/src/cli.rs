@@ -42,6 +42,14 @@ enum Actions {
         #[arg(short, long)]
         /// Prevent to export the js assets
         no_js_emit: bool,
+
+        #[arg(long)]
+        /// Skip compiling the server with `cargo build --release`
+        no_cargo: bool,
+
+        #[arg(short, long)]
+        /// Show the full output of vite, cargo and the build hooks
+        verbose: bool,
     },
     /// Scaffold a new project
     New {
@@ -148,6 +156,8 @@ pub fn app() -> std::io::Result<()> {
             r#static,
             server,
             no_js_emit,
+            no_cargo,
+            verbose,
         } => {
             let span = span!(Level::TRACE, "BUILD");
 
@@ -163,10 +173,16 @@ pub fn app() -> std::io::Result<()> {
                 None
             };
 
-            let mut source_builder = SourceBuilder::new(Mode::Prod)?;
-            source_builder.base_build()?;
-            source_builder.generate_typescript_file()?;
-            build::build(source_builder.app, ssg_override, no_js_emit);
+            let source_builder = SourceBuilder::new(Mode::Prod)?;
+            build::build(
+                source_builder,
+                build::BuildOptions {
+                    ssg_override,
+                    no_js_emit,
+                    no_cargo,
+                    verbose,
+                },
+            );
         }
         Actions::New {
             folder_name,

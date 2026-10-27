@@ -74,6 +74,15 @@ pub fn is_api_path(entry: &Path, base_path: &Path) -> bool {
 /// Whether `port` can be bound on every address `host:port` resolves to. Binding
 /// each resolved address (not just the first that succeeds) detects a conflict
 /// regardless of the IPv4/IPv6 family the port is held on.
+/// Stream a child's output to the terminal, or capture it for the caller.
+fn child_stdio(verbose: bool) -> Stdio {
+    if verbose {
+        Stdio::inherit()
+    } else {
+        Stdio::piped()
+    }
+}
+
 fn port_is_available(host: &str, port: u16) -> bool {
     use std::net::{TcpListener, ToSocketAddrs};
     match format!("{host}:{port}").to_socket_addrs() {
@@ -267,11 +276,11 @@ impl App {
 
     /// Build the react client + server bundles. Returns the build script's
     /// stdout (the bundle-size summary — vite itself logs at `error` level) so
-    /// the caller can print it once its spinner has stopped.
-    pub fn build_react_prod(&self, static_export: bool) -> String {
+    /// the caller can print it once its spinner has stopped. The error carries
+    /// the script's stderr.
+    pub fn build_react_prod(&self, static_export: bool) -> Result<String, String> {
         if !Path::new(BUILD_JS_SCRIPT).exists() {
-            error!("Failed to find the build script. Please run `npm install`");
-            std::process::exit(1);
+            return Err("Failed to find the build script. Please run `npm install`".into());
         }
 
         let output = Command::new("node")
@@ -285,55 +294,122 @@ impl App {
                 if static_export { "true" } else { "false" },
             )
             .output()
-            .unwrap_or_else(|_| {
-                error!("Failed to build the react source");
-                std::process::exit(1);
-            });
+            .map_err(|err| format!("Failed to build the react source: {err}"))?;
 
         if !output.status.success() {
-            error!("Failed to build the react source");
-            error!("Error: {}", String::from_utf8_lossy(&output.stderr));
-            std::process::exit(1);
+            return Err(format!(
+                "Failed to build the react source\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
 
-        String::from_utf8_lossy(&output.stdout).into_owned()
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 
     /// Run a build lifecycle hook (`prebuild` / `postbuild`) defined in
-    /// `ossido.config.ts`, via the `ossido-run-build-hook` bin. Inherits stdio so
-    /// the hook's own logs stream through, and passes `OSSIDO_STATIC` so the hook
-    /// context reports the right mode/output dir. Returns whether it succeeded —
-    /// a hook that throws exits non-zero. The bin no-ops fast when the hook is
-    /// undefined, so this is cheap even for projects with no hooks.
-    pub fn run_build_hook(&self, name: &str, static_export: bool) -> bool {
+    /// `ossido.config.ts`, via the `ossido-run-build-hook` bin, passing
+    /// `OSSIDO_STATIC` so the hook context reports the right mode/output dir.
+    /// The bin no-ops fast when the hook is undefined, so this is cheap even for
+    /// projects with no hooks.
+    ///
+    /// `verbose` streams the hook's logs; otherwise they are captured and
+    /// returned so the caller can print them without tearing its spinner. A hook
+    /// that throws exits non-zero, reported as `Err` with whatever it logged.
+    pub fn run_build_hook(
+        &self,
+        name: &str,
+        static_export: bool,
+        verbose: bool,
+    ) -> Result<String, String> {
         if !Path::new(RUN_BUILD_HOOK_SCRIPT).exists() {
-            error!("Failed to find the build-hook script. Please run `npm install`");
-            std::process::exit(1);
+            return Err("Failed to find the build-hook script. Please run `npm install`".into());
         }
 
-        Command::new("node")
+        let output = Command::new("node")
             .arg(RUN_BUILD_HOOK_SCRIPT)
             .arg(name)
             .env(
                 "OSSIDO_STATIC",
                 if static_export { "true" } else { "false" },
             )
-            .status()
-            .map(|status| status.success())
-            .unwrap_or(false)
+            .stdout(child_stdio(verbose))
+            .stderr(child_stdio(verbose))
+            .output()
+            .map_err(|err| format!("Failed to run the {name} hook: {err}"))?;
+
+        let logs = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        if output.status.success() {
+            Ok(logs)
+        } else {
+            Err(format!("{name} hook failed\n{logs}"))
+        }
     }
 
-    /// Compile the Rust server up front (blocking, stdio inherited). Callers can
-    /// then wait only for the already-built binary to boot rather than racing a
-    /// cold compile against a readiness timeout (a cold `cargo run` on
-    /// Windows/CI can exceed it), and a compile error surfaces here instead of
-    /// as an opaque "server did not become ready". Returns whether it built.
-    pub fn build_rust_server(&self) -> bool {
-        Command::new("cargo")
+    /// Compile the Rust server up front. Callers can then wait only for the
+    /// already-built binary to boot rather than racing a cold compile against a
+    /// readiness timeout (a cold `cargo run` on Windows/CI can exceed it), and a
+    /// compile error surfaces here instead of as an opaque "server did not
+    /// become ready". Cargo's output streams when `verbose`, and is otherwise
+    /// captured and only returned on failure.
+    pub fn build_rust_server(&self, verbose: bool) -> Result<(), String> {
+        let output = Command::new("cargo")
             .arg("build")
-            .status()
-            .map(|status| status.success())
-            .unwrap_or(false)
+            .stdin(Stdio::null())
+            .stdout(child_stdio(verbose))
+            .stderr(child_stdio(verbose))
+            .output()
+            .map_err(|err| format!("Failed to run cargo: {err}"))?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Failed to build the server\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
+        }
+    }
+
+    /// `cargo build --release`, returning the path of the compiled server binary.
+    ///
+    /// stdout carries cargo's JSON messages, scanned for the executable
+    /// artifact's location. Diagnostics are rendered to stderr, which streams
+    /// (with cargo's progress bar) when `verbose` and is otherwise captured and
+    /// only returned on failure.
+    pub fn build_rust_server_release(&self, verbose: bool) -> Result<Option<PathBuf>, String> {
+        let output = Command::new("cargo")
+            .args([
+                "build",
+                "--release",
+                "--message-format=json-render-diagnostics",
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(child_stdio(verbose))
+            .output()
+            .map_err(|err| format!("Failed to run cargo: {err}"))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "cargo build --release failed\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        // The root package is built last, so the last executable artifact is the
+        // server (dependencies' build scripts are not reported as executables).
+        let executable = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .rev()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .filter(|message| message["reason"] == "compiler-artifact")
+            .find_map(|message| message["executable"].as_str().map(PathBuf::from));
+
+        Ok(executable)
     }
 
     pub fn run_rust_server(&self) -> Child {
