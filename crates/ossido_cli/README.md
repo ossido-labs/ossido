@@ -22,7 +22,8 @@ ossido build               # build the production assets
 ```
 
 `ossido new` accepts `--template`, `--tailwind`, `--mdx`, `--output`, `--alias`
-and `-y/--yes`; `ossido build` accepts `--static` (SSG), `--server` (SSR server)
-and `--no-js-emit`. Run `ossido <command> --help` for the full list.
+and `-y/--yes`; `ossido build` accepts `--static` (SSG), `--server` (SSR server),
+`--no-js-emit` and `--no-cargo` (skip the server's `cargo build --release`).
+Run `ossido <command> --help` for the full list.
 
 Check [ossido](https://github.com/ossido-labs/ossido) for more.

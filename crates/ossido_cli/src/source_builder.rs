@@ -471,17 +471,22 @@ fn __ossido_environment_reload(
         layers_str
     }
 
-    // Adds Routers with routes to axum
+    // Adds Routers with routes to axum. A directory that ends up with no routes,
+    // no non-empty subdirectory and no middleware (e.g. one holding only
+    // `.tsx`/`.mdx` pages) yields nothing rather than an empty `Router::new()`.
     fn create_routes_declaration(&self, route_directory_info: &RouteDirectoryInfo) -> String {
         let routes = route_directory_info.routes.clone();
         let mut route_declarations = String::from("// ROUTE_BUILDER\n");
 
         route_declarations.push_str(r#".merge(Router::new()"#);
         // Group by directory, find dirs with middleware, have that spit out Router::new() with routes and middlewares
+        let mut is_empty = true;
 
         // directories can have their own middlewares and routes, recurse into that directory to get route/middleware info
         for directory in route_directory_info.directories.clone() {
-            route_declarations.push_str(&self.create_routes_declaration(&directory));
+            let nested = self.create_routes_declaration(&directory);
+            is_empty &= nested.is_empty();
+            route_declarations.push_str(&nested);
         }
         for (key, route) in routes {
             let Some(axum_info) = &route.axum_info else {
@@ -492,6 +497,7 @@ fn __ossido_environment_reload(
             if route.is_layout {
                 continue;
             }
+            is_empty = false;
             let AxumInfo {
                 axum_route,
                 module_import,
@@ -536,12 +542,21 @@ fn __ossido_environment_reload(
             }
         }
 
-        route_declarations.push_str(")\n");
+        // A layer on an otherwise empty router is still emitted, so the
+        // middleware module's function stays referenced.
+        if is_empty && !route_directory_info.has_middlewares() {
+            return String::new();
+        }
 
-        // add directory level middleware to routes
+        // Directory-level middleware goes inside this directory's router, so it
+        // wraps only the directory and its descendants — applied after the
+        // closing `)` it would land on the parent router and also wrap the
+        // siblings merged before it.
         if route_directory_info.has_middlewares() {
             route_declarations.push_str(&self.add_route_layers(route_directory_info));
         }
+
+        route_declarations.push_str(")\n");
         route_declarations
     }
 

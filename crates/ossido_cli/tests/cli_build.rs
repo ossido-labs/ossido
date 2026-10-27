@@ -511,3 +511,73 @@ fn it_omits_the_static_paths_endpoint_without_the_macro() {
     );
     assert!(!temp_main_rs_content.contains("ossido_internal_static_paths"));
 }
+
+#[test]
+#[serial]
+fn it_omits_routers_for_directories_without_rust_routes() {
+    let temp_ossido_project = TempOssidoProject::new();
+
+    temp_ossido_project.add_file("./src/routes/page.rs");
+    // TSX-only pages have no Rust handler, so their directories contribute no routes.
+    temp_ossido_project.add_file("./src/routes/docs/page.tsx");
+    temp_ossido_project.add_file("./src/routes/docs/guides/page.tsx");
+
+    let mut test_ossido_build = Command::cargo_bin("ossido").unwrap();
+    test_ossido_build
+        .arg("build")
+        .arg("--no-js-emit")
+        .assert()
+        .success();
+
+    let temp_main_rs_content =
+        fs::read_to_string(temp_ossido_project.path().join(".ossido/main.rs"))
+            .expect("Failed to read '.ossido/main.rs' content.");
+    let compact: String = temp_main_rs_content
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+
+    assert!(
+        !compact.contains(".merge(Router::new())"),
+        "empty router emitted:\n{temp_main_rs_content}"
+    );
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".route("/", get(page::ossido_internal_route))"#,
+    );
+}
+
+#[test]
+#[serial]
+fn it_scopes_directory_middleware_to_its_own_router() {
+    let temp_ossido_project = TempOssidoProject::new();
+
+    temp_ossido_project.add_file("./src/routes/page.rs");
+    temp_ossido_project.add_file_with_content("./src/routes/about/page.rs", HANDLER_FILE);
+    temp_ossido_project.add_file_with_content(
+        "./src/routes/api/middleware.rs",
+        r#"#[ossido::middleware]
+pub fn api_middleware() -> tower_http::cors::CorsLayer {
+    tower_http::cors::CorsLayer::new()
+}"#,
+    );
+    temp_ossido_project.add_file_with_content("./src/routes/api/health.rs", GET_API_FILE);
+
+    let mut test_ossido_build = Command::cargo_bin("ossido").unwrap();
+    test_ossido_build
+        .arg("build")
+        .arg("--no-js-emit")
+        .assert()
+        .success();
+
+    let temp_main_rs_content =
+        fs::read_to_string(temp_ossido_project.path().join(".ossido/main.rs"))
+            .expect("Failed to read '.ossido/main.rs' content.");
+
+    // The layer closes the `api` router rather than following it, which would
+    // put it on the parent and wrap the sibling `about` routes too.
+    assert_contains_ignoring_whitespace(
+        &temp_main_rs_content,
+        r#".merge(Router::new().route("/api/health", get(api_health::get_ossido_internal_api)).layer(api_middleware::api_middleware()))"#,
+    );
+}
