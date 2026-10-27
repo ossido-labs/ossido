@@ -1,3 +1,4 @@
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -8,23 +9,129 @@ use ossido_internal::config::OutputMode;
 use spinners::{Spinner, Spinners};
 use tracing::{error, trace};
 
-use crate::app::App;
 use crate::mode::Mode;
+use crate::source_builder::SourceBuilder;
 
 fn exit_gracefully_with_error(msg: &str) -> ! {
     error!(msg);
     std::process::exit(1);
 }
 
-/// Statically generate the site instead of building the SSR server.
+pub struct BuildOptions {
+    /// `Some(true)` for `--static`, `Some(false)` for `--server`, `None` to
+    /// defer to the config's `output`.
+    pub ssg_override: Option<bool>,
+    pub no_js_emit: bool,
+    /// Skip the `cargo build --release` of the server (`--no-cargo`).
+    pub no_cargo: bool,
+    /// Stream the underlying tools' output (vite, cargo, hooks) instead of
+    /// collapsing each into a checklist line.
+    pub verbose: bool,
+}
+
+/// One line of the build checklist.
 ///
-/// `ssg_override` is the CLI intent: `Some(true)` for `--static`, `Some(false)`
-/// for `--server`, `None` to defer to the config's `output`.
-pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
+/// Quiet mode animates a spinner and persists `✔ label  time`. Verbose mode
+/// prints the label up front instead: the child output streamed underneath
+/// would otherwise tear the spinner line apart. Without a terminal (CI, piped
+/// output) there is no spinner either, just the finished line.
+struct Step {
+    label: &'static str,
+    spinner: Option<Spinner>,
+    started: Instant,
+}
+
+impl Step {
+    fn start(label: &'static str, verbose: bool) -> Self {
+        let spinner = if verbose {
+            println!("{} {label}", "›".dimmed());
+            None
+        } else if std::io::stderr().is_terminal() {
+            Some(Spinner::new(Spinners::Dots, label.into()))
+        } else {
+            None
+        };
+
+        Self {
+            label,
+            spinner,
+            started: Instant::now(),
+        }
+    }
+
+    fn done(mut self) {
+        let line = format!(
+            "{} {}",
+            self.label,
+            format_elapsed(self.started.elapsed()).dimmed()
+        );
+        let tick = "✔".green().to_string();
+        match self.spinner.take() {
+            Some(mut spinner) => spinner.stop_and_persist(&tick, line),
+            None => println!("{tick} {line}"),
+        }
+    }
+
+    /// Mark the step failed and exit, printing `msg` (which may carry the
+    /// captured output of the failing tool) below it.
+    fn fail(&mut self, msg: &str) -> ! {
+        let line = format!("{} {}", "✘".red(), self.label);
+        match self.spinner.take() {
+            Some(mut spinner) => spinner.stop_with_message(line),
+            None => println!("{line}"),
+        }
+        exit_gracefully_with_error(msg)
+    }
+}
+
+fn format_elapsed(elapsed: Duration) -> String {
+    if elapsed < Duration::from_secs(1) {
+        format!("{}ms", elapsed.as_millis())
+    } else {
+        format!("{:.1}s", elapsed.as_secs_f64())
+    }
+}
+
+/// Print a build hook's captured logs, indented under the checklist.
+fn print_hook_logs(logs: &str) {
+    for line in logs.lines().filter(|line| !line.trim().is_empty()) {
+        println!("  {}", line.dimmed());
+    }
+}
+
+/// Build the project: the React client + server bundles, then either the SSR
+/// server binary (`cargo build --release`) or a static export.
+///
+/// Each stage is a checklist line; the route tree and emitted files are
+/// printed once everything has finished.
+pub fn build(mut source_builder: SourceBuilder, options: BuildOptions) {
+    let BuildOptions {
+        ssg_override,
+        no_js_emit,
+        no_cargo,
+        verbose,
+    } = options;
+
+    println!("Building for production...\n");
+
+    let mut step = Step::start("Scaffolding project", verbose);
+    if let Err(err) = source_builder.base_build() {
+        step.fail(&err.to_string());
+    }
+    step.done();
+
+    let mut step = Step::start("Generating types", verbose);
+    if let Err(err) = source_builder.generate_typescript_file() {
+        step.fail(&err.to_string());
+    }
+    step.done();
+
     if no_js_emit {
         println!("Rust build successfully finished");
         std::process::exit(0);
     }
+
+    let mut app = source_builder.app;
 
     app.build_ossido_config()
         .unwrap_or_else(|_| exit_gracefully_with_error("Failed to build ossido.config.ts"));
@@ -52,75 +159,59 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
         }
     }
 
-    // `prebuild` hook, before any build work. Runs for both output modes; the
-    // config is already transpiled (by `build_ossido_config` above) so the hook
-    // is reachable via `loadConfig`.
-    if !app.run_build_hook("prebuild", ssg) {
-        exit_gracefully_with_error("prebuild hook failed");
-    }
-
-    let build_started = Instant::now();
-    let mut app_build_spinner = Spinner::new(Spinners::Dots, "Building app...".into());
-
     app.check_server_availability(Mode::Prod);
 
-    let build_output = app.build_react_prod(ssg);
-
-    // Persist a checklist-style line matching `ossido dev`'s "✔ Ready in Xms".
-    app_build_spinner.stop_and_persist(
-        &"✔".green().bold().to_string(),
-        format!("Built in {}ms", build_started.elapsed().as_millis())
-            .green()
-            .bold()
-            .to_string(),
-    );
-
-    // The build script's stdout carries the bundle-size summary (vite itself
-    // logs at `error` level) — print it under the tick, above the route tree.
-    let build_output = build_output.trim_end();
-    if !build_output.is_empty() {
-        println!("{build_output}");
+    // `prebuild` hook, before any build work. Runs for both output modes; the
+    // config is already transpiled (by `build_ossido_config` above) so the hook
+    // is reachable via `loadConfig`. No checklist line of its own: the bin
+    // no-ops for an undefined hook, so only its logs (if any) are shown.
+    match app.run_build_hook("prebuild", ssg, verbose) {
+        Ok(logs) => print_hook_logs(&logs),
+        Err(msg) => exit_gracefully_with_error(&msg),
     }
 
-    // `ossido build` always prints the route tree (the dev-only `logging.routeTree`
-    // option does not apply here).
-    crate::route_tree::print_route_tree(&app);
+    let mut step = Step::start("Building app", verbose);
+    let bundle_summary = app
+        .build_react_prod(ssg)
+        .unwrap_or_else(|msg| step.fail(&msg));
+    step.done();
+
+    // The SSR server is the deliverable in server mode, so compile it in release.
+    // A static export only needs the (debug) server transiently, below.
+    let mut server_binary = None;
+    if !ssg && !no_cargo {
+        let mut step = Step::start("Compiling server", verbose);
+        server_binary = app
+            .build_rust_server_release(verbose)
+            .unwrap_or_else(|msg| step.fail(&msg));
+        step.done();
+    }
 
     if ssg {
-        let ssg_started = Instant::now();
-        let mut app_build_static_spinner =
-            Spinner::new(Spinners::Dots, "Static site generation".into());
-
-        let mut exit_gracefully_with_error = |msg: &str| -> ! {
-            app_build_static_spinner.stop_with_message("\u{274C} Build failed\n".into());
-            exit_gracefully_with_error(msg)
-        };
+        let mut step = Step::start("Generating static site", verbose);
 
         let static_dir = PathBuf::from("out/static");
 
         if static_dir.is_dir() {
-            std::fs::remove_dir_all(&static_dir).unwrap_or_else(|_| {
-                exit_gracefully_with_error("Failed to clear the out/static folder")
-            });
+            std::fs::remove_dir_all(&static_dir)
+                .unwrap_or_else(|_| step.fail("Failed to clear the out/static folder"));
         }
 
         std::fs::create_dir(&static_dir)
-            .unwrap_or_else(|_| exit_gracefully_with_error("Failed to create static output dir"));
+            .unwrap_or_else(|_| step.fail("Failed to create static output dir"));
 
         copy(
             "./out/client",
-            static_dir,
+            &static_dir,
             &CopyOptions::new().overwrite(true).content_only(true),
         )
-        .unwrap_or_else(|_| {
-            exit_gracefully_with_error("Failed to clone assets into static output folder")
-        });
+        .unwrap_or_else(|_| step.fail("Failed to clone assets into static output folder"));
 
         // Compile the server first so the readiness poll below waits only for
         // the built binary to boot — not for a cold compile, which on Windows/CI
         // can exceed SERVER_READY_TIMEOUT and get the process killed mid-build.
-        if !app.build_rust_server() {
-            exit_gracefully_with_error("Failed to build the server for static generation");
+        if let Err(msg) = app.build_rust_server(verbose) {
+            step.fail(&msg);
         }
 
         // Tell the server to render pages buffered (react-dom/static `prerender`)
@@ -137,7 +228,7 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
 
         let mut exit_and_shut_server = |msg: &str| -> ! {
             _ = rust_server.kill();
-            exit_gracefully_with_error(msg)
+            step.fail(msg)
         };
 
         let reqwest_client = reqwest::blocking::Client::builder()
@@ -191,16 +282,7 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
         // Close server
         let _ = rust_server.kill();
 
-        app_build_static_spinner.stop_and_persist(
-            &"✔".green().bold().to_string(),
-            format!(
-                "Static generation in {}ms",
-                ssg_started.elapsed().as_millis()
-            )
-            .green()
-            .bold()
-            .to_string(),
-        );
+        step.done();
     }
 
     // Apply `.ossidoignore`: remove any emitted files matching its globs from the
@@ -216,7 +298,45 @@ pub fn build(mut app: App, ssg_override: Option<bool>, no_js_emit: bool) {
     // `postbuild` hook, after all artifacts exist (the static export in
     // `out/static`, or the client + server bundles in `out`). Its `manifest` is
     // the emitted-file list of the output directory.
-    if !app.run_build_hook("postbuild", ssg) {
-        exit_gracefully_with_error("postbuild hook failed");
+    match app.run_build_hook("postbuild", ssg, verbose) {
+        Ok(logs) => print_hook_logs(&logs),
+        Err(msg) => exit_gracefully_with_error(&msg),
+    }
+
+    // `ossido build` always prints the route tree (the dev-only `logging.routeTree`
+    // option does not apply here).
+    crate::route_tree::print_route_tree(&app);
+
+    print_files(&bundle_summary, server_binary.as_deref(), ssg);
+}
+
+/// The emitted files: the bundle-size table from the JS build, plus where the
+/// deployable output lives (the server binary, or the static export).
+fn print_files(bundle_summary: &str, server_binary: Option<&Path>, ssg: bool) {
+    println!("{}", "Files".bold());
+
+    let bundle_summary = bundle_summary.trim_matches('\n');
+    if !bundle_summary.is_empty() {
+        println!("{bundle_summary}");
+    }
+
+    if let Some(binary) = server_binary {
+        // Relative to the project when it lives inside it (the usual
+        // `target/release/<name>`); a shared CARGO_TARGET_DIR stays absolute.
+        let shown = std::env::current_dir()
+            .ok()
+            .and_then(|cwd| binary.strip_prefix(cwd).ok().map(Path::to_path_buf))
+            .unwrap_or_else(|| binary.to_path_buf());
+        let size = std::fs::metadata(binary)
+            .map(|meta| format!(" ({:.1} MB)", meta.len() as f64 / 1_000_000.0))
+            .unwrap_or_default();
+        println!(
+            "\n  {} {}{}",
+            "Server binary".dimmed(),
+            shown.display().to_string().cyan(),
+            size.dimmed()
+        );
+    } else if ssg {
+        println!("\n  {} {}", "Static site".dimmed(), "out/static".cyan());
     }
 }
